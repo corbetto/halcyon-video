@@ -9,8 +9,9 @@ const bin = bytes.subarray(28 + length);
 
 test('counter apparel exports bounded UV-mapped geometry and textured cloth roles', () => {
   assert.equal(bytes.toString('ascii', 0, 4), 'glTF');
-  assert.equal(gltf.meshes.length, 5);
+  assert.equal(gltf.meshes.length, 4);
   assert.ok(bytes.length < 700_000);
+  assert.ok(gltf.nodes.every((n: {name?: string}) => !/cap|visor|crown/i.test(n.name ?? '')));
   let triangles = 0;
   for (const mesh of gltf.meshes) for (const primitive of mesh.primitives) {
     triangles += gltf.accessors[primitive.indices].count / 3;
@@ -26,19 +27,22 @@ test('counter apparel exports bounded UV-mapped geometry and textured cloth role
     }
   }
   assert.ok(triangles > 10_000 && triangles < 22_000);
-  for (const name of ['ShirtCotton', 'CapTwill', 'RibAndStitch']) {
+  for (const name of ['ShirtCotton', 'RibAndStitch']) {
     const m = gltf.materials.find((m: { name: string }) => m.name === name);
     assert.ok(m.pbrMetallicRoughness.baseColorTexture);
     assert.ok(m.pbrMetallicRoughness.metallicRoughnessTexture);
     assert.ok(m.normalTexture);
     assert.equal(m.pbrMetallicRoughness.metallicFactor, 0);
   }
-  assert.equal(gltf.images.length, 8);
+  assert.equal(gltf.images.length, 7);
   assert.ok(gltf.images.every((i: { bufferView?: number; uri?: string }) => i.bufferView !== undefined && !i.uri));
 });
 
 test('all authored apparel solids have manifold edge topology', () => {
   const audit = JSON.parse(readFileSync(new URL('../tools/models/counter-apparel-topology.json', import.meta.url), 'utf8'));
-  assert.ok(audit.length > 20);
+  assert.ok(audit.length > 0);
+  assert.ok(audit.some((p: {part: string}) => p.part.includes('Shirt')));
+  assert.ok(audit.every((p: {part: string}) => !/cap|visor|crown/i.test(p.part)));
+
   for (const part of audit) assert.equal(part.nonmanifold_edges, 0, part.part);
 });

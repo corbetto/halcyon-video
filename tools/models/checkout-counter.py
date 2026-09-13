@@ -201,10 +201,10 @@ def cut_return_receiver(objects, shape):
     center_z = -.70
     cx = anchor[0] + math.sin(yaw)*center_z
     cz = anchor[1] + math.cos(yaw)*center_z
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx,-cz,2.75))
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx,-cz,2.35))
     cutter=bpy.context.object;cutter.name='Return receiver clearance'
     cutter.data.materials.append(MATERIALS[0])
-    cutter.dimensions=(2.12,1.80,2.5);cutter.rotation_euler.z=yaw
+    cutter.dimensions=(2.42,1.80,3.3);cutter.rotation_euler.z=yaw
     bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
     for obj in objects:
         bpy.context.view_layer.objects.active=obj

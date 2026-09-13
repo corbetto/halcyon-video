@@ -384,7 +384,10 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
       light.intensity = night ? 2600 : 0;
       light.shadow.needsUpdate = true;
     }
-    lampHeadMat.emissiveIntensity = night ? 3.2 : dusk ? 2.2 : 0.05;
+    // Subpixel lenses must not cross the bloom threshold as coverage changes.
+    // Actual sodium illumination comes from the unchanged window spotlights.
+    lampHeadMat.emissiveIntensity = night ? 1.2 : dusk ? 1.0 : 0.05;
+    lampHeadMat.userData.bakeEmissiveIntensity = night ? 3.2 : dusk ? 2.2 : .05;
     poolMat.opacity = night ? 0.5 : dusk ? 0.15 : 0.04;
     spillMat.opacity = night ? 0.55 : dusk ? 0.12 : 0.0;
   }

@@ -110,7 +110,8 @@ export function buildWindowBays(
     if (kneeSurface) {
       mapWallSegmentUV(kneeGeo, segW, KNEE_H, 0, kneeSurface.storeWidth, kneeSurface.roomHeight);
     }
-    const wall = new THREE.Mesh(kneeGeo, kneeMat);
+    // Only the room-facing plane wears interior paint; exterior reveals use the frame finish.
+    const wall = new THREE.Mesh(kneeGeo, [kneeTrimMat, kneeTrimMat, kneeTrimMat, kneeTrimMat, kneeMat, kneeTrimMat]);
     wall.position.set(cxSeg, KNEE_H / 2, -.15);
     wall.castShadow = true;
     wall.receiveShadow = true;
@@ -124,8 +125,8 @@ export function buildWindowBays(
     // (three-scene.ts) so the two read as one continuous baseboard height
     // instead of stepping up/down at every corner where a window wall meets
     // a solid one.
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.2, 0.34), kneeTrimMat);
-    kick.position.set(cxSeg, 0.1, -.15);
+    const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.3, 0.34), kneeTrimMat);
+    kick.position.set(cxSeg, 0.15, -.15);
     kick.receiveShadow = true;
     group.add(kick);
   });
@@ -133,13 +134,13 @@ export function buildWindowBays(
   for (const { lo, hi } of gaps) {
     const geo = new THREE.BoxGeometry(hi - lo, height, .3);
     if (kneeSurface) mapWallSegmentUV(geo, hi-lo, height, 0, kneeSurface.storeWidth, kneeSurface.roomHeight);
-    const divider = new THREE.Mesh(geo, kneeMat);
+    const divider = new THREE.Mesh(geo, [kneeTrimMat, kneeTrimMat, kneeTrimMat, kneeTrimMat, kneeMat, kneeTrimMat]);
     divider.name = 'frontWindowMasonryInterior';
     divider.position.set((lo+hi)/2, height/2, -.15);
     divider.castShadow = divider.receiveShadow = true;
     group.add(divider);
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(hi-lo, .2, .34), kneeTrimMat);
-    kick.position.set((lo+hi)/2, .1, -.15);
+    const kick = new THREE.Mesh(new THREE.BoxGeometry(hi-lo, .3, .34), kneeTrimMat);
+    kick.position.set((lo+hi)/2, .15, -.15);
     group.add(kick);
   }
 

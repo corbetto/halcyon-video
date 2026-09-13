@@ -19,12 +19,16 @@ export interface NrRoom {
 export function planNrRuns(room: NrRoom): NrRun[] {
   const left = STORE_CENTER_X - room.width / 2, right = STORE_CENTER_X + room.width / 2;
   const step = room.stepDepth > 0, rightBack = room.backZ + room.stepDepth;
-  const leftBack = room.backZ + (room.clubhouse ? 18 : NR_RUN_DEPTH + .08);
+  // Match the two exposed corner gaps, retaining complete stock bays.
+  const backStart = room.clubhouse ? room.backLeftX : Math.max(room.backLeftX, left + 2);
+  const backEnd = step ? room.stepX - NR_RUN_DEPTH - .25 : room.backRightX - (room.wall ? 2 : 0);
+  const back = fitNrRun(backEnd - backStart, (backStart + backEnd) / 2, room.backZ, 0);
+  if (!room.clubhouse) back.x = backStart + back.length / 2;
+  const cornerGap = room.clubhouse ? 18 : backStart - left;
+  const leftBack = room.backZ + Math.max(2, cornerGap);
   const leftRun = fitNrRun(room.wall ? room.sideBackZ - leftBack : 0, left + NR_LEFT_UNIT_STANDOFF, 0, Math.PI / 2);
   leftRun.wallInset = NR_LEFT_UNIT_STANDOFF;
   leftRun.z = leftBack + leftRun.length / 2;
-  const backEnd = step ? room.stepX - NR_RUN_DEPTH - .25 : room.backRightX - (room.wall ? NR_RUN_DEPTH + .08 : 0);
-  const back = fitNrRun(backEnd - room.backLeftX, (room.backLeftX + backEnd) / 2, room.backZ, 0);
   const connector = fitNrRun(step ? room.stepDepth - NR_RUN_DEPTH - .08 : 0, room.stepX, 0, -Math.PI / 2);
   connector.z = room.backZ + NR_RUN_DEPTH + .08 + connector.length / 2;
   const end = room.backRightX - (room.wall ? NR_RUN_DEPTH + .08 : 0);

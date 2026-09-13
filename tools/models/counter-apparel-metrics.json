@@ -2,17 +2,17 @@
   "bounds_blender": [
     [
       -1.8970706462860107,
-      -1.2389750480651855,
+      -0.34938862919807434,
       -0.00800000224262476
     ],
     [
-      1.5555133819580078,
+      0.5969194769859314,
       0.0,
       2.1649999618530273
     ]
   ],
-  "triangles": 19600,
-  "materials": 5,
-  "glb_bytes": 675936,
-  "textures": "eight 256x256 images: three cloth albedos, two shared normals, three roughness maps (export ORM)"
+  "triangles": 10312,
+  "materials": 4,
+  "glb_bytes": 400500,
+  "textures": "seven embedded 256x256 images; shirt and rib cloth plus mounting hardware"
 }

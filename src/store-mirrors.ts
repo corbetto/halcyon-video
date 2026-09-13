@@ -61,6 +61,7 @@ const savedMats: Array<{ o: any; m: any }> = [];
 const frustumScratch = new THREE.Frustum();
 const projScreenScratch = new THREE.Matrix4();
 const sphereScratch = new THREE.Sphere();
+const boxScratch = new THREE.Box3();
 const normalScratch = new THREE.Vector3();
 const centreScratch = new THREE.Vector3();
 
@@ -80,6 +81,11 @@ function onScreen(m: MirrorEntry, cameraPos: THREE.Vector3): boolean {
   if (!geo.boundingSphere) geo.computeBoundingSphere();
   sphereScratch.copy(geo.boundingSphere).applyMatrix4(m.r.matrixWorld);
   if (!frustumScratch.intersectsSphere(sphereScratch)) return false;
+  // Long, thin cornice mirrors have huge bounding spheres. Their actual
+  // bounds must intersect the view before they earn another scene render.
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  boxScratch.copy(geo.boundingBox).applyMatrix4(m.r.matrixWorld);
+  if (!frustumScratch.intersectsBox(boxScratch)) return false;
   // PlaneGeometry faces +Z locally; a Reflector only reflects on that side.
   normalScratch.set(0, 0, 1).transformDirection(m.r.matrixWorld);
   centreScratch.setFromMatrixPosition(m.r.matrixWorld);

@@ -111,19 +111,19 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
           box(width+step, top-bottom, front-courseBack+step, sign*(m+width/2), (bottom+top)/2, (front+courseBack)/2, material);
         }
         box(width, 14.4-d.headerBottom, back-.1, sign*(m+width/2), (14.4+d.headerBottom)/2, (back+.1)/2, brick);
-        box(m-o, d.headerBottom, .43, sign*(m+o)/2, d.headerBottom/2, .035, brick);
+        box(m-o, d.headerBottom, .93, sign*(m+o)/2, d.headerBottom/2, .285, brick);
       } else {
         box(width+.2, 1.6, front-back+.2, sign*(m+width/2), .8, (front+back)/2, soldier);
         box(width, d.pierTop-1.6, front-back, sign*(m+width/2), (d.pierTop+1.6)/2, (front+back)/2, brick);
         box(width, d.pierTop-d.headerBottom, back-.1, sign*(m+width/2), (d.pierTop+d.headerBottom)/2, (back+.1)/2, brick);
-        box(m-o, d.headerBottom, .43, sign*(m+o)/2, d.headerBottom/2, .035, brick);
+        box(m-o, d.headerBottom, .93, sign*(m+o)/2, d.headerBottom/2, .285, brick);
       }
     }
     if (p.style === 'gabled-brick') {
       for (const top of [d.headerTop, d.towerStripeTop]) box(m*2, 1.05, .07, 0, top-.525, d.frontProjection+.035, tile);
       box(m*2, 2.15, .025, 0, 11.275, d.frontProjection+.013, soldier);
-      box(1.8, 9.1, .43, 0, 4.55, .035, brick);
-      for (const sign of [-1, 1]) box(3.1, 1.82, .43, sign*(o-1.55), .91, .035, brick);
+      box(1.8, 9.1, .93, 0, 4.55, .285, brick);
+      for (const sign of [-1, 1]) box(3.1, 1.82, .93, sign*(o-1.55), .91, .285, brick);
     }
   }
     const downlights = new THREE.Group();
@@ -150,7 +150,10 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
       for (let i=0; i<position.count; i++) {
         const [x, y] = fitFacadeEntryVertex(position.getX(i), position.getY(i),
           ctx.ceilingY, p.entryHalfWidth, p.openingHalfWidth, p.style);
-        position.setXYZ(i, x, y, position.getZ(i));
+        // Rear entrance masonry meets the wing veneer at the same outside plane.
+        const z = position.getZ(i);
+        const flushJamb = p.style !== 'cone-canopy' && position.getY(i) <= 9.15 && z > 0 && z <= .33;
+        position.setXYZ(i, x, y, z + (flushJamb ? .5 : 0));
       }
       position.needsUpdate = true;
       obj.geometry.computeVertexNormals();

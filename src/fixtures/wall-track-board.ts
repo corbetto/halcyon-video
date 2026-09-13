@@ -16,6 +16,8 @@ import { getActiveTheme } from '../themes';
 import { assetUrl } from '../asset-url';
 import { mapDisplayFaceUVs } from './display-face-uv';
 import { tryLoadUserAssetTexture } from '../user-assets';
+import { BB_ARCHIVO_BLACK, BB_OUTFIT } from '../bundled-fonts';
+import { getActiveLogoSpec } from '../logo-spec';
 
 export type WallTrackBoardFormat = 'tall' | 'long';
 
@@ -269,13 +271,27 @@ export class WallTrackBoard implements StoreFixture {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
+    // Pin 109: bundled fonts — BB_ARCHIVO_BLACK for bold headers (corporate),
+    // BB_OUTFIT for friendly body callouts. The old generic sans-serif read
+    // as an undesigned draft; these are the project's canonical sign-shop pair.
+    const headFont = `${BB_ARCHIVO_BLACK}, sans-serif`;
+    const bodyFont = `${BB_OUTFIT}, sans-serif`;
+    const printLine = (text: string, y: number) => {
+      const font = ctx.font, size = Number(font.match(/([\d.]+)px/)?.[1] ?? 32);
+      const width = ctx.measureText(text).width;
+      if (width > w - 144) ctx.font = font.replace(/[\d.]+px/, `${size * (w - 144) / width}px`);
+      ctx.fillText(text, w / 2, y); ctx.font = font;
+    };
+
+
     ctx.fillStyle = '#152548';
-    ctx.font = '900 68px sans-serif';
-    ctx.fillText('HALCYON VIDEO', w / 2, 140);
+    ctx.font = `900 68px ${headFont}`;
+    const brand = getActiveLogoSpec(getActiveTheme());
+    printLine([brand.mainText, brand.subText].filter(Boolean).join(' '), 140);
 
     ctx.fillStyle = '#f8cf52';
-    ctx.font = '800 36px sans-serif';
-    ctx.fillText('MEMBERSHIP SERVICES', w / 2, 210);
+    ctx.font = `800 36px ${headFont}`;
+    printLine('MEMBERSHIP SERVICES', 210);
 
     // Divider bar
     ctx.fillStyle = '#152548';
@@ -284,27 +300,27 @@ export class WallTrackBoard implements StoreFixture {
     // Main poster callouts
     const title = customTitle ?? 'RENT MORE. PAY LESS.';
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 54px sans-serif';
-    ctx.fillText(title, w / 2, 360);
+    ctx.font = `900 54px ${headFont}`;
+    printLine(title, 360);
 
     ctx.fillStyle = '#152548';
-    ctx.font = '700 32px sans-serif';
-    ctx.fillText('WEEKEND 3-FOR-2 SPECIALS', w / 2, 450);
-    ctx.fillText('NO DEPOSIT WITH MEMBERSHIP', w / 2, 510);
-    ctx.fillText('FAST DROP-BOX RETURNS', w / 2, 570);
-    ctx.fillText('OVER 5,000 TITLES IN STOCK', w / 2, 630);
+    ctx.font = `700 32px ${bodyFont}`;
+    printLine('WEEKEND 3-FOR-2 SPECIALS', 450);
+    printLine('NO DEPOSIT WITH MEMBERSHIP', 510);
+    printLine('FAST DROP-BOX RETURNS', 570);
+    printLine('OVER 5,000 TITLES IN STOCK', 630);
 
     // Blue banner at bottom
     ctx.fillStyle = '#152548';
     ctx.fillRect(60, 720, w - 120, 190);
 
     ctx.fillStyle = '#f8cf52';
-    ctx.font = '800 38px sans-serif';
-    ctx.fillText('JOIN TODAY AT THE COUNTER', w / 2, 790);
+    ctx.font = `800 38px ${headFont}`;
+    printLine('JOIN TODAY AT THE COUNTER', 790);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '600 24px sans-serif';
-    ctx.fillText('FREE MEMBERSHIP CARD WITH FIRST RENTAL', w / 2, 850);
+    ctx.font = `600 24px ${bodyFont}`;
+    printLine('FREE MEMBERSHIP CARD WITH FIRST RENTAL', 850);
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;

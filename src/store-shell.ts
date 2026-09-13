@@ -196,7 +196,8 @@ scene: StoreScene,
     if (scene.wallSurface) {
       mapWallSegmentUV(kneeGeo, segW, KNEE_H, 0, scene.wallSurface.storeWidth, scene.wallSurface.roomHeight);
     }
-    const wall = new THREE.Mesh(kneeGeo, kneeMat);
+    // Only the room-facing plane wears interior paint; exterior reveals use the frame finish.
+    const wall = new THREE.Mesh(kneeGeo, [kneeTrimMat, kneeTrimMat, kneeTrimMat, kneeTrimMat, kneeMat, kneeTrimMat]);
     wall.position.set(cxSeg, KNEE_H / 2, -.15);
     wall.castShadow = true;
     wall.receiveShadow = true;
@@ -207,11 +208,11 @@ scene: StoreScene,
     cap.castShadow = true;
     cap.receiveShadow = true;
     group.add(cap);
-    // Navy base kick — #134: matches baseboardMat's 0.2ft height exactly
+    // Navy base kick — #134: matches baseboardMat's 0.3ft height exactly
     // (below, in the room-shell baseboards) so this window wall's trim
     // lines up with the solid walls' at every corner instead of stepping.
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.2, 0.34), kneeTrimMat);
-    kick.position.set(cxSeg, 0.1, -.15);
+    const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.3, 0.34), kneeTrimMat);
+    kick.position.set(cxSeg, 0.15, -.15);
     kick.receiveShadow = true;
     group.add(kick);
   });
@@ -813,10 +814,12 @@ export function buildStore(scene: StoreScene) {
     // rolls the panels themselves off to clean white instead of clipping, and
     // the 1.1 bloom threshold gives them the faint halo real diffusers have.
     // Keep emitted bounce proportional to the brighter direct ceiling keys.
-    emissiveIntensity: 1.55 * 1.56,
+    emissiveIntensity: 1.2,
     roughness: 0.4,
     metalness: 0.0
   }), 'light-source');
+  // Keep the approved room bounce while restraining the visible lens halo.
+  trofferMat.userData.bakeEmissiveIntensity = 1.55 * 1.56;
   // The T-bar grid itself: the rail that borders EVERY module (plain tiles,
   // troffers and diffusers all hang their face inside one of these), so it
   // draws the whole visible lattice of the ceiling.
@@ -1628,8 +1631,8 @@ export function buildStore(scene: StoreScene) {
     scene.scene.add(seg);
     // Navy base kick matching the knee wall's (#134) so the baseboard line
     // runs unbroken from the knee wall across the margin into the side wall.
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.2, 0.34), marginKickMat);
-    kick.position.set(STORE_CENTER_X + (a + b) / 2, floorY + 0.1, FRONT_GLASS_Z + .15);
+    const kick = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.3, 0.34), marginKickMat);
+    kick.position.set(STORE_CENTER_X + (a + b) / 2, floorY + 0.15, FRONT_GLASS_Z + .15);
     kick.receiveShadow = true;
     scene.scene.add(kick);
   });
@@ -1847,9 +1850,9 @@ export function buildStore(scene: StoreScene) {
 
   // Back baseboard — full width; the side runs below start 0.04 ft off the
   // back wall so the corners butt cleanly against this run's front face.
-  const bbBackGeo = new THREE.BoxGeometry(storeWidth, 0.2, 0.04);
+  const bbBackGeo = new THREE.BoxGeometry(storeWidth, 0.3, 0.04);
   const bbBack = new THREE.Mesh(bbBackGeo, baseboardMat);
-  bbBack.position.set(STORE_CENTER_X, floorY + 0.1, backWallZ + 0.02);
+  bbBack.position.set(STORE_CENTER_X, floorY + 0.15, backWallZ + 0.02);
   scene.scene.add(bbBack);
 
   // Baseboards for the stepped right section. bbStepFront's left edge (at
@@ -1860,14 +1863,14 @@ export function buildStore(scene: StoreScene) {
   // bbBack (full storeWidth) and the right-wall run already.
   if (scene.hasStep) {
     const bbStepFrontRight = rightEdgeX - 2 * BB_HALF; // clears the right run's near edge (rightEdgeX-0.04)
-    const bbStepFront = new THREE.Mesh(new THREE.BoxGeometry(bbStepFrontRight - scene.stepX, 0.2, 0.04), baseboardMat);
-    bbStepFront.position.set((scene.stepX + bbStepFrontRight) / 2, floorY + 0.1, stepWallZ + 0.03);
+    const bbStepFront = new THREE.Mesh(new THREE.BoxGeometry(bbStepFrontRight - scene.stepX, 0.3, 0.04), baseboardMat);
+    bbStepFront.position.set((scene.stepX + bbStepFrontRight) / 2, floorY + 0.15, stepWallZ + 0.03);
     scene.scene.add(bbStepFront);
 
     const bbStepSideNear = backWallZ + 0.04; // clears bbBack's far edge (backWallZ+0.04)
     const bbStepSideFar = stepWallZ + 0.01; // touches bbStepFront's near edge (stepWallZ+0.01)
-    const bbStepSide = new THREE.Mesh(new THREE.BoxGeometry(bbStepSideFar - bbStepSideNear, 0.2, 0.04), baseboardMat);
-    bbStepSide.position.set(scene.stepX - 0.03, floorY + 0.1, (bbStepSideNear + bbStepSideFar) / 2);
+    const bbStepSide = new THREE.Mesh(new THREE.BoxGeometry(bbStepSideFar - bbStepSideNear, 0.3, 0.04), baseboardMat);
+    bbStepSide.position.set(scene.stepX - 0.03, floorY + 0.15, (bbStepSideNear + bbStepSideFar) / 2);
     bbStepSide.rotation.y = Math.PI / 2;
     scene.scene.add(bbStepSide);
   }
@@ -1875,16 +1878,16 @@ export function buildStore(scene: StoreScene) {
   // Side-wall baseboards, BOTH walls, on the SOLID spans only: the window
   // ribbon's own base kick (createWindowSection, 0.34 ft deep) covers the
   // glazed span — running a baseboard behind it too made the two coplanar
-  // 0.2 ft trims z-fight along the whole ribbon. Ends are trimmed so every
+  // base trims z-fight along the whole ribbon. Ends are trimmed so every
   // floor corner is a clean butt-join:
   //  - back end starts 0.04 off the back wall (clear of bbBack; on the
   //    stepped right wall, 0.05 off the step's front face, clear of
   //    bbStepFront's 0.01..0.05 z-span),
   //  - front end stops at the front corner-margin kick's inner face
-  //    (z = 15 - 0.17; that kick is 0.34 ft deep, centered on the glass
-  //    line) instead of running under it — the deeper kick reads as the
+  //    (z = 15 - 0.02; that kick is 0.34 ft deep, centered 0.15 ft
+  //    outside the glass line) instead of running under it — the deeper kick reads as the
   //    corner return and this run butts into its side.
-  const FRONT_KICK_INNER_Z = FRONT_GLASS_Z - 0.17;
+  const FRONT_KICK_INNER_Z = FRONT_GLASS_Z - 0.02;
   const buildSideBaseboards = (side: 'left' | 'right') => {
     const wallX = side === 'left' ? STORE_CENTER_X - storeWidth / 2 : STORE_CENTER_X + storeWidth / 2;
     const inward = side === 'left' ? 1 : -1;
@@ -1894,8 +1897,8 @@ export function buildStore(scene: StoreScene) {
       : [[rearStart, FRONT_KICK_INNER_Z]];
     segs.forEach(([z0, z1]) => {
       if (z1 - z0 < 0.05) return;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(z1 - z0, 0.2, 0.04), baseboardMat);
-      seg.position.set(wallX + inward * BB_HALF, floorY + 0.1, (z0 + z1) / 2);
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(z1 - z0, 0.3, 0.04), baseboardMat);
+      seg.position.set(wallX + inward * BB_HALF, floorY + 0.15, (z0 + z1) / 2);
       seg.rotation.y = inward * Math.PI / 2;
       scene.scene.add(seg);
     });

@@ -44,7 +44,7 @@ try {
   await loaded;remove();results.sharedFinish={finishDisposals,mapDisposals};sharedFinish.dispose();sharedMap.dispose();
   GLTFLoader.prototype.load=original;return results;
  });
- for(const mode of ['installed','late','detached']) {assert.deepEqual(results[mode].disposed,results[mode].expected);assert.equal(results[mode].expected.geometry,5);assert.ok(results[mode].expected.texture>=5);assert.equal(results[mode].removed,true);assert.equal(results[mode].floor,null);}
+ for(const mode of ['installed','late','detached']) {assert.deepEqual(results[mode].disposed,results[mode].expected);assert.equal(results[mode].expected.geometry,4);assert.ok(results[mode].expected.texture>=5);assert.equal(results[mode].removed,true);assert.equal(results[mode].floor,null);}
  assert.deepEqual(results.sharedFinish,{finishDisposals:0,mapDisposals:0});
  assert.equal(results.installed.installed,true);assert.equal(results.installed.fallback,false);
  for(const mode of ['late','detached','failure','wrong-era','no-glass'])assert.equal(results[mode].installed,false);

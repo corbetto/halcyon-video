@@ -621,9 +621,9 @@ export class OutdoorLightingRig {
       for (const m of mats) {
         // Keyed by material: these are shared across every instanced tile, so a
         // list would double-record and restore a zero.
-        if (m?.userData?.bakeEmissiveOff && !suppressed.has(m)) {
+        if ((m?.userData?.bakeEmissiveOff || Number.isFinite(m?.userData?.bakeEmissiveIntensity)) && !suppressed.has(m)) {
           suppressed.set(m, (m as THREE.MeshStandardMaterial).emissiveIntensity);
-          (m as THREE.MeshStandardMaterial).emissiveIntensity = 0;
+          (m as THREE.MeshStandardMaterial).emissiveIntensity = m.userData.bakeEmissiveOff ? 0 : m.userData.bakeEmissiveIntensity;
         }
       }
     });

@@ -2,6 +2,7 @@ import { buildWallCourtesyTelephone } from './fixtures/wall-courtesy-telephone';
 import { installDisplayModel } from './fixtures/display-model';
 import { buildRooftopHVAC } from './rooftop-hvac';
 import { selfLit } from './material-lighting';
+import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 // Exterior envelope shared by the architectural styles. Window openings,
 // service-door placement and masonry tiling follow the store's live plan.
 // Fitted entrance portals and canopies are authored in Blender; none of this
@@ -132,7 +133,7 @@ export function rightSideDoorZone(sideRibbon: { frontZ: number; backZ: number } 
   if (!sideRibbon) return null;
   const doorZ = sideRibbon.backZ - 0.5 - RIGHT_SIDE_DOOR_W / 2;
   const halfZ = (RIGHT_SIDE_DOOR_W + 0.4) / 2; // matches the interior frame's DOOR_W+0.4 span below
-  const signTopY = RIGHT_SIDE_DOOR_H + 0.75 + (0.73 + 0.06) / 2; // housing center + half its height
+  const signTopY = RIGHT_SIDE_DOOR_H + 0.75 + (0.73 + 0.08) / 2; // housing center + half its height (pin 107 dimensional housing)
   return { z0: doorZ - halfZ, z1: doorZ + halfZ, yTop: Math.max(RIGHT_SIDE_DOOR_H + 0.16, signTopY) };
 }
 
@@ -367,11 +368,12 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     // 15.5in x 8.75in face (aspect ~1.78) carrying RED "EXIT" at the NFPA 101 /
     // IBC minimum 6in cap height — i.e. letters filling ~69% of the face height
     // and nearly its full width, which is what makes one read as an exit sign
-    // at a glance. It used to be a 2.36:1 letterbox with ~3.9in green letters
-    // floating in the middle, which read as a printed placard.
-    // Self-luminous like the real thing: the emissiveMap carries only the
-    // glyphs, so they glow well above the surrounding face without blooming it.
+    // at a glance.
+    //
+    // Original molded housing fitted to the existing face and wall anchor.
+    // Its open bezel and recessed face make the construction readable in profile.
     const SIGN_W = 1.3, SIGN_H = 0.73;
+    const HOUSING_D = 0.292; // 3.5 in fitted housing depth
     const drawExitFace = (bg: string, fg: string): THREE.CanvasTexture => {
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 144; // matches SIGN_W/SIGN_H, no stretch
@@ -379,15 +381,12 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
       c.fillStyle = bg;
       c.fillRect(0, 0, canvas.width, canvas.height);
       c.fillStyle = fg;
-      // 99px caps on a 144px face = 6in on an 8.75in sign (code minimum).
-      c.font = '900 99px Arial, sans-serif';
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      // Wide letter-spacing, drawn per-glyph (canvas letterSpacing support varies).
-      const word = 'EXIT';
-      const step = 60;
-      const x0 = canvas.width / 2 - ((word.length - 1) * step) / 2;
-      for (let i = 0; i < word.length; i++) c.fillText(word[i], x0 + i * step, canvas.height / 2 + 4);
+      // Measure actual ink height; CSS font size is not capital-letter height.
+      c.font = `100px ${BB_ARCHIVO_BLACK}`;
+      const caps = c.measureText('EXIT').actualBoundingBoxAscent || 72;
+      c.font = `${100 * 99 / caps}px ${BB_ARCHIVO_BLACK}`;
+      c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+      c.fillText('EXIT',canvas.width/2,(canvas.height+99)/2,canvas.width-20);
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
@@ -397,15 +396,32 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
       map: drawExitFace('#f2f4f1', '#cf142b'),          // white acrylic face, safety-red lettering
       emissive: 0xffffff,
       emissiveMap: drawExitFace('#000000', '#ff3b30'),  // only the letters glow (backlit red)
-      emissiveIntensity: 2.0,                            // reads as self-luminous, not printed
+      emissiveIntensity: 1.2,                            // internally lit lettering below the bloom threshold
       roughness: 0.55,
       metalness: 0.0,
     }), 'light-source');
-    addBox(0.12, SIGN_H + 0.06, SIGN_W + 0.08, rightEdgeX - 0.16, DOOR_H + 0.75, doorZ, frameMat, false); // housing
+
+    // The Blender shell has an open bezel and a recessed seat, not a solid
+    // block covering the illuminated face. Its back attaches to the wall.
+    const housing = new THREE.Group(); housing.name = 'exit-sign-housing';
+    housing.position.set(rightEdgeX - .01, DOOR_H + .75, doorZ);
+    housing.rotation.y = -Math.PI / 2; group.add(housing);
+    const housingMat = new THREE.MeshStandardMaterial({ color: 0xe9ece6, roughness: .6, metalness: 0 });
+    const housingFallback = new THREE.Group(); housing.add(housingFallback);
+    const part = (w: number, h: number, d: number, x: number, y: number, z: number) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),housingMat);
+      mesh.position.set(x,y,z); housingFallback.add(mesh);
+    };
+    part(SIGN_W+.08,SIGN_H+.08,.04,0,0,.02);
+    for (const side of [-1,1]) {
+      part(.04,SIGN_H+.08,HOUSING_D-.04,side*(SIGN_W/2+.02),0,(HOUSING_D+.04)/2);
+      part(SIGN_W,.04,HOUSING_D-.04,0,side*(SIGN_H/2+.02),(HOUSING_D+.04)/2);
+    }
+    const removeHousing = installDisplayModel(params.context,housing,housingFallback,'models/exit-sign.glb',{ExitHousing:housingMat});
+    group.addEventListener('removed',removeHousing);
     const exitFace = new THREE.Mesh(new THREE.PlaneGeometry(SIGN_W, SIGN_H), exitFaceMat);
-    exitFace.position.set(rightEdgeX - 0.225, DOOR_H + 0.75, doorZ);
-    exitFace.rotation.y = -Math.PI / 2; // face -X, into the store
-    group.add(exitFace);
+    exitFace.name = 'exit-sign-illuminated-face'; exitFace.position.z = .274;
+    housing.add(exitFace);
   }
 
   group.add(buildFacadeEntryModel(params.context, {

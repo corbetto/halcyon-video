@@ -247,23 +247,7 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
       rows: 14,
     },
   },
-  // 2. Shallow horizontal dark rental-terms board above front glass facing shoppers.
-  //    Parameterized 11.5 ft width fitting glazing run, configurable illumination.
-  {
-    id: 'wall-track-board-terms',
-    kind: 'wall-track-board',
-    position: { x: 24.5, z: 14.92 },
-    yaw: Math.PI,
-    options: {
-      format: 'long',
-      themes: ['bb-2000'],
-      width: 11.5,
-      height: 1.45,
-      surfaceY: 9.10,
-      rows: 8,
-      illuminated: false,
-    },
-  },
+  // Pin 113: the unsubstantiated blank rental-terms strip is not installed.
   // (The previously-viewed dump bin that used to sit at x 16.5, z 3.0 was
   // removed in #37: that spot is INSIDE the checkout counter's shield outline,
   // so its brown tub read as a stray brown box poking through the counter.)

@@ -1,0 +1,14 @@
+{
+  "triangles": 380,
+  "meshes": 1,
+  "material_roles": [
+    "ExitHousing"
+  ],
+  "outer_size_ft": [
+    1.38,
+    0.81,
+    0.292
+  ],
+  "face_seat_depth_ft": 0.274,
+  "manifold": true
+}

@@ -115,13 +115,8 @@ test('wall-track-board: placement declarations and era gating', () => {
     'tall board themes include bb-1993, bb-2000, bb-2010',
   );
 
-  // Verify long format placement facing shoppers above front glass
-  assert.ok(configSource.includes("id: 'wall-track-board-terms'"), 'terms placement declared');
-  assert.ok(configSource.includes("format: 'long'"), 'long format specified');
-  assert.ok(
-    /id:\s*'wall-track-board-terms'[\s\S]*?themes:\s*\[\s*'bb-2000'\s*\]/.test(configSource),
-    'long board appears in its attested 2000 store',
-  );
+  // Owner pin 113 removes the unexplained strip; keep the reusable board fixture.
+  assert.ok(!configSource.includes("id: 'wall-track-board-terms'"));
 
   // 1990 Coming Soon board is not displaced (only exists on bb-1990 via COMING_SOON_LETTERBOARD_THEMES)
   assert.ok(configSource.includes("id: 'coming-soon-letterboard-counter-end'"));

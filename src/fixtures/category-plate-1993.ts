@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { selfLit } from '../material-lighting';
 import { registerSignMount } from './sign-mount';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 import { getBackTexture, registerBackTexture } from './sign-fixtures';
@@ -223,9 +224,15 @@ export function buildCategoryPlate1993(
     color: family, roughness: 0.6, metalness: 0.0, side: THREE.DoubleSide,
   });
   const faceMat = (tex: THREE.Texture) =>
-    new THREE.MeshStandardMaterial({
+    selfLit(new THREE.MeshStandardMaterial({
       map: tex, roughness: 0.6, metalness: 0.0,
-    });
+      // Pin 103: internally lit — the face texture doubles as the emissive
+      // map (its radial vignette darkens the edges, so the glow blooms from
+      // the center like a real backlit lightbox).
+      emissive: 0xffffff,
+      emissiveMap: tex,
+      emissiveIntensity: 0.65,
+    }), 'light-source');
 
   // Sloped faces: front (+z at top) and back, meeting at the bottom edge.
   // Simple quads; UV v=0 at the bottom edge, v=1 at the top.

@@ -9,6 +9,8 @@ import { placementBudget } from './progressive-placement';
 import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility';
 import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
 import * as THREE from 'three';
+import { installDirectLightVisibility } from './direct-light-visibility';
+installDirectLightVisibility();
 import { isPublicDemo } from './demo-mode';
 import { Movie, JellyfinLibrary, Episode } from './jellyfin';
 import { assetUrl } from './asset-url';

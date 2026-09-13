@@ -30,3 +30,15 @@ test('both side walls carry stock behind glazing and the ribbon stays contiguous
     }
   }
 });
+
+test('back-left shelf ends leave matching two-foot corner gaps without a clubhouse', () => {
+  for (const width of [60, 72, 80, 96]) {
+    const left = 11 - width / 2;
+    const room = { width, backZ: -46, backLeftX: left + 1.7, backRightX: 11 + width / 2 - .2,
+      stepX: 11 + width / 2 - .2, stepDepth: 0, sideBackZ: -14, clubhouse: false, wall: true };
+    const [side, back] = planNrRuns(room);
+    assert.ok(Math.abs((back.x - back.length / 2) - left - 2) < 1e-8);
+    assert.ok(Math.abs((side.z - side.length / 2) - room.backZ - 2) < 1e-8);
+    assert.ok(side.z + side.length / 2 <= room.sideBackZ);
+  }
+});
