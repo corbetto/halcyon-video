@@ -2581,6 +2581,7 @@ export function buildStore(scene: StoreScene) {
         return Array.from(map.values());
       },
       getLocalContext: () => scene.localRecommendPool(),
+      onShowMovie: (movie) => scene.jumpToTitle(movie.id),
       // "Order it for me": the clerk-dialog twin of the inspect-view request
       // press — the shared orderTitle flow, with her toast muted because
       // she's already talking to you in the dialog.

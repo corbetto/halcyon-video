@@ -413,7 +413,7 @@ export function claspSuggestions(scene: StoreScene, target: ClaspTarget): ClerkS
     .slice(0, Math.max(0, 4 - picks.length))
     .map((m) => ({
       movie: m,
-      reason: "It's the one everybody's been calling about this week.",
+      reason: m.genres.length ? `It is listed under ${m.genres.slice(0, 2).join(" and ").toLowerCase()}.` : "You can read the synopsis before deciding.",
       requested: requested(m),
     }));
   return [...picks, ...pad];
