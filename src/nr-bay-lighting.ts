@@ -1,3 +1,4 @@
+import { activeStoreFormat } from './store-format';
 import { getActiveTheme } from './themes';
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
@@ -8,7 +9,7 @@ import { selfLit } from './material-lighting';
 /** One recessed fitting per bay; static shelf wash is evaluated by nr-bay-wash. */
 export function buildNrBayLighting(scene: StoreScene): void {
   scene.nrBayLightAnchors = []; scene.nrBayLightingUpdate = null;
-  if (getActiveTheme().id !== 'bb-1990') return;
+  if (getActiveTheme().id !== 'bb-1990' || !activeStoreFormat().newReleasesWall) return;
   const root = new THREE.Group(); root.name = 'New Release bay downlights'; scene.scene.add(root);
   const anchors = scene.nrRuns.flatMap(run => Array.from({ length: run.cols / 8 }, (_, i) => {
     const x = -run.length / 2 + (i + .5) * NR_BAY_WIDTH, z = 2.9;

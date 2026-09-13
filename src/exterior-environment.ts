@@ -19,6 +19,7 @@ import { installParkingLampModels } from './parking-lamp-model';
 import { installCommercialStreetscape } from './commercial-streetscape';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createLightPoolTexture, createSoftShadowTexture, createConcreteSidewalkTexture } from './canvas-textures';
+import { activeStoreFormat } from './store-format';
 import { installExteriorReturnKiosk } from './exterior-return-kiosk';
 import { installCurbKit } from './curb-kit';
 import { buildExteriorRoad } from './exterior-road';
@@ -143,6 +144,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   track(buildEntranceBollards(scene, group, [leftEdgeX - 1.4, rightEdgeX + 1.4], frontZ + 1.6, requestRender));
 
   // ─── Exterior return kiosk: original prop retained as loading fallback ──
+  if (activeStoreFormat().facadeStyle !== 'storefront') {
   const boxMat = track(new THREE.MeshStandardMaterial({ color: '#8a1f1f', roughness: 0.55, metalness: 0.1 }));
   const boxSlotMat = track(new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.8 }));
   const newsBox = new THREE.Mesh(track(new THREE.BoxGeometry(1.3, 3.2, 1.3)), boxMat);
@@ -154,6 +156,8 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   slot.position.set(rightEdgeX + 2.6, 2.5, frontZ + 1.3 + 0.66);
   group.add(slot);
   track(installExteriorReturnKiosk(scene, group, [newsBox, slot], rightEdgeX + 2.6, frontZ + 1.3, requestRender));
+
+  }
 
   // Street lamps combine shadowed window spill with a decorative asphalt pool.
   const poleMat = track(new THREE.MeshStandardMaterial({ color: '#3a3d40', roughness: 0.6, metalness: 0.5 }));

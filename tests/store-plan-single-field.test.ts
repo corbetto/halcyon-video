@@ -81,9 +81,9 @@ for (const counts of [[1500, 400], [3000, 900, 200], [400, 120]]) {
       assert.deepEqual(floor.slice(lo, hi + 1), mine,
         `library ${li} is split across the floor: uses ${mine.join(',')} of ${floor.join(',')}`);
     });
-    // Libraries read left to right in queue order: library 0 leftmost.
-    const leftmost = counts.map((_, li) => Math.min(...libUnits(li).map((u) => runX(u.anchorX))));
-    for (let li = 1; li < counts.length; li++) {
+    // Freestanding libraries retain queue order; the wall library has its own run.
+    const leftmost = counts.map((_, li) => Math.min(...libUnits(li).filter(u => !u.singleSided).map((u) => runX(u.anchorX)))).filter(Number.isFinite);
+    for (let li = 1; li < leftmost.length; li++) {
       assert.ok(leftmost[li] >= leftmost[li - 1], `library ${li} starts left of library ${li - 1}`);
     }
   });

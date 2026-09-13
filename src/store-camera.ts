@@ -357,13 +357,12 @@ export function updateCameraTarget(scene: StoreScene) {
     if (leftCap) {
       const currentPos = pe.moviePositions[pe.selectedIdx];
       const row = currentPos ? currentPos.row : 0;
-      const shelfIdx = (AISLE_SHELF_HEIGHTS.length - 1) - row;
-      const shelfY = AISLE_SHELF_HEIGHTS[shelfIdx] ?? 3.2;
+      const shelfY = [3.0, 2.167, 1.333, 0.5][row] ?? 3.0;
       const caseLocalY = shelfY - UNIT_FRAME_HEIGHT / 2;
 
-      // Frame the endcap display, centered horizontally on the endcap face
-      // Z distance is fixed at 3.8 feet from the endcap face (local Z = 0.05)
-      const localCamPos = new THREE.Vector3(0, caseLocalY + 0.4, 0.05 + 3.8);
+      // Fit the whole 2.1ft header on a portrait phone as well as a wide view.
+      const displayDistance = Math.max(3.8, 2.35 / (2 * Math.tan(THREE.MathUtils.degToRad(scene.camera.fov / 2)) * scene.camera.aspect));
+      const localCamPos = new THREE.Vector3(0, caseLocalY + 0.4, 0.05 + displayDistance);
       const localLookAt = new THREE.Vector3(0, caseLocalY + 0.4, 0.05);
 
       // Convert the local coordinates of the endcap to world space

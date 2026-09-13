@@ -9,7 +9,7 @@ import type * as THREE from 'three';
 import type { Movie, JellyfinLibrary } from './jellyfin.ts';
 import {
   LIBRARY_X_SPACING, FIELD_Z_FRONT, CENTER_WALKWAY, AISLE_ANGLE, HERRINGBONE_AISLE_ANGLE, BOX_SPACING,
-  MAX_SHELF_COLS, UNIT_CAPACITY, MAX_RUN_UNITS, RUN_BREAK_GAP, UNIT_SECTIONS,
+  MAX_SHELF_COLS, UNIT_CAPACITY, UNIT_SIDE_CAPACITY, MAX_RUN_UNITS, RUN_BREAK_GAP, UNIT_SECTIONS,
   SECTION_CAPACITY, TINY_LIBRARY_MOVIES, MIN_CATEGORY_TITLES,
   STORE_CATEGORY_ORDER, shelfTitleCompare, sectionFillCopies, columnFillCount,
   collectionCategoryCandidates, shelfCategoryCandidatesOf,
@@ -506,11 +506,20 @@ export class StorePlan {
   // placement AND orientation is decided.
   private planRuns() {
     const N = this.libraries.length;
+    // Put a small library (or its first twelve face blocks) along the left
+    // side wall. The rest retains the ordinary double-sided floor plan.
+    const wallLibrary = FORMAT.singleField ? this.libraries.map((_, i) => i)
+      .filter(i => this.layoutFor(i).entries.some(Boolean))
+      .sort((a, b) => this.layoutFor(a).entries.length - this.layoutFor(b).entries.length)[0] : undefined;
+    const wallBlocks = wallLibrary === undefined ? 0
+      : Math.min(12, Math.ceil(this.layoutFor(wallLibrary).entries.length / UNIT_SIDE_CAPACITY));
     const queue: { lib: number; u: number }[] = [];
     for (let i = 0; i < N; i++) {
       // Padded layout length (not raw movie count): category padding claims
       // whole sections, so the units must be sized for the padded shelf order.
-      const numUnits = Math.max(1, Math.ceil(this.layoutFor(i).entries.length / UNIT_CAPACITY));
+      const numUnits = i === wallLibrary
+        ? Math.max(0, Math.ceil((this.layoutFor(i).entries.length - wallBlocks * UNIT_SIDE_CAPACITY) / UNIT_CAPACITY))
+        : Math.max(1, Math.ceil(this.layoutFor(i).entries.length / UNIT_CAPACITY));
       for (let u = 0; u < numUnits; u++) queue.push({ lib: i, u });
     }
 
@@ -558,6 +567,19 @@ export class StorePlan {
       taken += want;
       lineId = this.fillField(field, slice, lineId);
     });
+
+    if (wallLibrary !== undefined) {
+      const length = (MAX_SHELF_COLS - 1) * BOX_SPACING + 1;
+      for (let block = 0; block < wallBlocks; block++) {
+        const x = STORE_CENTER_X - this.getStoreWidth() / 2 + 0.26;
+        this.shelvingUnits.push({ libraryIdx: wallLibrary, unitIdxInLibrary: block,
+          singleSided: true, cols: MAX_SHELF_COLS, xCenter: x, anchorX: x,
+          zPos: 1.0 - block * length - FIELD_Z_FRONT,
+          lineId, rowGroupId: lineId,
+          posInLine: block, isLineFront: block === 0, isLineBack: block === wallBlocks - 1,
+          yaw: 0, browseSign: 1 });
+      }
+    }
 
     // Post-process shelvingUnits so each library's units are numbered in the
     // order a customer WALKS the floor. Within a line the visually-LEFT unit
@@ -922,7 +944,7 @@ export class StorePlan {
       let e = s;
       while (e + 1 < libUnits.length && libUnits[e + 1].rowGroupId === libUnits[s].rowGroupId) e++;
       for (let u = s; u <= e; u++) order.push({ unit: u, side: 'front' });
-      for (let u = e; u >= s; u--) order.push({ unit: u, side: 'back' });
+      for (let u = e; u >= s; u--) if (!libUnits[u].singleSided) order.push({ unit: u, side: 'back' });
       s = e + 1;
     }
     this.blockOrderCache.set(libIdx, order);
@@ -934,6 +956,7 @@ export class StorePlan {
   // holds. Falls back to the unit index for synthetic units (back wall etc.)
   // that aren't part of the plan.
   blockIndexOf(libIdx: number, unitIdx: number, side: 'front' | 'back'): number {
+    if (side === 'back' && this.shelvingUnits.find(u => u.libraryIdx === libIdx && u.unitIdxInLibrary === unitIdx)?.singleSided) return Number.MAX_SAFE_INTEGER;
     const order = this.entryBlockOrder(libIdx);
     for (let b = 0; b < order.length; b++) {
       if (order[b].unit === unitIdx && order[b].side === side) return b;
@@ -973,9 +996,9 @@ export class StorePlan {
     return this.shelvingUnits.map((u, i) => ({
       label: `shelving:unit-${i}`,
       kind: 'shelving',
-      cx: u.xCenter,
+      cx: u.xCenter + (u.singleSided ? u.browseSign * (UNIT_DEPTH / 4 - .125) : 0),
       cz: this.aisleZCenter(u),
-      w: UNIT_DEPTH,
+      w: u.singleSided ? UNIT_DEPTH / 2 + .25 : UNIT_DEPTH,
       d: (u.cols - 1) * BOX_SPACING + 1.0,
       yaw: u.yaw,
     }));
@@ -1007,7 +1030,7 @@ export class StorePlan {
 
     const ends: OpenRunEnd[] = [];
     for (const u of this.shelvingUnits) {
-      if (!u.isLineFront || u.libraryIdx < 0) continue;
+      if (!u.isLineFront || u.libraryIdx < 0 || u.singleSided) continue;
       const frontLocalZ = FIELD_Z_FRONT + u.zPos;
       // Open-floor probe: a line-front at a CHUNK boundary has the next run
       // ~3 ft in front (RUN_BREAK_GAP) — furniture there would choke the

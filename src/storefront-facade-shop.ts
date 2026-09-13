@@ -85,7 +85,7 @@ export function buildShopfrontFacade(params: ShopFacadeBuildParams): StorefrontF
   // brass course, no self-illumination — a painted board, not a marquee. ────
   stuccoBox(storeWidth + 0.6, fasciaH, 0.6, CX, fasciaCY, FRONT_Z + 0.35);
   addBox(storeWidth + 0.65, 0.14, 0.65, CX, parapetTop + 0.07, FRONT_Z + 0.35, trimMat); // thin cap trim
-  addBox(storeWidth + 0.6, 0.1, 0.62, CX, fasciaBot - 0.05, FRONT_Z + 0.35, trimMat);    // sill trim under the board
+  addBox(storeWidth + 0.6, 0.1, 0.62, CX, fasciaBot - 0.05, FRONT_Z + 0.49, trimMat);    // sill trim under the board
 
   // ── Solid returns filling the front-wall corner margins, floor to fascia —
   // the same idea as the chain's brick returns, in stucco. ───────────────────
@@ -143,21 +143,14 @@ export function buildShopfrontFacade(params: ShopFacadeBuildParams): StorefrontF
   // facade) so any brand LogoSpec that asks for freestanding 3D letters —
   // logo-storefront.ts reads anchor.gable/anchor.fascia interchangeably —
   // still resolves to sane geometry instead of dividing by a zero height. ────
-  // Deliberately SMALL (owner ruling 2026-08-23: "really tiny, right above
-  // the door") — a modest sign sitting low on the now-taller fascia board,
-  // directly over the door leaf, with clear stucco above it.
+  // A modest sign, centred within the fascia above the entrance.
   const fasciaWidth = storeWidth + 0.6;
   const logoHeight = Math.min(fasciaH * 0.34, 1.2);
   const logoWidth = Math.min(fasciaWidth * 0.4, logoHeight * 1.8);
   const logoAnchor: FacadeLogoAnchor = {
     x: CX,
-    // Empirically, not geometrically, centred: create3DDoubleLayeredSign's
-    // plane IS centred on this anchor, but the active brand's actual glyph
-    // ink sits low within its own texture frame (there's transparent margin
-    // above the wordmark), so anchoring at the band's true vertical centre
-    // reads as sitting high — pinning near the sill instead keeps the
-    // visible lettering clear of the coping cap above.
-    y: fasciaBot + 0.1,
+    // Centre the existing brand artwork in the board above the entrance.
+    y: fasciaCY,
     z: FRONT_Z + 0.35 + 0.31,
     width: logoWidth,
     height: logoHeight,

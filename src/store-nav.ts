@@ -148,8 +148,8 @@ function exitGenreEndcapToShelf(scene: StoreScene, fixture: SceneFixture, exitTo
     } else {
       // A row's mouth cap: Left continues to the previous ROW's back face,
       // whose reading end is that row's first unit.
-      scene.selectedUnitIdx = rowStartUnit(libUnits, prevUnit.rowGroupId).unitIdxInLibrary;
-      scene.selectedSide = 'back';
+      scene.selectedUnitIdx = (prevUnit.singleSided ? prevUnit : rowStartUnit(libUnits, prevUnit.rowGroupId)).unitIdxInLibrary;
+      scene.selectedSide = prevUnit.singleSided ? 'front' : 'back';
     }
     scene.updateColsCount();
     scene.selectedCol = scene.colsCount - 1;
@@ -386,10 +386,10 @@ export function moveLeftInternal(scene: StoreScene) {
           // reading end is the line's FIRST unit, at its last (screen-right)
           // column.
           if (prevUnit) {
-            const prevLineFirstUnit = rowStartUnit(libUnits, prevUnit.rowGroupId);
+            const prevLineFirstUnit = prevUnit.singleSided ? prevUnit : rowStartUnit(libUnits, prevUnit.rowGroupId);
 
             scene.selectedUnitIdx = prevLineFirstUnit.unitIdxInLibrary;
-            scene.selectedSide = 'back';
+            scene.selectedSide = prevLineFirstUnit.singleSided ? 'front' : 'back';
             scene.updateColsCount();
             scene.selectedCol = scene.colsCount - 1;
             scene.cameraWindowMinCol = Math.max(0, scene.colsCount - BROWSE_WINDOW_SIZE);

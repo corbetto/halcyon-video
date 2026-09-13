@@ -1794,7 +1794,7 @@ export function buildStore(scene: StoreScene) {
   // (registered just above) rather than assuming equal division, so this
   // still lands correctly if StorefrontSpec.windowBays ever carries
   // variable-width bays.
-  const frontPanelsWithPosters = posterBayIndices(frontPanes.length);
+  const frontPanelsWithPosters = activeStoreFormat().id === 'mom-and-pop' ? [] : posterBayIndices(frontPanes.length);
   // Bays under the era campaign banner (bb-2010; storefront-campaign-poster.ts)
   // stay lightbox-free — a suspended poster hanging IN FRONT of the banner is
   // the clash this shares placement math to prevent.
@@ -1824,7 +1824,7 @@ export function buildStore(scene: StoreScene) {
   // Posters on every second pane of BOTH side-window ribbons (skipped
   // entirely when the store is too shallow to carry a ribbon). The right
   // ribbon used to go bare — feedback/042: "this window needs posters too".
-  for (const ribbon of [leftRibbon, rightRibbon]) {
+  for (const ribbon of (activeStoreFormat().id === 'mom-and-pop' ? [] : [leftRibbon, rightRibbon])) {
     if (!ribbon) continue;
     const paneW = ribbon.len / ribbon.cols;
     for (let panelIdx = 1; panelIdx < ribbon.cols; panelIdx += 2) {
@@ -2234,7 +2234,11 @@ export function buildStore(scene: StoreScene) {
   for (const p of collectionEndcaps) {
     if (typeof p.options?.lineId === 'number') endcapHostLineIds.add(p.options.lineId);
   }
-  const endcapPlacements = scene.staffPickEndcapPlacements(endcapHostLineIds);
+  const plantPlacements = activeStoreFormat().plants
+    ? momAndPopPlantPlacements(scene.getStoreWidth(), scene.backWallZ,
+      scene.plan.openLineFrontEnds().filter(end => !endcapHostLineIds.has(end.unit.lineId))) : [];
+  const plantLineIds = new Set(plantPlacements.map(p => p.options!.lineId));
+  const endcapPlacements = scene.staffPickEndcapPlacements(new Set([...endcapHostLineIds, ...plantLineIds as Set<number>]));
   for (const p of endcapPlacements) {
     if (typeof p.options?.lineId === 'number') endcapHostLineIds.add(p.options.lineId);
   }
@@ -2284,6 +2288,9 @@ export function buildStore(scene: StoreScene) {
   // returned stock -- unconfigured/unreachable => scene.gameMovies is [], no
   // fixture. (Discovery suggestions used to add a rack here too; they now
   // shelve inline with the regular stock — see the constructor's merge.)
+  for (const cap of scene.libraryEndCaps) {
+    if (cap.userData.isFront && plantLineIds.has(cap.userData.lineId)) cap.userData.plantReserved = true;
+  }
   // ...then filtered by what THIS STORE FORMAT admits: a mom-and-pop has no
   // open floor for floor displays and no counter band to mount a letterboard
   // on, so those never reach the build loop at all (see admitFixturePlacements).
@@ -2310,7 +2317,7 @@ export function buildStore(scene: StoreScene) {
     // The back room, on the formats that have one (GH #33).
     ...(activeStoreFormat().curtainedSection ? curtainedAlcovePlacements() : []),
     // Potted plants in mom-and-pop mode
-    ...(activeStoreFormat().plants ? momAndPopPlantPlacements(scene.getStoreWidth(), scene.backWallZ, scene.plan.openLineFrontEnds()) : []),
+    ...plantPlacements,
   ], {
     floorDisplays: activeStoreFormat().floorDisplays,
     counterShape: scene.storefrontSpec.counterShape,

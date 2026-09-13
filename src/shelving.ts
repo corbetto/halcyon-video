@@ -7,6 +7,8 @@
 // movie boxes bake their resting transforms from the plan, not from these
 // meshes, so any structure that respects the plan's dimensions works.
 import * as THREE from 'three';
+import { buildWallLibraryUnit } from './wall-library-shelving';
+import { activeStoreFormat } from './store-format';
 import { ShelfModelBatch, type ShelfPart } from './shelf-model';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { JellyfinLibrary } from './jellyfin';
@@ -371,6 +373,10 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     const aisleParent = makeAisleGroup(unit.yaw, unit.xCenter, unitZCenter);
     aisleParent.name = `gondola-unit:${unit.libraryIdx}:${unit.unitIdxInLibrary}`;
     aisleParent.userData.gondolaLine = unit.lineId;
+    if (unit.singleSided) {
+      buildWallLibraryUnit(deps, unit, aisleParent, getSectionLabelMat);
+      return;
+    }
     const cols = unit.cols;
     const shelfLength = (cols - 1) * BOX_SPACING + 1.0; // 0.5 ft margin on each end
 
@@ -602,6 +608,21 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         };
         place(plusXLabel, 1);
         place(minusXLabel, -1);
+      }
+
+      if (!activeStoreFormat().overheadSignage) {
+        // Small independent-store labels clip onto the eye-level shelf lip.
+        for (const [sign, label] of [[1, plusXLabel], [-1, minusXLabel]] as const) {
+          const card = new THREE.Mesh(getBoxTemplate(0.04, 0.20, 1.45), [
+            getSectionLabelMat(label), getSectionLabelMat(label),
+            materials.signSide, materials.signSide, materials.signSide, materials.signSide,
+          ]);
+          card.position.set(xCenter + sign * (unitDepthAtHeight(4.795) / 2 + 0.04), 4.795, zSecCenter);
+          card.name = 'eye-level library clasp';
+          markSignMesh(card, { casts: true });
+          aisleParent.add(card);
+        }
+        continue;
       }
 
       if (archedTopper) {
