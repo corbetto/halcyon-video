@@ -1,4 +1,4 @@
-import { disposeShelfVisibility } from './shelf-visibility';
+import { disposeShelfVisibility, initializeHiddenShelfInstances } from './shelf-visibility';
 import { mobileStoreActive } from './mobile-store';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): building/clearing the instanced shelf
@@ -366,7 +366,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   scene.unitSideFrontMeshMap.clear();
   scene.unitSideBackMeshMap.clear();
 
-  // Instances start ZERO-SCALE (all-zero matrices), not three.js's default
+  // Instances start ZERO-SCALE (affine matrices with w=1), not three.js's default
   // identity: real placement happens later, per slot, in animate()'s dirty-slot
   // pass (as posters stream in). With identity starts, every not-yet-placed and
   // never-used tail instance renders as a case clump at the world origin — and
@@ -374,7 +374,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // probes, mirrors) both captures that clump and caches a wrong culling
   // sphere for the mesh.
   const initInstancesHidden = (mesh: THREE.InstancedMesh) => {
-    (mesh.instanceMatrix.array as Float32Array).fill(0);
+    initializeHiddenShelfInstances(mesh);
   };
 
   for (const [key, capacity] of unitSideCapacity) {

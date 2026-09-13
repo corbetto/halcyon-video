@@ -1,50 +1,43 @@
-import * as THREE from 'three';
+import type { InstancedMesh } from 'three';
 import type { StoreScene } from './three-scene';
 
-const states = new WeakMap<StoreScene, {
-  next: number;
-  spine: THREE.MeshBasicMaterial;
-  materials: Map<THREE.InstancedMesh, THREE.Material | THREE.Material[]>;
-}>();
-const sphere = new THREE.Sphere();
+/** Hide unplaced instances with a valid affine zero-scale transform. */
+export function initializeHiddenShelfInstances(mesh: InstancedMesh): void {
+  const matrices = mesh.instanceMatrix.array;
+  matrices.fill(0);
+  // An all-zero 4x4 matrix has w=0: bounding-sphere transforms divide by
+  // zero and poison the whole batch with NaN. Zero scale still needs w=1.
+  for (let offset = 15; offset < matrices.length; offset += 16) matrices[offset] = 1;
+}
 
-/** Native per-batch frustum culling plus distance LOD. Runs at 10Hz, not per slot/frame. */
+const nextUpdates = new WeakMap<StoreScene, number>();
+
+/** Keep artwork on resident shelf batches; the renderer culls offscreen bounds. */
 export function tickShelfVisibility(scene: StoreScene, time: number): void {
-  let state = states.get(scene);
-  if (!state) {
-    state = { next: 0, spine: new THREE.MeshBasicMaterial({ color: 0x374151 }), materials: new Map() };
-    states.set(scene, state);
-  }
-  if (time < state.next) return;
-  state.next = time + 100;
+  if (time < (nextUpdates.get(scene) ?? 0)) return;
+  nextUpdates.set(scene, time + 100);
   let changed = false;
-  const active = scene.slotsByPosition.get(scene.getActiveSlotKey());
   for (const [key, front] of scene.unitSideFrontMeshMap) {
-    // Wall and display stock is bounded separately and stays face-out.
+    // Wall and display stock is bounded separately.
     if (key.startsWith('fixture_') || key.startsWith('back_wall')) continue;
-    if (!state.materials.has(front)) state.materials.set(front, front.material);
-    if (!front.boundingSphere) front.computeBoundingSphere();
-    sphere.copy(front.boundingSphere!).applyMatrix4(front.matrixWorld);
-    const distance = Math.max(0, sphere.center.distanceTo(scene.camera.position) - sphere.radius);
-    const selected = active?.frontMesh === front;
+    // Distance alone cannot tell whether a cover is still readable, especially
+    // in long aisles or a narrow field of view. Resident poster arrays already
+    // have mipmaps: keep the real materials and let sampling choose their detail.
     front.frustumCulled = true;
-    const visible = selected || distance < 80;
-    const material = selected || distance < 28 ? state.materials.get(front)! : state.spine;
-    changed ||= front.visible !== visible || front.material !== material;
-    front.visible = visible;
-    front.material = material;
+    changed = !front.visible || changed;
+    front.visible = true;
     const back = scene.unitSideBackMeshMap.get(key);
-    if (back) { back.frustumCulled = true; back.visible = selected || distance < 28; }
+    if (back) {
+      back.frustumCulled = true;
+      changed = !back.visible || changed;
+      back.visible = true;
+    }
   }
-  // Both mouse-walk and keyboard glides stream only the nearby view.
+  // Throttle nearby cover promotion while retaining already uploaded artwork.
   scene.updateLOD();
   if (changed) scene.requestRender();
 }
 
 export function disposeShelfVisibility(scene: StoreScene): void {
-  const state = states.get(scene);
-  if (!state) return;
-  for (const [mesh, material] of state.materials) mesh.material = material;
-  state.spine.dispose();
-  states.delete(scene);
+  nextUpdates.delete(scene);
 }
