@@ -43,7 +43,7 @@ are at least 0.08, steel metalness is 0.85, laminate 0.03, reveal 0.10; roughnes
 varies approximately 0.44–0.56. UV islands are packed per physical part and tiled 8× for fine physical grain.
 The light baffle sits at Z 0.05, giving 0.85 ft of visible depth ahead of the
 existing counter band; it masks the blue counter behind the receiving throat.
-Cost: 2,116 triangles, four mesh draws, three materials, 334,280 GLB bytes.
+Cost: 2,324 triangles, four mesh draws, three materials, 348,056 GLB bytes.
 Decoded image pixels total 512 KiB before mipmaps; loader texture objects can
 share image data. The existing runtime label adds its original draws/textures.
 
@@ -67,3 +67,10 @@ captures block only the new GLB. Each run clears localStorage and uses the corpo
 1993 store by default; optional theme and storefront arguments exercise other
 finishes and counter anchors. Photographs and verification logs are delivered in the task outbox;
 these are local in-store previews, not a deployment.
+
+## Staff collection well
+
+The white housing opens onto a fitted dark receiver tub containing twenty
+rental cases. The staff-side counter opening is cut in Blender for both shield
+and square surrounds; the white front, slot aperture and moving flap keep their
+existing bounds and anchors. A blue backing retains the existing label contrast.

@@ -99,8 +99,11 @@ export function buildWindowBays(
   });
   const kneeTrimMat = new THREE.MeshStandardMaterial({ color: 0x001030, roughness: 0.55, metalness: 0.05 });
   wings.forEach(({ lo, hi }) => {
-    const segW = hi - lo;
-    const cxSeg = (lo + hi) / 2;
+    const innerLo = kneeGap && Math.abs(lo - kneeGap.center - kneeGap.halfWidth) < .01;
+    const innerHi = kneeGap && Math.abs(hi - kneeGap.center + kneeGap.halfWidth) < .01;
+    const a = lo - (innerLo ? .4 : 0), b = hi + (innerHi ? .4 : 0);
+    const segW = b - a;
+    const cxSeg = (a + b) / 2;
     const kneeGeo = new THREE.BoxGeometry(segW, KNEE_H, 0.3);
     // Floor-mounted, so vBottom 0 — samples the wall texture's bottom rows
     // just like the full-height corner margins flanking this run.
@@ -108,12 +111,12 @@ export function buildWindowBays(
       mapWallSegmentUV(kneeGeo, segW, KNEE_H, 0, kneeSurface.storeWidth, kneeSurface.roomHeight);
     }
     const wall = new THREE.Mesh(kneeGeo, kneeMat);
-    wall.position.set(cxSeg, KNEE_H / 2, 0);
+    wall.position.set(cxSeg, KNEE_H / 2, -.15);
     wall.castShadow = true;
     wall.receiveShadow = true;
     group.add(wall);
     const cap = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.12, 0.4), kneeTrimMat);
-    cap.position.set(cxSeg, KNEE_H + 0.06, 0);
+    cap.position.set(cxSeg, KNEE_H + 0.06, -.15);
     cap.castShadow = true;
     cap.receiveShadow = true;
     group.add(cap);
@@ -122,7 +125,7 @@ export function buildWindowBays(
     // instead of stepping up/down at every corner where a window wall meets
     // a solid one.
     const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.2, 0.34), kneeTrimMat);
-    kick.position.set(cxSeg, 0.1, 0);
+    kick.position.set(cxSeg, 0.1, -.15);
     kick.receiveShadow = true;
     group.add(kick);
   });
@@ -132,11 +135,11 @@ export function buildWindowBays(
     if (kneeSurface) mapWallSegmentUV(geo, hi-lo, height, 0, kneeSurface.storeWidth, kneeSurface.roomHeight);
     const divider = new THREE.Mesh(geo, kneeMat);
     divider.name = 'frontWindowMasonryInterior';
-    divider.position.set((lo+hi)/2, height/2, 0);
+    divider.position.set((lo+hi)/2, height/2, -.15);
     divider.castShadow = divider.receiveShadow = true;
     group.add(divider);
     const kick = new THREE.Mesh(new THREE.BoxGeometry(hi-lo, .2, .34), kneeTrimMat);
-    kick.position.set((lo+hi)/2, .1, 0);
+    kick.position.set((lo+hi)/2, .1, -.15);
     group.add(kick);
   }
 

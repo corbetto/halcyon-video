@@ -62,7 +62,7 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     FacadeDownlight: downlight,
     FacadeBrick: brick,
     FacadeSoldierBrick: soldier,
-    FacadeTile: tile,
+    FacadeTile: p.style === 'flat-parapet' ? brick : tile,
     FacadeTrim: trim,
     FacadeCoping: coping,
     // The early brick portal continues its masonry under the header.
@@ -207,7 +207,7 @@ export function setFacadeEntryLighting(scene: THREE.Scene, mode: OutsideMode): v
   scene.getObjectByName('storefrontEntryModel')?.userData.setOutsideMode?.(mode);
   // The facade sign is backlit after dusk, with no bloom obscuring its ink
   // in daylight. Store the authored night value once so toggles do not drift.
-  const level = mode === 'night' ? 1 : mode === 'sunset' ? .2 : 0;
+  const level = mode === 'night' ? .25 : mode === 'sunset' ? .08 : 0;
   for (const name of ['storefrontLogo3D', 'storefrontLayeredLogo']) {
     scene.getObjectByName(name)?.traverse(obj => {
       if (!(obj instanceof THREE.Mesh)) return;

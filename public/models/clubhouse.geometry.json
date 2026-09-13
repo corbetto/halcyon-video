@@ -1,11 +1,14 @@
 {
-  "bytes": 454628,
-  "triangles": 6476,
-  "draws": 5,
+  "bytes": 485744,
+  "triangles": 6868,
+  "draws": 8,
   "roles": [
     "FramePaint",
     "HeaderPaint",
     "PanelLaminate",
+    "ShelfLaminate",
+    "ShelfEdge",
+    "Baseboard",
     "EdgePaint",
     "CabinetLaminate"
   ],

@@ -1,3 +1,6 @@
+import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
+import { activeStoreFormat } from './store-format';
+import { planNrRuns, nrSlotTransform, type NrRun } from './nr-run-layout';
 import { disposeSceneMeshes } from './scene-mesh-disposal';
 import { installStoreSurfaceFinishes } from './store-surface-finish';
 import { fitSteppedCornerDepth } from './stepped-corner-clearance';
@@ -54,9 +57,7 @@ import {
   FIELD_Z_FRONT,
   AISLE_SHELF_HEIGHTS,
   WALL_SHELF_HEIGHTS,
-  BOX_SPACING,
   STAGGER_OFFSET,
-  NR_SECTION_COLS,
   UNIT_SIDE_CAPACITY,
   BACK_WALL_UNIT_IDX,
   seededRandom01,
@@ -68,7 +69,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols, wallAllowsFeatureSections,
+  FixturePlacement, newReleasesWallSpan, wallAllowsFeatureSections,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -793,8 +794,10 @@ export class StoreScene {
   // ribbon, back-aligned into the back-left corner) and continues contiguously
   // onto the back wall, which carries shelving spanning the whole wall and is
   // stepped: the right portion juts forward toward the viewer. The RIGHT wall
-  // carries no New Releases — its stretch behind the window ribbon holds the
-  // exterior side door instead.
+  // carries matching bays, ending before the service-door clearance.
+  public nrBayLightAnchors: { x: number; y: number; z: number }[] = [];
+  public nrBayLightingUpdate: (() => void) | null = null;
+  public nrRuns: NrRun[] = [];
   public nrLeftWallCols = 36;
   // Side-window ribbon z-span shared by BOTH side walls (null = no ribbon,
   // walls stay solid). Computed with the NR wall layout below; consumed by the
@@ -802,8 +805,7 @@ export class StoreScene {
   public sideRibbon: { frontZ: number; backZ: number } | null = null;
   public nrBackWallColsRun1 = 0;
   public nrBackWallColsRun2 = 0;
-  private nrBackWallColsRun3 = 0;
-  private nrBackWallCols = 36;
+  public nrBackWallColsRun3 = 0;
   public nrTotalCols = 72;
   public nrBackLeftX = -6.0;       // left X where back-wall shelving begins (after the left sliver)
   public nrBackRightEdgeX = 30.5;  // right X where back-wall shelving ends
@@ -1241,16 +1243,6 @@ export class StoreScene {
       // Derived flag every step-only site gates on, so nothing floats or leaves a
       // hole when the notch is removed. See the guarded blocks in buildStore().
       this.hasStep = this.stepDepth > 0;
-      const length1 = this.nrBackRun1EndX - this.nrBackLeftX;
-      const length2 = this.stepDepth;
-      const length3 = this.nrBackRightEdgeX - this.stepX;
-
-      this.nrBackWallColsRun1 = Math.max(0, Math.floor((length1 - 1.0) / BOX_SPACING));
-      this.nrBackWallColsRun2 = this.hasStep ? Math.max(0, Math.floor((length2 - 1.0) / BOX_SPACING)) : 0;
-      this.nrBackWallColsRun3 = this.hasStep ? Math.max(0, Math.floor((length3 - 1.0) / BOX_SPACING)) : 0;
-
-      this.nrBackWallCols = this.nrBackWallColsRun1 + this.nrBackWallColsRun2 + this.nrBackWallColsRun3;
-
       // Side-window ribbons: both side walls carry
       // the reference building's banded window run toward the FRONT. WINDOWS
       // TAKE PRIORITY (user direction): the ribbon claims its reference span
@@ -1281,20 +1273,13 @@ export class StoreScene {
       this.sideRibbon = ribbonLen >= SIDE_RIBBON_MIN_LEN
         ? { frontZ: SIDE_RIBBON_FRONT_Z, backZ: SIDE_RIBBON_FRONT_Z - ribbonLen }
         : null;
-      // Left wall has no stepped corner: its unit back-aligns to the back wall.
-      const unitBackZ = this.nrLeftWallUnitBackZ();
-      const unitSpace = (this.sideRibbon ? this.sideRibbon.backZ - SIDE_RIBBON_CLEARANCE : 15.0) - unitBackZ;
-      // GH #6: this used to hard-cap at 36 columns regardless of how much wall
-      // was actually available, which left the run stopping visibly short of
-      // the window ribbon on any store wide enough to offer more (the
-      // baseline-width store's ~44 available columns only ever built 36,
-      // an 8-column/~4.6ft gap of bare wall between the last case and the
-      // glass). The whole point of this calc is described right above it as
-      // ADAPTIVE — sized to whatever the ribbon leaves behind it — so let it
-      // actually use the space it computed instead of throwing some away.
-      this.nrLeftWallCols = newReleasesLeftWallCols(unitSpace);
-
-      this.nrTotalCols = this.nrLeftWallCols + this.nrBackWallCols;
+      // Fit the physical bays and stock to the same perimeter runs.
+      this.nrRuns = planNrRuns({ width: sw, backZ: this.backWallZ, backLeftX: this.nrBackLeftX,
+        backRightX: this.nrBackRightEdgeX, stepX: this.stepX, stepDepth: this.stepDepth,
+        sideBackZ: this.sideRibbon ? this.sideRibbon.backZ - SIDE_RIBBON_CLEARANCE : 15,
+        clubhouse: !!this.plan.clubhouse, wall: activeStoreFormat().newReleasesWall });
+      [this.nrLeftWallCols, this.nrBackWallColsRun1, this.nrBackWallColsRun2, this.nrBackWallColsRun3] = this.nrRuns.map(r => r.cols);
+      this.nrTotalCols = this.nrRuns.reduce((n, r) => n + r.cols, 0);
     }
 
     // Gather all unique movies from all libraries for the New Releases back
@@ -1330,8 +1315,8 @@ export class StoreScene {
 
     // Sections ARE the physical bays (store-nr-bays.ts): cut per wall run the
     // way the divider panels are, so no title ever spans a divider or the
-    // corner. A trailing partial bay is its own narrower section.
-    const nrBays = nrBaysForRuns([this.nrLeftWallCols, this.nrBackWallColsRun1, this.nrBackWallColsRun2, this.nrBackWallColsRun3]);
+    // corner. Only complete physical bays enter this ribbon.
+    const nrBays = nrBaysForRuns(this.nrRuns.map(r => r.cols));
     const numWallSections = nrBays.length;
     // A regular wall section faces ONE title out across its whole 8-column row,
     // so the wall wants one candidate per ROW, not per column. Those two counts
@@ -1749,7 +1734,6 @@ export class StoreScene {
   // section divider, so leaned cases (and their jittered stacked copies) never
   // graze the divider panel. Sign convention is for an ASCENDING local axis:
   // the column just after a divider shifts +, the column just before shifts −.
-  private static readonly NR_DIVIDER_CLEARANCE = 0.045;
   // `runStartCol` is the run's first column as a GLOBAL ribbon index: a column
   // adjacent to a divider suppressed inside a double-feature (see
   // nrSuppressedDividerCols) keeps its normal spacing so the doubled section
@@ -1768,97 +1752,10 @@ export class StoreScene {
     return null;
   }
 
-  private nrDividerNudge(colInRun: number, runStartCol = 0): number {
-    if (colInRun > 0 && colInRun % NR_SECTION_COLS === 0 &&
-        !this.nrSuppressedDividerCols.has(runStartCol + colInRun)) return StoreScene.NR_DIVIDER_CLEARANCE;
-    if (colInRun % NR_SECTION_COLS === NR_SECTION_COLS - 1 &&
-        !this.nrSuppressedDividerCols.has(runStartCol + colInRun + 1)) return -StoreScene.NR_DIVIDER_CLEARANCE;
-    return 0;
-  }
-
-  // Center Z of the LEFT-wall New Releases unit. Back-aligned against the
-  // back-left corner (the front stretch of the left wall carries the
-  // side-window ribbon), so the ribbon's col order runs front -> back and
-  // meets the back wall's Run 1 right at the corner — one contiguous wall of
-  // New Releases from the left wall onto the back wall. Single source of
-  // truth for the layout calc, the slot transforms, the built shelf run, and
-  // its signage.
-  public nrLeftWallUnitCenterZ(): number {
-    const unitLen = this.nrLeftWallCols * BOX_SPACING + 1.0;
-    return this.nrLeftWallUnitBackZ() + unitLen / 2;
-  }
-
-  // Back Z of the LEFT-wall unit's shelf boards: exactly the back-wall run's
-  // built depth from the back wall, so the unit's back end panel (which
-  // extends 0.04 ft past the boards, toward the wall) tucks behind Run 1's
-  // front face — the mirror of LEFT_SLIVER in the other axis. Single source
-  // for the layout calc (unitBackZ) and nrLeftWallUnitCenterZ above.
-  private nrLeftWallUnitBackZ(): number {
-    return this.backWallZ + (this.plan.clubhouse ? 18 : NR_RUN_DEPTH);
-  }
-
+  public nrLeftWallUnitCenterZ(): number { return this.nrRuns[0]?.z ?? this.nrLeftWallUnitBackZ(); }
+  private nrLeftWallUnitBackZ(): number { return this.backWallZ + (this.plan.clubhouse ? 18 : NR_RUN_DEPTH); }
   public getNewReleasesSlotTransform(col: number, _movie?: Movie, shelfY = WALL_SHELF_HEIGHTS[0]): { x: number, z: number, rotationY: number } {
-    const leftWallCols = this.nrLeftWallCols;
-    // Front cover and rental copy sit at the lip of the deeper #311 trays.
-    // Physical reserve behind them fits three/four Amray cases; the catalog
-    // continues to own how many rental copies are actually displayed.
-    const offset = nrWallStockOffset(shelfY);
-
-    if (col < leftWallCols) {
-      // Left Wall unit (faces +X into the store interior). Col 0 sits at the
-      // FRONT (just behind the window ribbon), ascending toward the back-left
-      // corner where the back wall's Run 1 picks up — contiguous ribbon.
-      // Case standoff mirrors the back-wall runs: the unit's group origin sits
-      // NR_LEFT_UNIT_STANDOFF off the wall mesh (its own "wall plane"), and the
-      // case hinge goes `offset` in front of that — the same stack-aware offset
-      // every other run uses. The old hardcoded +0.22 ignored both the standoff
-      // and extra-copy stack depth, sinking leaned cases back through the
-      // backing panel into the wall (user-reported back-left clipping).
-      const storeWidth = this.getStoreWidth();
-      const leftWallX = 11.0 - storeWidth / 2 + NR_LEFT_UNIT_STANDOFF + offset;
-      const wallZCenter = this.nrLeftWallUnitCenterZ();
-      // Front to back distribution (descending world Z, so the nudge flips sign)
-      const zPos = wallZCenter + ((leftWallCols - 1) * BOX_SPACING) / 2 - col * BOX_SPACING - this.nrDividerNudge(col);
-      return { x: leftWallX, z: zPos, rotationY: Math.PI / 2 };
-    }
-
-    const colInBack = col - leftWallCols;
-
-    if (colInBack < this.nrBackWallColsRun1) {
-      // Run 1: Far back wall (faces +Z)
-      const length1 = this.nrBackRun1EndX - this.nrBackLeftX;
-      const margin1 = (length1 - this.nrBackWallColsRun1 * BOX_SPACING) / 2;
-      const localX = -length1 / 2 + margin1 + (colInBack + 0.5) * BOX_SPACING + this.nrDividerNudge(colInBack, leftWallCols);
-      const centerPos1X = (this.nrBackLeftX + this.nrBackRun1EndX) / 2;
-      return { x: centerPos1X + localX, z: this.backWallZ + offset, rotationY: 0 };
-    } else if (colInBack < this.nrBackWallColsRun1 + this.nrBackWallColsRun2) {
-      // Run 2: Connector side wall (faces -X, along Z at stepX)
-      const c = colInBack - this.nrBackWallColsRun1;
-      const length2 = this.stepDepth;
-      const margin2 = (length2 - this.nrBackWallColsRun2 * BOX_SPACING) / 2;
-      const localX = -length2 / 2 + margin2 + (c + 0.5) * BOX_SPACING + this.nrDividerNudge(c, leftWallCols + this.nrBackWallColsRun1);
-      const stepWallZ = this.backWallZ + this.stepDepth;
-      const midStepZ = (this.backWallZ + stepWallZ) / 2;
-      // Since rotationY is -Math.PI/2, local X translates to world Z
-      return { x: this.stepX - offset, z: midStepZ + localX, rotationY: -Math.PI / 2 };
-    } else if (colInBack < this.nrBackWallColsRun1 + this.nrBackWallColsRun2 + this.nrBackWallColsRun3) {
-      // Run 3: Stepped-forward front wall (faces +Z)
-      const c = colInBack - this.nrBackWallColsRun1 - this.nrBackWallColsRun2;
-      const length3 = this.nrBackRightEdgeX - this.stepX;
-      const margin3 = (length3 - this.nrBackWallColsRun3 * BOX_SPACING) / 2;
-      const localX = -length3 / 2 + margin3 + (c + 0.5) * BOX_SPACING + this.nrDividerNudge(c, leftWallCols + this.nrBackWallColsRun1 + this.nrBackWallColsRun2);
-      const centerPos3X = (this.stepX + this.nrBackRightEdgeX) / 2;
-      const stepWallZ = this.backWallZ + this.stepDepth;
-      return { x: centerPos3X + localX, z: stepWallZ + offset, rotationY: 0 };
-    } else {
-      // Defensive fallback (cols beyond the ribbon should not exist): clamp
-      // onto the last Run 1 column so nothing ever lands at the origin.
-      const length1 = this.nrBackRun1EndX - this.nrBackLeftX;
-      const margin1 = (length1 - this.nrBackWallColsRun1 * BOX_SPACING) / 2;
-      const lastC = Math.max(0, this.nrBackWallColsRun1 - 1);
-      const localX = -length1 / 2 + margin1 + (lastC + 0.5) * BOX_SPACING;
-      return { x: (this.nrBackLeftX + this.nrBackRun1EndX) / 2 + localX, z: this.backWallZ + offset, rotationY: 0 };
-    }
+    return nrSlotTransform(this.nrRuns, col, nrWallStockOffset(shelfY));
   }
 
   private initThree() {
@@ -2774,7 +2671,10 @@ export class StoreScene {
     const sunIntensity = this.selectedSky ? this.selectedSky.sunIntensity : 3.6;
     const sunLight = new THREE.DirectionalLight(sunColor, sunIntensity);
     const sunTarget = new THREE.Object3D();
-    sunTarget.position.set(14.0, 0.0, this.scaleZ(-12.0));
+    sunTarget.position.set(STORE_CENTER_X, this.ceilingY / 2, (FRONT_GLASS_Z + this.backWallZ) / 2);
+    const sunShadowRadius = Math.hypot(this.getStoreWidth() / 2 + 2,
+      (FRONT_GLASS_Z - this.backWallZ) / 2 + 8, this.ceilingY / 2 + 4);
+    this.outdoor.sunShadowDistance = sunShadowRadius + 20;
     this.scene.add(sunTarget);
     sunLight.target = sunTarget;
     this.outdoor.sunLight = sunLight;
@@ -2787,12 +2687,12 @@ export class StoreScene {
     const sunShadowSize = this.effectiveQuality === 'high' ? 4096 : (this.effectiveQuality === 'medium' ? 2048 : 1024);
     sunLight.shadow.mapSize.width = sunShadowSize;
     sunLight.shadow.mapSize.height = sunShadowSize;
-    sunLight.shadow.camera.left = -55;
-    sunLight.shadow.camera.right = 55;
-    sunLight.shadow.camera.top = 45;
-    sunLight.shadow.camera.bottom = -45;
+    sunLight.shadow.camera.left = -sunShadowRadius;
+    sunLight.shadow.camera.right = sunShadowRadius;
+    sunLight.shadow.camera.top = sunShadowRadius;
+    sunLight.shadow.camera.bottom = -sunShadowRadius;
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 95;
+    sunLight.shadow.camera.far = 2 * sunShadowRadius + 40;
     this.scene.add(sunLight);
     this.scene.add(sunLight.target);
     this.topLights.push(sunLight);
@@ -5066,7 +4966,8 @@ export class StoreScene {
       // Same per-frame fixture upkeep a VIDEO frame does — the gate above has
       // already established none of it changes anything visible except the TV
       // texture upload, which is the entire point of the frame.
-      this.entrance?.update(time);
+      this.nrBayLightingUpdate?.();
+    this.entrance?.update(time);
       this.ambientTvs?.update(time);
       for (const f of this.slottedFixtures) f.update(time);
       perfTrace.end(SP_SIM);
@@ -5539,6 +5440,7 @@ export class StoreScene {
 
     // Fixture upkeep: desk terminal cursor blink; TV audio listener sync +
     // VideoTexture upload.
+    this.nrBayLightingUpdate?.();
     this.entrance?.update(time);
     this.ambientTvs?.update(time);
     this.updateMarqueeBulbs(time); // T13: no-op unless bb_marquee_anim is 'chase'; see its own comment

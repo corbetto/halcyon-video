@@ -40,7 +40,7 @@ export class Clubhouse implements SlottedFixture {
     const mat=(name:string,color:string,roughness=.76)=>this.own(new THREE.MeshStandardMaterial({name,color,roughness}));
     const wall = this.ctx.wallSurface?.material ?? mat('WallPaint', pal.wall, .92);
     const finishes={FramePaint:mat('FramePaint',pal.primary),HeaderPaint:mat('HeaderPaint',pal.primary),
-      PanelLaminate:wall,EdgePaint:mat('EdgePaint',pal.secondary),CabinetLaminate:mat('CabinetLaminate','#282722'),WallPoster:mat('WallPoster','#ffffff')};
+      PanelLaminate:wall,ShelfLaminate:mat('ShelfLaminate','#f8f2e8',.65),ShelfEdge:mat('ShelfEdge','#d6d0c5',.55),Baseboard:mat('Baseboard','#262626',.8),EdgePaint:mat('EdgePaint',pal.secondary),CabinetLaminate:mat('CabinetLaminate','#282722'),WallPoster:mat('WallPoster','#ffffff')};
     const fallback=new THREE.Group();root.add(fallback);
     const box=(parent:THREE.Group,x:number,y:number,z:number,w:number,h:number,d:number,m:THREE.Material,yaw=0)=>{
       const mesh=new THREE.Mesh(this.own(new THREE.BoxGeometry(w,h,d)),m);mesh.position.set(x,y,z);mesh.rotation.y=yaw;
@@ -53,8 +53,8 @@ export class Clubhouse implements SlottedFixture {
       const h=shelf?3.4:tv?2.3:panel?3.5:7.65;
       if(shelf){
         const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=f.yaw;fallback.add(g);
-        box(g,0,1.7,-.54,3.7,3.4,.12,finishes.PanelLaminate);
-        for(const y of this.shelfHeights){box(g,0,y+.04,0,3.7,.08,1.2,finishes.PanelLaminate);box(g,0,y+.13,.57,3.7,.1,.06,finishes.EdgePaint);}
+        box(g,0,1.7,-.54,3.7,3.4,.12,finishes.ShelfLaminate);
+        for(const y of this.shelfHeights){box(g,0,y+.04,0,3.7,.08,1.2,finishes.ShelfLaminate);box(g,0,y+.13,.57,3.7,.1,.06,finishes.ShelfEdge);}
       } else if(tv){
         const cabinet=new THREE.Group();cabinet.position.set(x,0,z);cabinet.rotation.y=f.yaw;fallback.add(cabinet);
         box(cabinet,0,1.15,0,3.5,2.3,3.5,finishes.CabinetLaminate);
@@ -66,13 +66,16 @@ export class Clubhouse implements SlottedFixture {
     for (const side of ['front','right']) {
       for (const u of [-6.7,.6]) box(fallback,side==='front'?u:6.9,5.55,side==='front'?6.9:u,.4,4.1,.4,finishes.FramePaint);
     }
-    for (const [lo,hi,m] of [[7.21,9.633333,finishes.HeaderPaint],
-      [9.633333,9.966667,finishes.EdgePaint],[9.966667,10.3,finishes.HeaderPaint],
-      [10.3,10.6,finishes.PanelLaminate]] as const) {
+    for (const [lo,hi,m] of [[7.21,9.933333,finishes.HeaderPaint],
+      [9.933333,10.266667,finishes.EdgePaint],[10.266667,10.6,finishes.HeaderPaint]] as const) {
       box(fallback,4,(lo+hi)/2,4,8.5,hi-lo,.35,m,Math.PI/4);
       box(fallback,-3,(lo+hi)/2,6.9,8,hi-lo,.3,m);
       box(fallback,6.9,(lo+hi)/2,-3,.3,hi-lo,8,m);
     }
+    box(fallback,-.03,.16,-6.765,13.53,.32,.07,finishes.Baseboard);
+    box(fallback,-6.765,.16,-.03,.07,.32,13.53,finishes.Baseboard);
+    box(fallback,-3.2,.16,6.735,7.4,.32,.07,finishes.Baseboard);
+    box(fallback,6.735,.16,-3.2,.07,.32,7.4,finishes.Baseboard);
     box(fallback,6.98,3.51,-3.05,.56,.12,6.85,finishes.PanelLaminate);
     for(const z of [-6.47,.37])box(fallback,6.9,5.44,z,.3,3.74,.08,finishes.EdgePaint);
     fallback.traverse(o=>{if(o instanceof THREE.Mesh && o.material===wall)mapClubhouseWall(o,this.ctx);});

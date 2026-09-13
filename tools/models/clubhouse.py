@@ -12,7 +12,7 @@ def linear_hex(hex):
  return tuple(v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4 for v in rgb)
 def canonical(name):return linear_hex(re.search(r"export const "+name+r" = '(#[0-9a-fA-F]{6})'",canon).group(1))
 roles={}
-for name,color in [('FramePaint',canonical('HALCYON_BLUE')),('HeaderPaint',canonical('HALCYON_BLUE')),('PanelLaminate',linear_hex('#eeeae0')),('EdgePaint',canonical('HALCYON_CREAM')),('CabinetLaminate',linear_hex('#282722')),('WallPoster',linear_hex('#ffffff'))]:
+for name,color in [('FramePaint',canonical('HALCYON_BLUE')),('HeaderPaint',canonical('HALCYON_BLUE')),('PanelLaminate',linear_hex('#eeeae0')),('ShelfLaminate',linear_hex('#f8f2e8')),('ShelfEdge',linear_hex('#d6d0c5')),('Baseboard',linear_hex('#262626')),('EdgePaint',canonical('HALCYON_CREAM')),('CabinetLaminate',linear_hex('#282722')),('WallPoster',linear_hex('#ffffff'))]:
  m=bpy.data.materials.new(name);m.diffuse_color=(*color,1);m.use_nodes=True;bsdf=m.node_tree.nodes['Principled BSDF'];bsdf.inputs['Base Color'].default_value=(*color,1);bsdf.inputs['Roughness'].default_value=.72 if 'Laminate' in name else .76;roles[name]=m
 parts=[]
 def slab(name,poly,lo,hi,role,bevel=.012,cutters=None):
@@ -84,12 +84,12 @@ for z in [-6.47,.37]:box('Right window reveal',6.9,z,.3,.08,3.57,8.72,'EdgePaint
 for side in ['front','right']:
  def shelf(name,x,z,w,d,lo,hi,role):return box(side+' '+name,x if side=='front' else z,z if side=='front' else x,w if side=='front' else d,d if side=='front' else w,lo,hi,role)
  for center in [-5.1,-1.4]:
-  for x in [center-1.8,center+1.8]:shelf('shelf upright',x,7.6,.1,1.2,.08,3.4,'PanelLaminate')
-  shelf('shelf back',center,7.08,3.5,.12,.08,3.4,'PanelLaminate')
+  for x in [center-1.8,center+1.8]:shelf('shelf upright',x,7.6,.1,1.2,.08,3.4,'ShelfLaminate')
+  shelf('shelf back',center,7.08,3.5,.12,.08,3.4,'ShelfLaminate')
   shelf('recessed plinth',center,7.5,3.5,.9,0,.25,'FramePaint')
   for y in [0.5, 1.38, 2.26]:
-   shelf('tray',center,7.6,3.5,1.2,y,y+.08,'PanelLaminate')
-   shelf('retaining lip',center,8.17,3.5,.06,y+.08,y+.18,'EdgePaint')
+   shelf('tray',center,7.6,3.5,1.2,y,y+.08,'ShelfLaminate')
+   shelf('retaining lip',center,8.17,3.5,.06,y+.08,y+.18,'ShelfEdge')
 # The upper construction fits the dropped lid, retaining low shelf/chair scale.
 # 4.5 -> 13.5 is remapped to 4.5 -> 10.6 feet; all joints share this datum.
 for o in parts:
@@ -99,12 +99,16 @@ for o in parts:
 # Keep the entry/window geometry and overall soffit height unchanged.
 for o in parts:
  if o.name in ['Mitered broad fascia','Upper accent band','Upper fascia cap']:
-  lo,hi={'Mitered broad fascia':(7.6516666667,9.6333333333),
-    'Upper accent band':(9.6333333333,9.9666666667),
-    'Upper fascia cap':(9.9666666667,10.3)}[o.name]
+  lo,hi={'Mitered broad fascia':(7.6516666667,9.9333333333),
+    'Upper accent band':(9.9333333333,10.2666666667),
+    'Upper fascia cap':(10.2666666667,10.6)}[o.name]
   oldlo=min(v.co.z for v in o.data.vertices);oldhi=max(v.co.z for v in o.data.vertices)
   for v in o.data.vertices:v.co.z=lo+(v.co.z-oldlo)*(hi-lo)/(oldhi-oldlo)
-ring('Soffit fitted return',10.3,10.6,'PanelLaminate')
+# Continuous skirting follows the inside wall faces and stops at the doorway.
+box('Inside rear skirting',-.03,-6.765,13.53,.07,0,.32,'Baseboard',.006)
+box('Inside left skirting',-6.765,-.03,.07,13.53,0,.32,'Baseboard',.006)
+box('Inside front skirting',-3.2,6.735,7.4,.07,0,.32,'Baseboard',.006)
+box('Inside right skirting',6.735,-3.2,.07,7.4,0,.32,'Baseboard',.006)
 # Physical box-projected UVs: the same ten repeats per foot as the store's
 # equipment finish, after the final height mapping (packed UVs stretched it).
 for o in parts:

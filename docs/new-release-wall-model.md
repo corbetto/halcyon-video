@@ -31,3 +31,13 @@ npm test && npm run build
 ```
 
 The browser verification renders the real installer in an isolated yellow-wall scene, including two full sections and a one-foot trimmed section. It is not a screenshot of a populated production catalog. Asset tests check tier/section dimensions, slope, usable capacity, finite UVs/normals, materials, draw-call merging, fallback behavior and disposal during loading.
+
+## Complete bay layout
+
+The perimeter planner fits only complete 4.8-foot bays with eight centered stock
+columns. The same runs drive geometry, dividers, stock, wall-mounted signs and
+clerk collision boundaries. Both side walls are stocked behind their windows;
+the right-side service door retains its clearance. The 1990 cornice contains a
+recessed fitting at each bay and real circular apertures through its underside.
+The repeated fittings share instanced geometry and materials. Six nearby shelf
+beams are reused as the visitor moves, bounding rendering cost.

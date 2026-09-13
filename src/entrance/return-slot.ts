@@ -153,7 +153,7 @@ export class ReturnSlot {
     );
 
     const theme = getActiveTheme();
-    const blueHex = theme.palette.counterTop;
+    const blueHex = '#f4f4f0';
     const goldHex = theme.palette.secondary;
 
     // Same laminate mottle the counter band wears, so the chute reads as a
@@ -236,8 +236,18 @@ export class ReturnSlot {
 
     // "▼ RETURN TAPES HERE ▼" across the top panel, theme gold on body blue.
     const fallback = [...this.group.children];
-    this.buildLettering(zFace, slotTop, blueHex, goldHex);
+    this.buildLettering(zFace, slotTop, theme.palette.counterTop, goldHex);
     this.model = installReturnSlotModel(ctx, this.group, fallback, blueHex);
+    const titles = ctx.libraries.flatMap(l => l.movies).filter(m => !m.discovery && !m.collectionGap && !m.comingSoon).slice(0, 4);
+    titles.forEach((movie, index) => {
+      const materials = createHeroRentalMaterials(movie).map(m => m.clone()); this.ownedMats.push(...materials);
+      for (let level = 0; level < 5; level++) {
+        const tape = new THREE.Mesh(getRentalCaseGeometry(false), materials);
+        tape.name = 'Returned tape in receiver'; tape.position.set((index % 2 ? .44 : -.44), 1 + level * .12, -.98 + Math.floor(index / 2) * .68);
+        tape.rotation.set(-Math.PI / 2, 0, (index % 2 ? 1 : -1) * .055);
+        tape.castShadow = tape.receiveShadow = true; this.group.add(tape);
+      }
+    });
   }
 
   /**
@@ -359,6 +369,11 @@ export class ReturnSlot {
     const screwG = new THREE.CylinderGeometry(0.0095, 0.0095, 0.022, 10);
     screwG.rotateX(Math.PI / 2);
     this.ownedGeoms.push(plateG, textG, glossG, screwG);
+    // Preserve the original high-contrast label on the newly white housing.
+    const labelBack = new THREE.MeshStandardMaterial({ color: _blueHex, roughness: .65 });
+    this.ownedMats.push(labelBack);
+    const backing = new THREE.Mesh(plateG, labelBack);
+    backing.position.set(0, stripY, zFace + .01); backing.receiveShadow = true; this.group.add(backing);
     const plate = new THREE.Mesh(plateG, plateMat);
     plate.position.set(0, stripY, zFace + 0.012);
     plate.castShadow = false;

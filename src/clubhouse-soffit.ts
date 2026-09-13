@@ -29,7 +29,7 @@ export function buildClubhouseSoffit(left: number, back: number, ceiling: number
   underside.position.y=CLUBHOUSE.height-.006;underside.name='Lower acoustic tile ceiling';underside.receiveShadow=true;root.add(underside);
   // Flush diffusers on the lower grid, including the neighboring shelving bays.
   const trimGeo=new THREE.BoxGeometry(1.98,.06,1.98),lightGeo=new THREE.BoxGeometry(1.82,.025,1.82);
-  for(const [x,z] of [[5,5],[3,15],[15,3]]){
+  for(const [x,z] of [[5,5],[3,16.5],[16.5,3]]){
     const trim=new THREE.Mesh(trimGeo,frame);trim.position.set(left+x,CLUBHOUSE.height-.035,back+z);root.add(trim);
     const panel=new THREE.Mesh(lightGeo,lens);panel.position.set(left+x,CLUBHOUSE.height-.074,back+z);root.add(panel);
   }

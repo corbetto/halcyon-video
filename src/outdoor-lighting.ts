@@ -120,6 +120,7 @@ export class OutdoorLightingRig {
   public outsideMode: OutsideMode = 'day';
   // Created by StoreScene (setupLighting / buildStore) and handed over.
   public sunLight: THREE.DirectionalLight | null = null;
+  public sunShadowDistance = 100;
   public commercialSky = false;
   public skyMesh: THREE.Mesh | null = null;
   // The storefront sign PointLight (created by buildStore). Its shadow runs with
@@ -264,7 +265,7 @@ export class OutdoorLightingRig {
   applySunPlacement() {
     if (this.sunLight) {
       const el = this.sunElevation, az = this.sunAzimuth;
-      const dist = 42;
+      const dist = this.sunShadowDistance;
       const dir = new THREE.Vector3(
         Math.sin(az) * Math.cos(el),
         Math.sin(el),

@@ -1,3 +1,6 @@
+import { placeStockCart } from './fixtures/stock-cart-layout';
+import { buildNrBayLighting } from './nr-bay-lighting';
+import { NR_BAY_WIDTH, nrColumnX } from './nr-run-layout';
 import { buildClubhouseSoffit, clubhouseSoffitPolygon } from './clubhouse-soffit';
 import { CLUBHOUSE } from './fixtures/clubhouse-layout';
 import { NR_RUN_DEPTH } from './store-layout';
@@ -35,7 +38,7 @@ import { windowBayLayout } from './storefront-window-layout';
 import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
-import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
+import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
@@ -73,7 +76,7 @@ import { mapFacadeUV } from './facade-masonry';
 import { createFacadeSlateMaterial } from './facade-slate-material';
 import { setFacadeEntryLighting } from './storefront-entry-model';
 import { buildWindowAwnings, setWindowAwningLighting } from './storefront-awning';
-import { buildStorefrontLogo3D } from './logo-storefront';
+import { buildStorefrontLogo3D, fitStorefrontEmblemAnchor } from './logo-storefront';
 import { create3DDoubleLayeredSign, markSignMesh, auditSignMeshes } from './sign-builders';
 import { retailAudio } from './audio';
 import { buildSignage, SignSlot } from './fixtures/signage';
@@ -194,13 +197,13 @@ scene: StoreScene,
       mapWallSegmentUV(kneeGeo, segW, KNEE_H, 0, scene.wallSurface.storeWidth, scene.wallSurface.roomHeight);
     }
     const wall = new THREE.Mesh(kneeGeo, kneeMat);
-    wall.position.set(cxSeg, KNEE_H / 2, 0);
+    wall.position.set(cxSeg, KNEE_H / 2, -.15);
     wall.castShadow = true;
     wall.receiveShadow = true;
     group.add(wall);
     // Navy sill cap on top of the knee wall
     const cap = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.12, 0.4), kneeTrimMat);
-    cap.position.set(cxSeg, KNEE_H + 0.06, 0);
+    cap.position.set(cxSeg, KNEE_H + 0.06, -.15);
     cap.castShadow = true;
     cap.receiveShadow = true;
     group.add(cap);
@@ -208,7 +211,7 @@ scene: StoreScene,
     // (below, in the room-shell baseboards) so this window wall's trim
     // lines up with the solid walls' at every corner instead of stepping.
     const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.2, 0.34), kneeTrimMat);
-    kick.position.set(cxSeg, 0.1, 0);
+    kick.position.set(cxSeg, 0.1, -.15);
     kick.receiveShadow = true;
     group.add(kick);
   });
@@ -414,11 +417,11 @@ export function buildStore(scene: StoreScene) {
   const KNEE_EXT_H = 2.0; // matches createWindowSection's knee-wall height
   const extVestibuleGapHalf = vestibuleHalfWidth(scene.storefrontSpec); // matches the front window's kneeGap
   const kneeVeneerThick = 0.1;
-  const kneeVeneerZ = FRONT_GLASS_Z + 0.15 + 0.02 + kneeVeneerThick / 2; // clear of the interior knee wall/frame (z=15±0.15)
+  const kneeVeneerZ = FRONT_GLASS_Z + 0.3 + 0.02 + kneeVeneerThick / 2; // clear of the interior knee wall/frame (z=15±0.15)
 
   const frontKneeSegs: [number, number][] =
     storeWidth / 2 - extVestibuleGapHalf > 0.05
-      ? [[-storeWidth / 2, -extVestibuleGapHalf], [extVestibuleGapHalf, storeWidth / 2]]
+      ? [[-storeWidth / 2, -extVestibuleGapHalf + .4], [extVestibuleGapHalf - .4, storeWidth / 2]]
       : [[-storeWidth / 2, storeWidth / 2]];
   frontKneeSegs.forEach(([a, b]) => {
     const segW = b - a;
@@ -592,6 +595,7 @@ export function buildStore(scene: StoreScene) {
     // LogoSpec Phase B1: a spec asking for a truly-3D sign (extruded emblem
     // or channel letters) builds through logo-storefront.ts; null means the
     // default flat layered sign below, byte-for-byte the legacy path.
+    facade.logoAnchor = fitStorefrontEmblemAnchor(facade.logoAnchor);
     scene.storefrontLogo3D = buildStorefrontLogo3D(facade.logoAnchor);
     if (scene.storefrontLogo3D) {
       scene.scene.add(scene.storefrontLogo3D.group);
@@ -1467,7 +1471,7 @@ export function buildStore(scene: StoreScene) {
   const backWallGeo = new THREE.PlaneGeometry(storeWidth, roomHeight);
   const backWall = new THREE.Mesh(backWallGeo, wallMat);
   backWall.position.set(STORE_CENTER_X, wallCenterY, backWallZ);
-  backWall.receiveShadow = true;
+  backWall.castShadow = backWall.receiveShadow = true;
   scene.scene.add(backWall);
 
   // Named mount surface for this wall (unrotated PlaneGeometry, so its
@@ -1503,6 +1507,7 @@ export function buildStore(scene: StoreScene) {
   // same mapping, so they carry the wall's mottle/orange-peel/contact-AO
   // instead of being flat paint that reads as a different surface where it
   // butts the wall segments beside it.
+  wallMat.shadowSide = THREE.DoubleSide;
   scene.wallSurface = { material: wallMat, storeWidth, roomHeight };
 
   // Step faces only exist when there's a notch — with bb_corner === 'none' the
@@ -1514,7 +1519,7 @@ export function buildStore(scene: StoreScene) {
     scaleWallUV(stepFrontGeo, rightSectionWidth);
     const stepFront = new THREE.Mesh(stepFrontGeo, wallMat);
     stepFront.position.set((scene.stepX + rightEdgeX) / 2, wallCenterY, stepWallZ);
-    stepFront.receiveShadow = true;
+    stepFront.castShadow = stepFront.receiveShadow = true;
     scene.scene.add(stepFront);
 
     // Connector wall closing the inner corner (runs in Z at stepX, faces -X)
@@ -1523,7 +1528,7 @@ export function buildStore(scene: StoreScene) {
     const stepSide = new THREE.Mesh(stepSideGeo, wallMat);
     stepSide.position.set(scene.stepX, wallCenterY, backWallZ + scene.stepDepth / 2);
     stepSide.rotation.y = -Math.PI / 2; // normal points -X toward the interior
-    stepSide.receiveShadow = true;
+    stepSide.castShadow = stepSide.receiveShadow = true;
     scene.scene.add(stepSide);
   }
 
@@ -1545,7 +1550,7 @@ export function buildStore(scene: StoreScene) {
       const seg = new THREE.Mesh(geo, wallMat);
       seg.position.set(wallX, (yBottom + yTop) / 2, (z0 + z1) / 2);
       seg.rotation.y = inwardYaw;
-      seg.receiveShadow = true;
+      seg.castShadow = seg.receiveShadow = true;
       scene.scene.add(seg);
     };
     if (!ribbon) {
@@ -1600,7 +1605,7 @@ export function buildStore(scene: StoreScene) {
       const band = new THREE.Mesh(geo, wallMat);
       band.position.set(STORE_CENTER_X + (a + b) / 2, (WINDOW_HEAD_Y + ceilingY) / 2, FRONT_GLASS_Z);
       band.rotation.y = Math.PI; // Facing inwards
-      band.receiveShadow = true;
+      band.castShadow = band.receiveShadow = true;
       scene.scene.add(band);
     });
 
@@ -1619,12 +1624,12 @@ export function buildStore(scene: StoreScene) {
     const seg = new THREE.Mesh(geo, wallMat);
     seg.position.set(STORE_CENTER_X + (a + b) / 2, (floorY + WINDOW_HEAD_Y) / 2, FRONT_GLASS_Z);
     seg.rotation.y = Math.PI; // Facing inwards
-    seg.receiveShadow = true;
+    seg.castShadow = seg.receiveShadow = true;
     scene.scene.add(seg);
     // Navy base kick matching the knee wall's (#134) so the baseboard line
     // runs unbroken from the knee wall across the margin into the side wall.
     const kick = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.2, 0.34), marginKickMat);
-    kick.position.set(STORE_CENTER_X + (a + b) / 2, floorY + 0.1, FRONT_GLASS_Z);
+    kick.position.set(STORE_CENTER_X + (a + b) / 2, floorY + 0.1, FRONT_GLASS_Z + .15);
     kick.receiveShadow = true;
     scene.scene.add(kick);
   });
@@ -1978,8 +1983,7 @@ export function buildStore(scene: StoreScene) {
   // (the layout calc already shrank it to fit behind the side-window
   // ribbon; a hardcoded 36 here would build shelves wider than the stocked
   // columns and poke them into the window zone).
-  const leftWallCols = scene.nrLeftWallCols;
-  const leftWallShelfWidth = leftWallCols * BOX_SPACING + 1.0;
+  const leftWallShelfWidth = scene.nrRuns[0]?.length ?? 0;
 
   // Shared materials for aisle shelving units
   const sharedAisleSignSideMat = new THREE.MeshStandardMaterial({
@@ -2076,7 +2080,7 @@ export function buildStore(scene: StoreScene) {
   const shelfModels = new ShelfModelBatch();
   const nrWallModels = new NrWallModelBatch();
   const nrTopperRuns: NrTopperRun[] = [];
-  const buildShelfRun =(length: number, centerPos: THREE.Vector3, rotationY: number, globalColStart: number) => {
+  const buildShelfRun =(length: number, centerPos: THREE.Vector3, rotationY: number, globalColStart: number, wallInset: number) => {
     const group = new THREE.Group();
     const nrFallback: THREE.Mesh[] = [];
     const nrPanels: number[] = [];
@@ -2108,15 +2112,13 @@ export function buildStore(scene: StoreScene) {
         y: -.017, z: .012, yaw: -Math.PI / 2 }]);
 
       if (Math.abs(yPos - 4.7) < 0.01 && scene.promoSignMat && scene.promoSignRedMat) {
-        const runCols = Math.floor((length - 1.0) / BOX_SPACING);
-        const margin = (length - runCols * BOX_SPACING) / 2;
+        const runCols = Math.round(length / NR_BAY_WIDTH) * NR_SECTION_COLS;
         const numSections = Math.ceil(runCols / NR_SECTION_COLS);
 
         for (let s = 0; s < numSections; s += 2) {
           const startCol = s * NR_SECTION_COLS;
           const endCol = Math.min(runCols - 1, s * NR_SECTION_COLS + NR_SECTION_COLS - 1);
-          const centerCol = (startCol + endCol) / 2;
-          const xCenter = -length / 2 + margin + (centerCol + 0.5) * BOX_SPACING;
+          const xCenter = (nrColumnX(length, startCol) + nrColumnX(length, endCol)) / 2;
 
           const signGeom = new THREE.BoxGeometry(1.2, 0.3, 0.001);
           const materials = [
@@ -2166,13 +2168,12 @@ export function buildStore(scene: StoreScene) {
     // Same front-face depth as the shelves/end-panels (#130 — used to sit
     // recessed 0.1ft behind the shelf's own front lip, leaving a gap you
     // could see straight through to the shelf/case behind it).
-    const runCols = Math.floor((length - 1.0) / BOX_SPACING);
-    const margin = (length - runCols * BOX_SPACING) / 2;
+    const runCols = Math.round(length / NR_BAY_WIDTH) * NR_SECTION_COLS;
     for (let colDivider = NR_SECTION_COLS; colDivider < runCols; colDivider += NR_SECTION_COLS) {
       // A double-feature spans two sections as ONE display: skip the
       // divider that would bisect it (global boundary = run start + local).
       if (scene.nrSuppressedDividerCols.has(globalColStart + colDivider)) continue;
-      const xDiv = -length / 2 + margin + colDivider * BOX_SPACING;
+      const xDiv = -length / 2 + colDivider / NR_SECTION_COLS * NR_BAY_WIDTH;
       const div = new THREE.Mesh(backDividerGeo, sharedShelfMat);
       div.position.set(xDiv, NR_PANEL_CY, NR_ANCHOR_Z);
       nrFallback.push(div); nrPanels.push(xDiv);
@@ -2191,46 +2192,19 @@ export function buildStore(scene: StoreScene) {
       length,
       topY: NR_PANEL_H,
       // Cards retain the established top-of-carcass sign anchor.
-      frontZ: nrFrontZAt(NR_PANEL_H),
+      frontZ: .012 - wallInset,
       sideMaterial: sharedShelfMat,
     });
   };
 
-  // Back-wall New Releases runs. Run 1 (far back wall) always exists — with a
-  // notch it stops at stepX; with bb_corner === 'none' it spans the whole back
-  // wall. The connector side wall (Run 2) and stepped-forward front wall (Run 3)
-  // only exist when there's a notch; their lengths are 0 otherwise, so guard
-  // them to avoid building zero/negative-length shelf runs.
   const midStepZ = (backWallZ + stepWallZ) / 2;
-  // End before the connector's projecting shelf so the two runs do not
-  // intersect at the inside corner or hide each other's last case column.
-  buildShelfRun(scene.nrBackRun1EndX - scene.nrBackLeftX,
-      new THREE.Vector3((scene.nrBackLeftX + scene.nrBackRun1EndX) / 2, 0, backWallZ), 0,
-    scene.nrLeftWallCols);
-  if (scene.hasStep) {
-    buildShelfRun(scene.stepDepth,
-      new THREE.Vector3(scene.stepX, 0, midStepZ), -Math.PI / 2,
-      scene.nrLeftWallCols + scene.nrBackWallColsRun1);
-    buildShelfRun(scene.nrBackRightEdgeX - scene.stepX,
-      new THREE.Vector3((scene.stepX + scene.nrBackRightEdgeX) / 2, 0, stepWallZ), 0,
-      scene.nrLeftWallCols + scene.nrBackWallColsRun1 + scene.nrBackWallColsRun2);
-  }
-
-  // LEFT-wall New Releases unit — the START of the ribbon. Back-aligned
-  // into the back-left corner behind the side-window ribbon; its col order
-  // runs front -> back (ascending local X under rotY = +PI/2), meeting
-  // Run 1's leftmost column right at the corner. Same builder as every
-  // other wall run: cols ascend along local X and globalColStart is 0, so
-  // section dividers and double-feature suppression line up with the slot
-  // transforms. Windows take priority (user direction): when the layout
-  // calc zeroed its columns (the side ribbon claimed the wall), skip it —
-  // the back-wall runs carry New Releases alone.
   const leftWallXCenter = STORE_CENTER_X - storeWidth / 2 + NR_LEFT_UNIT_STANDOFF;
   const leftWallZCenter = scene.nrLeftWallUnitCenterZ();
-  if (scene.nrLeftWallCols > 0) {
-    buildShelfRun(leftWallShelfWidth,
-      new THREE.Vector3(leftWallXCenter, 0, leftWallZCenter), Math.PI / 2, 0);
+  for (const run of scene.nrRuns) if (run.cols > 0) {
+    buildShelfRun(run.length, new THREE.Vector3(run.x, 0, run.z), run.yaw, run.startCol, run.wallInset);
   }
+
+  buildNrBayLighting(scene);
 
   // Section markers on top of every New Releases wall run: the 1990 store
   // names this wall with ticket cards, not paint (the wall itself carries only
@@ -2373,7 +2347,17 @@ export function buildStore(scene: StoreScene) {
       }
     });
   };
+  fixturePlacements.sort((a, b) => Number(a.kind === 'release-cart') - Number(b.kind === 'release-cart'));
   fixturePlacements.forEach(placement => {
+    if (placement.kind === 'release-cart') {
+      const chosen = placeStockCart([...scene.plan.getUnitFootprints(), ...fixtureFootprints,
+        { label: 'counter and entrance', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
+        ...(scene.plan.clubhouse ? [{ label: 'clubhouse reserved', kind: 'structure' as const,
+          cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
+      ], { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2, minZ: backWallZ, maxZ: FRONT_GLASS_Z });
+      if (!chosen) return;
+      placement = chosen;
+    }
     const fixture = createFixture(placement, scene.fixtureContext());
     fixture.build();
     const footprint = fixture.getFootprint?.();
@@ -2512,6 +2496,9 @@ export function buildStore(scene: StoreScene) {
   // stepped back corner.
   const entranceClerkNav = scene.entrance.getClerkNav();
   scene.clerkNavRects = [
+    ...scene.nrRuns.filter(r => r.cols > 0).map(r => ({ label: `shelving:new-release-${r.startCol}`,
+      kind: 'shelving' as const, cx: r.x + Math.sin(r.yaw) * NR_RUN_DEPTH / 2,
+      cz: r.z + Math.cos(r.yaw) * NR_RUN_DEPTH / 2, w: r.length + .08, d: NR_RUN_DEPTH, yaw: r.yaw, clearance: .3 })),
     ...fixtureFootprints.filter(f => !f.label.startsWith('structure:counter-band')),
     ...scene.plan.getUnitFootprints(),
     // She may hug her own counter tighter than floor fixtures — the band's
@@ -2951,7 +2938,7 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
   const plan = ceilingCornicePoints(scene, storeWidth, backWallZ);
   const cornice = buildCornice(scene.scene,plan,ceilY,liveMirrorsAllowed(scene),reflectorTargetSize(scene.renderer),()=>{
     scene.renderer.shadowMap.needsUpdate=true; scene.requestRender();
-  });
+  }, scene.nrBayLightAnchors);
   scene.shelves.push(cornice);
 
   // --- Prebaked warm up-glow where the cornice meets the gold walls ---

@@ -36,7 +36,7 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   { id: 'counter-apparel', kind: 'counter-apparel', position: { x: 15.5, z: 8.54 }, yaw: Math.PI },
   // Open entrance foreground, before the aisle ends. Parallel to the runner;
   // neither end closes the entrance. #222 continues to own vestibule mats.
-  { id: 'rope-queue-entrance', kind: 'rope-stanchions', position: { x: -4.9, z: 8.5 }, yaw: 0 },
+  // Entrance rope rails stay dormant until the owner chooses their location.
   // Reserved left checkout bay, opposite the sale table; clear of the queue.
   { id: 'release-cart-checkout', kind: 'release-cart', position: { x: -5, z: 3 }, yaw: 0, options: { noRentalCase: true } },
   // Floor displays are SPREAD down the store's open central corridor (the

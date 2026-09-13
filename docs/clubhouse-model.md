@@ -102,8 +102,8 @@ Late model and private-texture arrivals are disposed after host removal.
 Blender scripted mesh authoring and Blender's standard glTF exporter produce
 `tools/models/clubhouse.blend`, `tools/models/clubhouse.py` and
 `public/models/clubhouse.glb`. The source retains named construction parts, UVs
-and five finish roles. The export costs 560,256 bytes / 7,976 triangles / five
-material batches and contains zero images. The fitted structural soffit lives
+and eight finish roles, separating wall plaster, shelf laminate, shelf edges and
+baseboard. The export costs 485,744 bytes / 6,868 triangles / eight material batches and contains zero images. The fitted structural soffit lives
 in `src/clubhouse-soffit.ts`, following the existing procedural shell pipeline.
 The completed chair and television assets were reused without remodeling.
 
@@ -149,3 +149,10 @@ Unavailable artwork leaves the ordinary wall visible. The television and
 VCR face diagonally into the store. The television borrows the ambient
 player's picture material and keeps that decoder active while its screen
 is visible. No second video or audio pipeline is added.
+
+## September 2026 finish and ceiling fit
+
+The interior has continuous dark skirting. Family shelves use pale laminate and
+matching shelf-edge hardware independently of the plaster liners. The painted
+stripe reaches the 10.6-foot dropped soffit, and the adjacent diffusers clear
+its wall faces. The existing family catalog slots and open windows remain live.

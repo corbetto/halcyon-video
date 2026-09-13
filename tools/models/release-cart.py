@@ -1,5 +1,5 @@
 """Original generic stock cart; feet, Blender Z up, glTF Y up. Run blender -b -P this_file."""
-import bpy, math, os, json
+import bpy, bmesh, math, os, json
 from mathutils import Vector
 ROOT=os.path.abspath(os.path.join(os.path.dirname(__file__),'../..'))
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
@@ -40,15 +40,20 @@ for x in [-1.5,1.5]:
   for dy in [-.095,.095]:box('CasterFork_'+tag+str(dy),(x,y+dy,.35),(.12,.035,.32),chrome)
   bpy.ops.mesh.primitive_cylinder_add(vertices=20,radius=.18,depth=.15,location=(x,y,.18),rotation=(math.pi/2,0,0));finish(bpy.context.object,'Tire_'+tag,rubber)
   bpy.ops.mesh.primitive_cylinder_add(vertices=12,radius=.065,depth=.23,location=(x,y,.18),rotation=(math.pi/2,0,0));finish(bpy.context.object,'Axle_'+tag,chrome)
-# Solid sheet tray: inset floor, fitted four walls with rolled upper edges.
-box('TopTrayFloor',(0,0,2.525),(3.2,1.7,.05))
-for y in [-.875,.875]:box('TrayLongWall'+str(y),(0,y,2.70),(3.3,.05,.40))
-for x in [-1.675,1.675]:box('TrayEndWall'+str(x),(x,0,2.70),(.05,1.8,.40))
-# Lower shelf and tilted back support; cases lean into this open rack.
-box('LowerShelf',(0,0,.875),(3.2,1.7,.05))
-for y in [-.86,.86]:box('LowerLip'+str(y),(0,y,.95),(3.3,.04,.15))
-for x in [-1.63,1.63]:box('LowerEnd'+str(x),(x,0,.95),(.04,1.7,.15))
-o=box('LeaningRackBack',(0,.41,1.20),(3.1,.04,.68));o.rotation_euler.x=-math.pi/6
+# Each tray is one closed folded sheet, including its bottom and inside faces.
+def tray(name, floor, rim):
+ outer=[(-1.7,-.95),(1.7,-.95),(1.7,.95),(-1.7,.95)]
+ inner=[(-1.64,-.89),(1.64,-.89),(1.64,.89),(-1.64,.89)]
+ verts=[(x,y,z) for ring,z in [(outer,floor-.06),(outer,floor+rim),(inner,floor+rim),(inner,floor)] for x,y in ring]
+ faces=[(3,2,1,0),(12,13,14,15)]
+ for i in range(4):
+  j=(i+1)%4;faces += [(i,j,j+4,i+4),(i+4,j+4,j+8,i+8),(i+8,j+8,j+12,i+12)]
+ me=bpy.data.meshes.new(name);me.from_pydata(verts,[],faces);me.update()
+ ob=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(ob)
+ bm=bmesh.new();bm.from_mesh(me);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));assert all(e.is_manifold for e in bm.edges);bm.to_mesh(me);bm.free()
+ finish(ob,name,steel)
+tray('Closed top tray',2.55,.35)
+tray('Closed lower tray',.9,.15)
 for y in [-.80,.80]:tube('FrameRail'+str(y),[(-1.5,y,2.35),(1.5,y,2.35)],.035,steel)
 points=[(1.5,-.75,2.65),(1.9,-.75,2.65)]
 for i in range(1,7):a=-math.pi/2+i*math.pi/12;points.append((1.9+.15*math.cos(a),-.6+.15*math.sin(a),2.65))
@@ -56,6 +61,7 @@ points.append((2.05,.6,2.65))
 for i in range(1,7):a=i*math.pi/12;points.append((1.9+.15*math.cos(a),.6+.15*math.sin(a),2.65))
 points.append((1.5,.75,2.65));tube('ContinuousPushHandle',points)
 bpy.context.scene.unit_settings.system='IMPERIAL';bpy.context.scene.unit_settings.scale_length=.3048
+bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'tools/models/release-cart.blend'))
 bpy.ops.object.select_all(action='SELECT')
 bpy.context.view_layer.objects.active=next(o for o in bpy.context.scene.objects if o.type=='MESH')

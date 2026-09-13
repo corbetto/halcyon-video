@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { StorePlan } from '../src/store-plan.ts';
-import { clubhouseEligible, clubhouseFeet, clubhouseHost, childrenChairPlacements } from '../src/fixtures/clubhouse-layout.ts';
+import { CLUBHOUSE, clubhouseEligible, clubhouseFeet, clubhouseHost, childrenChairPlacements } from '../src/fixtures/clubhouse-layout.ts';
 import { validateLayout } from '../src/layout-validator.ts';
 import { ClerkNavGrid } from '../src/clerk-nav.ts';
 import type { Movie, JellyfinLibrary } from '../src/jellyfin.ts';
@@ -38,7 +38,7 @@ for(const arrangement of ['straight','diagonal','herringbone'] as const) test(`$
 test('shipped host uses UVs, named materials, modest cost and floor/ceiling bounds',()=>{
   const bytes=readFileSync(new URL('../public/models/clubhouse.glb',import.meta.url));
   const gltf=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
-  assert.ok(bytes.length<650000);assert.equal(gltf.meshes.length,5);assert.equal(gltf.images?.length??0,0);
+  assert.ok(bytes.length<650000);assert.equal(gltf.meshes.length,8);assert.equal(gltf.images?.length??0,0);
   let triangles=0,minY=Infinity,maxY=-Infinity;
   for(const mesh of gltf.meshes)for(const p of mesh.primitives){
     assert.ok(p.attributes.TEXCOORD_0!==undefined);assert.ok(gltf.materials[p.material].name);
@@ -65,7 +65,7 @@ test('upper paint band meets the wall stripe and finish UVs retain physical scal
   const top=(role:string)=>Math.max(...gltf.meshes.flatMap((m:any)=>m.primitives)
     .filter((p:any)=>gltf.materials[p.material].name===role)
     .map((p:any)=>gltf.accessors[p.attributes.POSITION].max[1]));
-  const wallTop=13.5-2.7-.5;
+  const wallTop=CLUBHOUSE.height;
   assert.ok(Math.abs(top('HeaderPaint')-wallTop)<.0001);
   assert.ok(Math.abs(top('EdgePaint')-(wallTop-1/3))<.0001);
   for(const mesh of gltf.meshes)for(const p of mesh.primitives){

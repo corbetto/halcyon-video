@@ -24,7 +24,7 @@ def material(name,color,metal,roughness):
  nm=nodes.new('ShaderNodeNormalMap'); nm.inputs['Strength'].default_value=.45; links.new(tex.outputs['Color'],nm.inputs['Color']); links.new(nm.outputs['Normal'],p.inputs['Normal'])
  tex=nodes.new('ShaderNodeTexImage'); tex.image=rm; links.new(tex.outputs['Color'],p.inputs['Roughness'])
  return m
-body=material('ChuteLaminate',(.08,.13,.34),.03,.36)
+body=material('ChuteLaminate',(.9,.9,.87),.03,.45)
 metal=material('ChuteSteel',(.48,.50,.53),.85,.36)
 dark=material('ChuteReveal',(.09,.10,.12),.1,.62)
 parts=[]
@@ -45,8 +45,8 @@ def box(name,x0,x1,y0,y1,z0,z1,mat,bevel=.006):
  return profile(name,x0,x1,[(y0,z0),(y1,z0),(y1,z1),(y0,z1)],mat,bevel)
 # Continuous rounded millwork envelope, with a machined aperture and hollow rear.
 yz=[(0,-1.49),(3.85,-1.49),(3.85,.52)]
-for i in range(1,25):
- a=math.pi/2*(1-i/24); yz.append((3.47+.38*math.sin(a),.52+.38*math.cos(a)))
+for i in range(1,17):
+ a=math.pi/2*(1-i/16); yz.append((3.47+.38*math.sin(a),.52+.38*math.cos(a)))
 yz.append((0,.9))
 shell=profile('Rounded laminate shell',-1.2,1.2,yz,body,0)
 def cut(name,x0,x1,y0,y1,z0,z1):
@@ -55,8 +55,14 @@ def cut(name,x0,x1,y0,y1,z0,z1):
  bpy.ops.object.modifier_apply(modifier=mod.name); parts.remove(cutter); bpy.data.objects.remove(cutter,do_unlink=True)
 cut('Open rear counter socket',-1.06,1.06,.08,3.46,-1.60,.76)
 cut('Through aperture',-1,0,2.4,2.7,.70,1.0)
+cut('Open staff collection well',-1.06,1.06,1.6,4.0,-1.60,.20)
+# Drop receiver: a fitted tub beneath the open well, with four retaining walls.
+box('Receiver floor',-1.06,1.06,.83,.91,-1.49,.24,dark)
+box('Receiver rear rim',-1.06,1.06,.91,1.62,-1.49,-1.41,dark)
+box('Receiver front rim',-1.06,1.06,.91,1.62,.16,.24,dark)
+for a,b in [(-1.06,-.98),(.98,1.06)]:box('Receiver side rim',a,b,.91,1.62,-1.41,.16,dark)
 bpy.context.view_layer.objects.active=shell
-mod=shell.modifiers.new('Eased laminate cut edges','BEVEL'); mod.width=.006; mod.segments=3; bpy.ops.object.modifier_apply(modifier=mod.name)
+mod=shell.modifiers.new('Eased laminate cut edges','BEVEL'); mod.width=.006; mod.segments=2; bpy.ops.object.modifier_apply(modifier=mod.name)
 shell.select_set(True); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.smart_project(island_margin=.015); bpy.ops.object.mode_set(mode='OBJECT'); shell.select_set(False)
 # Folded throat, open all the way to the receiver. No solid dark cavity cube.
 box('Throat ceiling',-1,0,2.68,2.70,.05,.904,metal,.002)
@@ -84,6 +90,7 @@ for o in parts:
 for area in bpy.context.screen.areas:
  if area.type=='VIEW_3D':
   area.spaces.active.region_3d.view_distance=7; area.spaces.active.region_3d.view_location=Vector((0,0,1.9))
+bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/interior-return-chute.blend'))
 # Merge static parts by material, keep hinge independently movable.
 source_parts=len(parts)

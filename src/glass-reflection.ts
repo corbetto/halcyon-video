@@ -194,10 +194,11 @@ export function addGlassReflectionPane(
 ): THREE.Mesh | null {
   if (useCheapMaterials()) return null;
   const pane = new THREE.Mesh(glass.geometry, makeGlassReflectionMaterial({
-    // Window glass is plain glass: F0 = 0.04 head-on rising to a mirror at
-    // grazing, and no gain on top. That IS the "lit store at dusk" read the
-    // panes were always meant to have.
-    envMapIntensity: 1,
+    // A subdued window reflection preserves the view through the glass,
+    // including when parking lamps line up with the viewing angle.
+    envMapIntensity: .45,
+    layerGain: .18,
+    roughness: .14,
     side: THREE.DoubleSide,
     ...opts,
   }));
@@ -207,10 +208,10 @@ export function addGlassReflectionPane(
   // Above the glass it sits on, so the reflection composites over the
   // transmitted image rather than under it.
   pane.renderOrder = glass.renderOrder + 1;
-  // Never shadowed: an additive reflection darkened by a shadow map would be
-  // light subtracted from a surface the light never landed on.
+  // Blocking masonry must also block the direct specular highlights.
+  // Shadowing reduces added light; it cannot subtract the transmitted view.
   pane.castShadow = false;
-  pane.receiveShadow = false;
+  pane.receiveShadow = true;
   parent.add(pane);
   return pane;
 }

@@ -51,7 +51,7 @@ import { makeCrtGlassMaterial, addGlassReflectionPane } from '../glass-reflectio
 import { assetUrl } from '../asset-url';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { getActiveTheme, themeKneeGoldHex } from '../themes';
-import { CEILING_Y, mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
+import { mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
 import { facadeEntryGlazing, facadeStyle } from '../storefront-architecture';
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
@@ -295,7 +295,7 @@ export class EntranceCheckout implements StoreFixture {
     // is closed by a solid, wall-colored capping soffit instead — see
     // "Solid soffit cap" below.
     const soffitCapY = vestibuleCeilingY(this.ctx.ceilingY);
-    const wallH = Math.min(soffitCapY, vestibuleCeilingY(CEILING_Y));
+    const wallH = Math.min(soffitCapY, WINDOW_HEAD_Y);
     const wallT = 0.12;          // glazing thickness
 
     // ----- Materials -----
@@ -339,7 +339,7 @@ export class EntranceCheckout implements StoreFixture {
     // delineate the narrow sidelights beside the door pair.
     const buildGlazedWall = (
       orient: 'X' | 'Z', fixed: number, s0: number, s1: number, gaps: number[],
-      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number },
+      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number },
     ) => {
       // place a box whose long axis lies along the wall's run direction
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
@@ -373,7 +373,7 @@ export class EntranceCheckout implements StoreFixture {
         // Only door jambs reach the floor. Fixed sidelight posts sit on the
         // masonry sill instead of cutting a dark stripe through its face.
         const isDoorJamb = intervals.some(([a, b]) => Math.abs(v - a) < 0.01 || Math.abs(v - b) < 0.01);
-        const bottom = isDoorJamb ? 0 : sillY;
+        const bottom = isDoorJamb ? 0 : (orient === 'Z' && Math.abs(v - frontZ) < .01 ? opts?.frontSillY ?? sillY : sillY);
         const top = fullHeight ? wallH : doorH;
         along(v, frameT, (top + bottom) / 2, top - bottom, frameD, frameMat);
       });
@@ -401,6 +401,28 @@ export class EntranceCheckout implements StoreFixture {
     const sideDoorZ = backZ + doorW / 2 + 0.4; // side doors sit on the store-side (inner) half
     this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ, hasChamber };
     const doorMats = { frameMat, glassMat, chrome };
+    if (hasChamber && this.ctx.wallSurface) {
+      const surface = this.ctx.wallSurface;
+      const liner = (lo: number, hi: number, bottom: number, top: number) => {
+        if (hi <= lo || top <= bottom) return;
+        const geo = new THREE.BoxGeometry(hi - lo, top - bottom, .16);
+        mapWallSegmentUV(geo, hi - lo, top - bottom, bottom, surface.storeWidth, surface.roomHeight);
+        const mesh = new THREE.Mesh(geo, surface.material);
+        mesh.name = 'vestibule-interior-masonry'; mesh.position.set((lo + hi) / 2, (bottom + top) / 2, frontZ - .24);
+        mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+      };
+      const glazing = facadeEntryGlazing(doorW, facadeStyle());
+      liner(xL - .2, xR + .2, WINDOW_HEAD_Y, soffitCapY);
+      liner(xL - .2, cx - glazing.openingHalfWidth, 0, WINDOW_HEAD_Y);
+      liner(cx + glazing.openingHalfWidth, xR + .2, 0, WINDOW_HEAD_Y);
+      if (glazing.dividerWidth) {
+        liner(cx - glazing.dividerWidth / 2, cx + glazing.dividerWidth / 2, 0, WINDOW_HEAD_Y);
+        const doorOuter = glazing.doorCenterOffset + doorW / 2;
+        liner(cx - glazing.openingHalfWidth, cx - doorOuter, 0, 1.82);
+        liner(cx + doorOuter, cx + glazing.openingHalfWidth, 0, 1.82);
+      }
+    }
+
 
     if (hasChamber) {
       // Gabled stores have separate entry/exit doors and transoms around a
@@ -441,8 +463,8 @@ export class EntranceCheckout implements StoreFixture {
       buildGlazedWall('X', backZ, xL, xR, []);
 
       // ----- Side walls (glass), each with one door on the inner (store-side) half -----
-      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ]); // right wall -> into store
-      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ]); // left wall  -> exiters enter
+      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // right wall -> into store
+      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // left wall  -> exiters enter
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xR, sideDoorZ, doorH, false, true, 1.4));
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xL, sideDoorZ, doorH, false, true, 1.4));
 

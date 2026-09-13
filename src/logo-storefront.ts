@@ -1,3 +1,5 @@
+import { facadeEmblemScale } from './facade-emblem-fit';
+import { facadeStyle } from './storefront-architecture';
 import { selfLit } from './material-lighting';
 // Phase B1 of the LogoSpec system: the storefront sign in TRUE 3D. Two modes
 // beyond the classic flat layered quads:
@@ -489,4 +491,13 @@ export function buildStorefrontLogo3D(
   }
   if (spec.storefront.extrudeDepth > 0) return buildExtrudedEmblem(spec, anchor);
   return null;
+}
+
+/** Large emblems stay supported by the facade across configurable brand shapes. */
+export function fitStorefrontEmblemAnchor(anchor: FacadeLogoAnchor): FacadeLogoAnchor {
+  const spec = getActiveLogoSpec();
+  if (spec.storefront.mode === 'letters') return anchor;
+  const points = emblemLoopsInFrame(spec).flat().map(p => ({ x: (p.x - .5) * anchor.width, y: (.5 - p.y) * anchor.height }));
+  const scale = facadeEmblemScale(points, anchor.y, anchor.gable, facadeStyle() === 'gabled-brick');
+  return { ...anchor, width: anchor.width * scale, height: anchor.height * scale };
 }

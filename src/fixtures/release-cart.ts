@@ -1,14 +1,15 @@
+import { shuffledStock } from './stock-cart-layout';
 import * as THREE from 'three';
 import { FixturePlacement } from '../store-layout';
 import { FixtureContext, FixtureSlot, SlottedFixture } from '../fixtures';
 import { Footprint, FLOOR_DISPLAY_CLEARANCE } from '../layout-validator';
-import { CASE_HEIGHT, CASE_DEPTH } from '../video-case';
+import { CASE_DEPTH } from '../video-case';
 import { installDisplayModel } from './display-model';
 
 /** Original unbranded service cart. Stock stays owned by the shared case pipeline. */
 export class ReleaseCart implements SlottedFixture {
-  capacity = 6;
-  genre = 'New Release Cart';
+  capacity = 48;
+  genre = 'Return Cart';
   shelfHeights = [.9, 2.55];
   private group: THREE.Group | null = null;
   private owned: Array<{ dispose(): void }> = [];
@@ -16,7 +17,7 @@ export class ReleaseCart implements SlottedFixture {
   private movies: FixtureContext['libraries'][number]['movies'] = [];
   constructor(public placement: FixturePlacement, private ctx: FixtureContext) {}
   refreshStock(): void {
-    this.movies = this.ctx.libraries.flatMap(l => l.movies).slice().sort((a, b) => (b.year || 0) - (a.year || 0)).slice(0, this.capacity);
+    this.movies = shuffledStock(this.ctx.libraries.flatMap(l => l.movies), this.capacity);
   }
   build(): void {
     this.refreshStock();
@@ -33,7 +34,7 @@ export class ReleaseCart implements SlottedFixture {
       const mesh = new THREE.Mesh(geo,steel); mesh.position.set(x,y,z); mesh.castShadow=true; fallback.add(mesh);
     };
     for (const y of [.875,2.525]) {
-      box(0,y,0,3.2,.05,1.7);
+      box(0,y,0,3.4,.05,1.9);
       for (const z of [-.875,.875]) box(0,y+.175,z,3.3,.35,.05);
       for (const x of [-1.675,1.675]) box(x,y+.175,0,.05,.35,1.8);
     }
@@ -53,16 +54,16 @@ export class ReleaseCart implements SlottedFixture {
   getSlots(): FixtureSlot[] {
     if (!this.group || !this.movies.length) return [];
     const slots: FixtureSlot[] = [];
-    for (let row=0;row<2;row++) for(let col=0;col<3;col++) {
-      const lean = row===0 ? -Math.PI/6 : 0;
-      const x=(col-1)*.82, z=row===0 ? -.05 : 0;
-      const yaw=this.placement.yaw;
-      slots.push({movie:this.movies[(row*3+col)%this.movies.length],side:'front',shelfIdx:row,col,
-        restingX:this.placement.position.x+x*Math.cos(yaw)+z*Math.sin(yaw),
-        restingZ:this.placement.position.z-x*Math.sin(yaw)+z*Math.cos(yaw),
-        restingY:this.shelfHeights[row]+CASE_HEIGHT/2*Math.cos(lean)+CASE_DEPTH/2*Math.abs(Math.sin(lean)),
-        restingRotY:yaw,restingRotX:lean,depth:CASE_DEPTH,
-        key:`fixture_${this.placement.id}_side_front_shelf_${row}_col_${col}`});
+    for (let row = 0; row < 2; row++) for (let col = 0; col < 24; col++) {
+      const stack = Math.floor(col / 3), level = col % 3;
+      const x = ((stack % 4) - 1.5) * .68, z = (Math.floor(stack / 4) - .5) * .79;
+      const yaw = this.placement.yaw;
+      slots.push({ movie: this.movies[(row * 24 + col) % this.movies.length], side: 'front', shelfIdx: row, col,
+        restingX: this.placement.position.x + x * Math.cos(yaw) + z * Math.sin(yaw),
+        restingZ: this.placement.position.z - x * Math.sin(yaw) + z * Math.cos(yaw),
+        restingY: this.shelfHeights[row] + CASE_DEPTH / 2 + level * (CASE_DEPTH + .008),
+        restingRotY: yaw + (stack % 2 ? .035 : -.035), restingRotX: -Math.PI / 2, depth: CASE_DEPTH,
+        key: `fixture_${this.placement.id}_side_front_shelf_${row}_col_${col}` });
     }
     return slots;
   }

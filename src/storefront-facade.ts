@@ -427,8 +427,8 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     x: CX,
     y: dimensions.logoY,
     z: towerFrontZ + 0.05,
-    width: logoWidth,
-    height: logoHeight,
+    width: logoWidth * 2,
+    height: logoHeight * 2,
     gable: style === 'gabled-brick'
       ? { baseY: gableBase, halfWidth: massHalf-1, height: gableH }
       : { baseY: 13.4, halfWidth: massHalf, height: dimensions.pierTop-13.4 },

@@ -61,7 +61,7 @@ const YELLOW_FRAC = 1 / 3;      // trim stripe, centered — the other 2/3 split
 // from every normal viewing angle. The visible "ceiling line" as experienced
 // from inside the store is that cornice's bottom edge, so the gap is measured
 // from THERE, not from the true ceiling plane.
-const CEILING_GAP_FT = 0.5;     // band TOP sits this far below the VISIBLE ceiling line
+const CEILING_GAP_FT = 0.2;     // band TOP sits this far below the VISIBLE ceiling line
 
 const WALL_STANDOFF = 0.04;     // ft off the wall plane — behind every wall fixture
 
@@ -185,6 +185,17 @@ export function buildWallStripe1990(scene: StoreScene): void {
       centerY,
       run.cz + Math.cos(run.yaw) * WALL_STANDOFF,
     );
+    const surface = scene.wallSurface;
+    if (surface) {
+      const uv = geo.getAttribute('uv');
+      const relief = new Float32Array(uv.count * 2);
+      const pos = geo.getAttribute('position');
+      for (let i = 0; i < uv.count; i++) {
+        relief[i * 2] = (uv.getX(i) / repeat * run.len) / surface.storeWidth;
+        relief[i * 2 + 1] = pos.getY(i) / surface.roomHeight;
+      }
+      geo.setAttribute('uv1', new THREE.BufferAttribute(relief, 2));
+    }
     parts.push(geo);
   }
 
@@ -201,7 +212,25 @@ export function buildWallStripe1990(scene: StoreScene): void {
   });
   const mesh = markSignMesh(new THREE.Mesh(merged, mat));
   mesh.name = 'wall-stripe-1990';
+  mesh.receiveShadow = true;
   scene.scene.add(mesh);
+  const wall = scene.wallSurface?.material;
+  if (wall instanceof THREE.MeshStandardMaterial) {
+    let previousNormal: THREE.Texture | null = null, previousRoughness: THREE.Texture | null = null;
+    const copies: THREE.Texture[] = [];
+    mesh.onBeforeRender = () => {
+      if (wall.normalMap === previousNormal && wall.roughnessMap === previousRoughness) return;
+      copies.splice(0).forEach(t => t.dispose());
+      const relief = (source: THREE.Texture | null) => {
+        if (!source) return null;
+        const texture = source.clone(); texture.channel = 1; texture.needsUpdate = true; copies.push(texture); return texture;
+      };
+      mat.normalMap = relief(wall.normalMap); mat.roughnessMap = relief(wall.roughnessMap);
+      mat.normalScale.copy(wall.normalScale); mat.roughness = wall.roughness;
+      previousNormal = wall.normalMap; previousRoughness = wall.roughnessMap; mat.needsUpdate = true;
+    };
+    mat.addEventListener('dispose', () => copies.forEach(t => t.dispose()));
+  }
 
   // Optional photo-derived upgrade strip, if the owner ever installs one.
   // A 404 is the normal committed case and leaves the procedural paint up.
