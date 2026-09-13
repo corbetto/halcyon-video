@@ -137,7 +137,8 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
       const sourceWidth = 2.16 + (1.4 - 2.16) * t;
       const width = p.depth + ((p.topDepth ?? p.depth) - p.depth) * t;
       pos.setXYZ(i, pos.getX(i) * (p.kind !== 'spine' ? width / sourceWidth : p.depth / .5),
-        y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8,
+        p.kind === 'spine' && (p.height ?? 5) < .5 ? (y - .20) * (p.height ?? 5) / 4.8
+          : y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8,
         pos.getZ(i) * (p.kind === 'spine' ? p.length : 1));
     }
     if (p.kind === 'cap') {

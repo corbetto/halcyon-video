@@ -434,6 +434,18 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
 
     });
 
+    // Finished laminate closes the base below the lowest deck on each face.
+    if (!wireFrame) {
+      const baseH = AISLE_SHELF_HEIGHTS[0] - .0425;
+      const faceX = unitDepthAtHeight(AISLE_SHELF_HEIGHTS[0]) / 2 - .05;
+      for (const side of [-1, 1]) {
+        stamp(structureParts, getBoxTemplate(.0625, baseH, shelfLength - .04),
+          xCenter + side * faceX, baseH / 2, zCenter);
+        structureModels.push({ kind: 'spine', depth: .0625, height: baseH,
+          length: shelfLength - .04, x: xCenter + side * faceX, z: zCenter });
+      }
+    }
+
     // Vertical dividers between sets of 7 columns - ONE CONTINUOUS PIECE FROM BOTTOM TO TOP
     const addDivider = (zDiv: number) => {
       if (wireFrame) {

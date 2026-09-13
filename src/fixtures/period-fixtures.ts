@@ -164,11 +164,6 @@ export class CandyDisplay implements StoreFixture {
         map: tex,
         roughness: 0.65,
         metalness: 0.05,
-        ...(powerWing ? {
-          emissiveMap: tex,
-          emissive: new THREE.Color(0xffffff),
-          emissiveIntensity: 0.15,
-        } : {}),
       });
       this.disposables.push({ mat: boxMat, tex });
 

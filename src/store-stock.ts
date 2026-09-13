@@ -17,7 +17,7 @@ import { isPublicDemo } from './demo-mode';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
 import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
-import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, NR_WALL_STOCK_OFFSET, NR_RUN_DEPTH, NR_WALL_SLOPE, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
+import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, NR_WALL_SLOPE, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { validateCaseFit, type CaseFitPair } from './layout-validator';
 import { retailAudio } from './audio';
 import { clearPosterPrefetch } from './poster-prefetch';
@@ -801,11 +801,11 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     const shelfIdx = slotPos.shelfIdx;
 
     const shelfY = WALL_SHELF_HEIGHTS[shelfIdx];
-    const transform = scene.getNewReleasesSlotTransform(col, movie);
+    const transform = scene.getNewReleasesSlotTransform(col, movie, shelfY);
     const hinge = scene.leanHingeOffset(LEAN_ANGLE, transform.rotationY, boxHeight);
     // Series boxsets are SERIES_DEPTH_MULT deeper, so their leaned bottom
     // edge needs proportionally more lift to stay out of the shelf board.
-    const yPos = shelfY + 0.03 + NR_WALL_SLOPE * (NR_WALL_STOCK_OFFSET - NR_RUN_DEPTH)
+    const yPos = shelfY + 0.03 + NR_WALL_SLOPE * -.14
       + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
     const bwX = transform.x + hinge.x;
     const bwZ = transform.z + hinge.z;

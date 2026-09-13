@@ -13,7 +13,8 @@ import { buildFacadeEntryModel } from './storefront-entry-model';
 import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
 import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
-import { createBrickTexture, createSlateTexture } from './canvas-textures';
+import { createBrickTexture } from './canvas-textures';
+import { createFacadeSlateMaterial } from './facade-slate-material';
 import { WINDOW_BAY_TARGET_WIDTH, FRONT_WINDOW_CORNER_MARGIN, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
 export interface FacadeBuildParams {
@@ -174,20 +175,12 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     group.add(m);
     return m;
   };
-  const slateTex = style === 'cone-canopy' ? createSlateTexture() : null;
-  const slateVeneer = slateTex ? new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: slateTex.map,
-    normalMap: slateTex.normalMap,
-    roughnessMap: slateTex.roughnessMap,
-    roughness: 0.85,
-    metalness: 0.08,
-  }) : null;
+  const slateHelper = style === 'cone-canopy' ? createFacadeSlateMaterial() : null;
+  const slateVeneer = slateHelper?.material ?? null;
   const masonry = slateVeneer ?? brickMaterial(1, 1);
-  if (slateTex && slateVeneer) {
+  if (slateHelper) {
     group.addEventListener('removed', () => {
-      [slateTex.map, slateTex.normalMap, slateTex.roughnessMap].forEach(t => t?.dispose());
-      slateVeneer.dispose();
+      slateHelper.dispose();
     });
   }
   const brickBox = (w: number, h: number, d: number, x: number, y: number, z: number) => {

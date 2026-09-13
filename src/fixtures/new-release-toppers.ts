@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { getActiveTheme, type StoreTheme } from '../themes';
 import { markSignMesh } from '../sign-builders';
-import { BOX_SPACING, SECTION_COLS } from '../store-layout';
+import { BOX_SPACING, NR_SECTION_COLS } from '../store-layout';
 import {
   createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T,
 } from './ticket-board-sign';
@@ -66,11 +66,11 @@ export function buildNewReleaseToppers(runs: NrTopperRun[]): THREE.Mesh[] {
     const runCols = Math.floor((run.length - 1.0) / BOX_SPACING);
     if (runCols <= 0) continue;
     const margin = (run.length - runCols * BOX_SPACING) / 2;
-    const sections = Math.ceil(runCols / SECTION_COLS);
+    const sections = Math.ceil(runCols / NR_SECTION_COLS);
 
     for (let s = 0; s < sections; s++) {
-      const startCol = s * SECTION_COLS;
-      const endCol = Math.min(runCols - 1, startCol + SECTION_COLS - 1);
+      const startCol = s * NR_SECTION_COLS;
+      const endCol = Math.min(runCols - 1, startCol + NR_SECTION_COLS - 1);
       // A short corner remainder cannot support a full-width topper. Its
       // neighbour already names the same ribbon; do not crowd the wall turn.
       if ((endCol - startCol + 1) * BOX_SPACING < TICKET_BOARD_W + .25) continue;

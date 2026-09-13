@@ -445,7 +445,7 @@ const CORPORATE: StoreFormatSpec = {
 
   facadeStyle: 'chain-tower',
   ceilingY: 13.5,
-  steppedCorner: true,
+  steppedCorner: false,
   keyLightSpacingScale: 1.0,
   keyLightIntensityScale: 1.0,
   carpet: 'loop-pile',

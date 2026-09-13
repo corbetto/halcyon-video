@@ -35,7 +35,7 @@ import { windowBayLayout } from './storefront-window-layout';
 import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
-import { NR_WALL_SLOPE, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
+import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
@@ -63,13 +63,14 @@ import { buildPreownedPreorderGamesSigns } from './fixtures/preowned-preorder-ga
 import { buildNewReleaseToppers, type NrTopperRun } from './fixtures/new-release-toppers';
 import { StoreClerk, ClerkDest } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
-import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createSlateTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
+import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
 import { getActiveTheme, themeTrimDarkHex, themeKneeGoldHex, WALL_PAINT_OPTIONS } from './themes';
 import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
 import { buildStorefrontFacade, WINDOW_HEAD_Y, SIDE_RIBBON_PANE_W } from './storefront-facade';
 import { buildShopfrontFacade } from './storefront-facade-shop';
 import { mapFacadeUV } from './facade-masonry';
+import { createFacadeSlateMaterial } from './facade-slate-material';
 import { setFacadeEntryLighting } from './storefront-entry-model';
 import { buildWindowAwnings, setWindowAwningLighting } from './storefront-awning';
 import { buildStorefrontLogo3D } from './logo-storefront';
@@ -375,27 +376,10 @@ export function buildStore(scene: StoreScene) {
   const isShopFacade = activeStoreFormat().facadeStyle === 'storefront';
   const isConeCanopy = facadeStyle() === 'cone-canopy';
   const stuccoSrc = createStuccoTexture();
-  const slateSrc = isConeCanopy ? createSlateTexture() : null;
+  const coneSlateHandle = isConeCanopy ? createFacadeSlateMaterial({ onChange: () => scene.requestRender() }) : null;
   const kneeVeneerMaterial = (repX: number, repY: number): THREE.MeshStandardMaterial => {
-    if (isConeCanopy && slateSrc) {
-      const map = slateSrc.map.clone();
-      const normalMap = slateSrc.normalMap.clone();
-      const roughnessMap = slateSrc.roughnessMap.clone();
-      [map, normalMap, roughnessMap].forEach((t) => {
-        t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(repX, repY);
-        t.needsUpdate = true;
-      });
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        map,
-        normalMap,
-        roughnessMap,
-        roughness: 0.85,
-        metalness: 0.08,
-      });
-      brickMats.push(mat);
-      return mat;
+    if (isConeCanopy && coneSlateHandle) {
+      return coneSlateHandle.material;
     }
     if (!isShopFacade) return brickMaterial(repX, repY);
     const map = stuccoSrc.map.clone();
@@ -446,6 +430,7 @@ export function buildStore(scene: StoreScene) {
     veneer.castShadow = true;
     veneer.receiveShadow = true;
     dimEnvOutside(veneer);
+    if (coneSlateHandle) veneer.addEventListener('removed', () => coneSlateHandle.dispose());
     scene.scene.add(veneer);
   });
 
@@ -1976,14 +1961,21 @@ export function buildStore(scene: StoreScene) {
   // #311: straight laminate carcass with eight independently sloped trays.
   // Keep the established floor-to-eight-foot panel and local +Z wall anchors.
   const WALL_CLEARANCE = NR_WALL_CLEARANCE;
-  const nrDepthAt = (_yPos: number): number => backWallShelfDepth;
-  const nrCenterZAt = (_yPos: number): number => WALL_CLEARANCE + backWallShelfDepth / 2;
-  const nrFrontZAt = (_yPos: number): number => WALL_CLEARANCE + backWallShelfDepth;
+  const nrDepthAt = nrWallDepthAtHeight;
+  const nrCenterZAt = (y: number): number => WALL_CLEARANCE + nrDepthAt(y) / 2;
+  const nrFrontZAt = (y: number): number => WALL_CLEARANCE + nrDepthAt(y);
   const NR_ANCHOR_Z = WALL_CLEARANCE + backWallShelfDepth / 2;
   const NR_PANEL_H = 8.0;
   const NR_PANEL_CY = NR_PANEL_H / 2;
   const backSidePanelGeo = new THREE.BoxGeometry(0.04, NR_PANEL_H, backWallShelfDepth);
   const backDividerGeo = new THREE.BoxGeometry(0.04, NR_PANEL_H, backWallShelfDepth);
+  for (const geometry of [backSidePanelGeo, backDividerGeo]) {
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) if (positions.getZ(i) > 0) {
+      positions.setZ(i, nrDepthAt(positions.getY(i) + NR_PANEL_CY) - backWallShelfDepth / 2);
+    }
+    geometry.computeVertexNormals();
+  }
 
   // Left-wall unit shelf width, sized from the ADAPTIVE column count
   // (the layout calc already shrank it to fit behind the side-window
@@ -2121,11 +2113,11 @@ export function buildStore(scene: StoreScene) {
       if (Math.abs(yPos - 4.7) < 0.01 && scene.promoSignMat && scene.promoSignRedMat) {
         const runCols = Math.floor((length - 1.0) / BOX_SPACING);
         const margin = (length - runCols * BOX_SPACING) / 2;
-        const numSections = Math.ceil(runCols / SECTION_COLS);
+        const numSections = Math.ceil(runCols / NR_SECTION_COLS);
 
         for (let s = 0; s < numSections; s += 2) {
-          const startCol = s * SECTION_COLS;
-          const endCol = Math.min(runCols - 1, s * SECTION_COLS + SECTION_COLS - 1);
+          const startCol = s * NR_SECTION_COLS;
+          const endCol = Math.min(runCols - 1, s * NR_SECTION_COLS + NR_SECTION_COLS - 1);
           const centerCol = (startCol + endCol) / 2;
           const xCenter = -length / 2 + margin + (centerCol + 0.5) * BOX_SPACING;
 
@@ -2179,7 +2171,7 @@ export function buildStore(scene: StoreScene) {
     // could see straight through to the shelf/case behind it).
     const runCols = Math.floor((length - 1.0) / BOX_SPACING);
     const margin = (length - runCols * BOX_SPACING) / 2;
-    for (let colDivider = SECTION_COLS; colDivider < runCols; colDivider += SECTION_COLS) {
+    for (let colDivider = NR_SECTION_COLS; colDivider < runCols; colDivider += NR_SECTION_COLS) {
       // A double-feature spans two sections as ONE display: skip the
       // divider that would bisect it (global boundary = run start + local).
       if (scene.nrSuppressedDividerCols.has(globalColStart + colDivider)) continue;

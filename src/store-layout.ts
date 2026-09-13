@@ -101,24 +101,8 @@ export function getStoreShellSpec(): StoreShellSpec {
   // deliberately even though its own default is a low one.
   const ceilingY = ls?.getItem('bb_ceiling') === 'high' ? HIGH_CEILING_Y : CEILING_Y;
 
-  // Stepped back-right corner. The store has always had this forward step; the
-  // option only varies its footprint. Depth is kept below the 8 ft back-wall
-  // shelf margin (see StorePlan.plan) so no freestanding island can reach into
-  // the notch — shelves never intersect it by construction.
-  // A format without the step has a flat back wall, full stop: the step exists
-  // to carry the New Releases wall, and a format with no New Releases wall
-  // (mom-and-pop) would just be notching its back corner for nothing — in a
-  // room this small the notch is a meaningful bite out of the sales floor.
-  let steppedCorner: StoreShellSpec['steppedCorner'] = FORMAT.steppedCorner
-    ? { corner: 'back-right', w: 7.2, d: 7.0 }
-    : null;
-  if (FORMAT.steppedCorner) {
-    switch (ls?.getItem('bb_corner')) {
-      case 'wide': steppedCorner = { corner: 'back-right', w: 11.0, d: 7.0 }; break;
-      case 'shallow': steppedCorner = { corner: 'back-right', w: 5.0, d: 4.0 }; break;
-      case 'none': steppedCorner = null; break;
-    }
-  }
+  // The retired rear notch is never reconstructed, including from saved settings.
+  const steppedCorner: StoreShellSpec['steppedCorner'] = null;
 
   // Wall displays default OFF so the default store is identical to today.
   const wallDecorEnabled = ls?.getItem('bb_walldecor') === '1';
@@ -355,6 +339,7 @@ export const STAGGER_OFFSET = -0.04; // Offset in feet — the rental copy peeks
 // are a fixed two sections wide so every island reads the same regardless of how
 // many movies its library holds (short libraries just leave the tail slots empty).
 export const SECTION_COLS = 6;
+export const NR_SECTION_COLS = 8; // Eight display boxes in a full New Release bay.
 // FORMAT-DRIVEN (see StoreFormatSpec.unitSections): the chain's unit is two
 // signboard sections wide, a mom-and-pop's is one. This is the granularity the
 // floor planner allocates shelving in, so it is read together with the tier
@@ -491,7 +476,7 @@ export function newReleasesLeftWallCols(unitSpace: number): number {
 // the corner insets in three-scene.ts, so the left-wall unit and back-wall
 // Run 1 always butt flush at the back-left corner whatever the store
 // dimensions are.
-export const NR_WALL_SHELF_DEPTH = 0.70;  // shelf-board depth (ft) — buildShelfRun's backWallShelfDepth
+export const NR_WALL_SHELF_DEPTH = 1.10;  // shelf-board depth (ft) — buildShelfRun's backWallShelfDepth
 // Assembly back face stand-off from the room wall plane. Must clear the
 // walls' navy baseboards (0.04 ft thick, standing 0.02 off the wall — see
 // bbBack et al. in buildStore): at the old 0.02 the backing panel and the
@@ -501,7 +486,14 @@ export const NR_WALL_CLEARANCE = 0.08;
 // Built depth of a wall run: room wall plane -> shelf/end-panel front face.
 export const NR_RUN_DEPTH = NR_WALL_CLEARANCE + NR_WALL_SHELF_DEPTH;
 // Front cover hinge, shared by the stock transform and sloped support plane.
-export const NR_WALL_STOCK_OFFSET = NR_RUN_DEPTH - .14;
+export const NR_WALL_TOP_DEPTH = .55;
+export function nrWallDepthAtHeight(y: number): number {
+  return NR_WALL_SHELF_DEPTH - (NR_WALL_SHELF_DEPTH - NR_WALL_TOP_DEPTH) * Math.max(0, Math.min(8, y)) / 8;
+}
+export function nrWallStockOffset(y: number): number {
+  return NR_WALL_CLEARANCE + nrWallDepthAtHeight(y) - .14;
+}
+export const NR_WALL_STOCK_OFFSET = nrWallStockOffset(WALL_SHELF_HEIGHTS[0]);
 export const NR_WALL_SLOPE = Math.tan(5 * Math.PI / 180);
 export const NR_LEFT_UNIT_STANDOFF = 0.1; // left-wall unit group origin off the wall mesh
 

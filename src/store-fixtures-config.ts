@@ -673,7 +673,7 @@ export function counterAnchoredPlacements(
         kind: 'candy-display',
         position: { x: 9.0, z: -4.45 }, // keep rear edge clear of band at z=-3.6
         yaw: 0,
-        options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true, powerWing: true }
+        options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
       },
       {
         id: 'tape-rewinder-counter',
@@ -756,7 +756,7 @@ export function counterAnchoredPlacements(
       kind: 'candy-display',
       position: { x: 5.81066, z: -2.47278 },
       yaw: 0.6697,
-      options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true, powerWing: true }
+      options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
     },
     // Rewinder on the inner rental counter's top — z matches counter.ts's
     // getInnerCounterSpine(13.9), yaw matches that segment's rotY. See

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { NrWallModelBatch } from '../src/nr-wall-model.ts';
-import { NR_WALL_SHELF_DEPTH, NR_WALL_SLOPE, WALL_SHELF_HEIGHTS } from '../src/store-layout.ts';
+import { NR_WALL_SHELF_DEPTH, NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_CLEARANCE, WALL_SHELF_HEIGHTS } from '../src/store-layout.ts';
 
 async function asset() {
   const bytes = await readFile(new URL('../public/models/new-release-wall.glb', import.meta.url));
@@ -36,15 +36,16 @@ test('NR asset: eight sloped tiers, eight-foot width, complete UV/materials and 
     const deck = scene.getObjectByName(`Deck_${i}`) as THREE.Mesh;
     const back = new THREE.Box3().setFromObject(scene.getObjectByName(`HighBack_${i}`)!);
     assert.ok(back.max.y - back.min.y > .60);
+    const frontZ = NR_WALL_CLEARANCE + nrWallDepthAtHeight(WALL_SHELF_HEIGHTS[i]);
     const pos = deck.geometry.getAttribute('position');
     let front = -Infinity, rear = -Infinity;
     for (let j = 0; j < pos.count; j++) {
       const p = new THREE.Vector3().fromBufferAttribute(pos, j).applyMatrix4(deck.matrixWorld);
-      if (p.z > .77) front = Math.max(front, p.y);
+      if (p.z > frontZ - .01) front = Math.max(front, p.y);
       if (p.z < .11) rear = Math.max(rear, p.y);
     }
     assert.ok(Math.abs(front - (WALL_SHELF_HEIGHTS[i] + .02)) < .001);
-    assert.ok(Math.abs((front - rear) / (.78 - .102) - NR_WALL_SLOPE) < .002);
+    assert.ok(Math.abs((front - rear) / (frontZ - .102) - NR_WALL_SLOPE) < .002);
   }
 });
 

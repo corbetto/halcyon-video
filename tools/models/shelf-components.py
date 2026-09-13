@@ -83,8 +83,7 @@ sweep('Slat', [(-.25,-.125),(.25,-.125),(.25,.072),(.213,.072),
                (-.25,.105),(-.213,.105),(-.213,.072),(-.25,.072)])
 # Structural carcass components: finished laminate panel with a recessed toe,
 # eased edges and a fitted central spine. Nominal height five feet.
-panel=sweep('Upright', [(-.94,0),(.94,0),(.94,.20),(1.08,.20),
-    (.70,4.994),(.694,5),(-.694,5),(-.70,4.994),(-1.08,.20),(-.94,.20)], .04)
+panel=sweep('Upright', [(-1.08,0),(1.08,0),(.70,4.994),(.694,5),(-.694,5),(-.70,4.994)], .04)
 # Bevel every sheet edge, including the cut underside of the toe notch.
 bpy.context.view_layer.objects.active=panel
 bevel=panel.modifiers.new('Finished panel edges','BEVEL');bevel.width=.006;bevel.segments=2

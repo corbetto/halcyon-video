@@ -38,17 +38,11 @@ export function installCandyPowerWing(ctx: FixtureContext, parent: THREE.Group, 
     const finish = (header.material as THREE.MeshStandardMaterial).clone();
     finish.color.set(0xffffff);
     finish.map = print;
-    finish.emissiveMap = print;
-    finish.emissive.set(0xffffff);
-    finish.emissiveIntensity = 0.55;
+    finish.emissiveMap = null;
+    finish.emissive.set(0x000000);
+    finish.emissiveIntensity = 0;
     finish.roughness = 0.7;
     materials.add(finish); header.material = finish;
-
-    // Display glow downlight illuminating the candy stock trays
-    const displayGlow = new THREE.PointLight(0xfff0d0, 10, 5, 2);
-    displayGlow.position.set(0, 3.85, 0.45);
-    displayGlow.name = 'candy-power-wing-glow';
-    model.add(displayGlow);
 
     model.name = 'candy-power-wing-model'; parent.add(model); fallback.visible = false;
     ctx.requestShadowRefresh(); ctx.requestRender();

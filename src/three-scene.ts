@@ -49,14 +49,14 @@ import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { ExteriorEnvironment } from './exterior-environment';
 import {
-  NR_RUN_DEPTH, NR_WALL_STOCK_OFFSET,
+  NR_RUN_DEPTH, nrWallStockOffset,
   NR_LEFT_UNIT_STANDOFF,
   FIELD_Z_FRONT,
   AISLE_SHELF_HEIGHTS,
   WALL_SHELF_HEIGHTS,
   BOX_SPACING,
   STAGGER_OFFSET,
-  SECTION_COLS,
+  NR_SECTION_COLS,
   UNIT_SIDE_CAPACITY,
   BACK_WALL_UNIT_IDX,
   seededRandom01,
@@ -812,7 +812,7 @@ export class StoreScene {
   public stepX = 15.0;             // X at which the back wall steps forward
   public stepDepth = 7.0;          // how far the right section comes toward the viewer (+Z)
   public get nrBackRun1EndX(): number { return this.stepX - (this.hasStep ? NR_RUN_DEPTH + .25 : 0); }
-  public hasStep = true;           // false when bb_corner === 'none' (flat back-right wall)
+  public hasStep = false;           // false when bb_corner === 'none' (flat back-right wall)
 
   // Data-driven room-shell options (T07): ceiling height, stepped-corner
   // footprint, and decorated wall zones. Read once at construction so a
@@ -1329,7 +1329,7 @@ export class StoreScene {
     // corner. A trailing partial bay is its own narrower section.
     const nrBays = nrBaysForRuns([this.nrLeftWallCols, this.nrBackWallColsRun1, this.nrBackWallColsRun2, this.nrBackWallColsRun3]);
     const numWallSections = nrBays.length;
-    // A regular wall section faces ONE title out across its whole 6-column row,
+    // A regular wall section faces ONE title out across its whole 8-column row,
     // so the wall wants one candidate per ROW, not per column. Those two counts
     // only coincided while a section happened to be as tall as it is wide
     // (6 tiers x 6 cols); at the measured 8 tiers a column-sized slice starves
@@ -1765,9 +1765,9 @@ export class StoreScene {
   }
 
   private nrDividerNudge(colInRun: number, runStartCol = 0): number {
-    if (colInRun > 0 && colInRun % SECTION_COLS === 0 &&
+    if (colInRun > 0 && colInRun % NR_SECTION_COLS === 0 &&
         !this.nrSuppressedDividerCols.has(runStartCol + colInRun)) return StoreScene.NR_DIVIDER_CLEARANCE;
-    if (colInRun % SECTION_COLS === SECTION_COLS - 1 &&
+    if (colInRun % NR_SECTION_COLS === NR_SECTION_COLS - 1 &&
         !this.nrSuppressedDividerCols.has(runStartCol + colInRun + 1)) return -StoreScene.NR_DIVIDER_CLEARANCE;
     return 0;
   }
@@ -1793,12 +1793,12 @@ export class StoreScene {
     return this.backWallZ + (this.plan.clubhouse ? 18 : NR_RUN_DEPTH);
   }
 
-  public getNewReleasesSlotTransform(col: number, _movie?: Movie): { x: number, z: number, rotationY: number } {
+  public getNewReleasesSlotTransform(col: number, _movie?: Movie, shelfY = WALL_SHELF_HEIGHTS[0]): { x: number, z: number, rotationY: number } {
     const leftWallCols = this.nrLeftWallCols;
     // Front cover and rental copy sit at the lip of the deeper #311 trays.
     // Physical reserve behind them fits three/four Amray cases; the catalog
     // continues to own how many rental copies are actually displayed.
-    const offset = NR_WALL_STOCK_OFFSET;
+    const offset = nrWallStockOffset(shelfY);
 
     if (col < leftWallCols) {
       // Left Wall unit (faces +X into the store interior). Col 0 sits at the

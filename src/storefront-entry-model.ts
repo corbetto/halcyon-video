@@ -17,7 +17,8 @@ import type { OutsideMode } from './outdoor-lighting';
 import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
 import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
-import { createBrickTexture, createSlateTexture } from './canvas-textures';
+import { createBrickTexture } from './canvas-textures';
+import { createFacadeSlateMaterial } from './facade-slate-material';
 import { buildConeCanopyFallback } from './storefront-cone-canopy';
 import { addStorefrontParkingPlaques } from './storefront-parking-plaques';
 
@@ -52,16 +53,8 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     metalness: .05,
     envMapIntensity: .2
   }), 'light-source');
-  const slateTex = createSlateTexture();
-  const slate = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: slateTex.map,
-    normalMap: slateTex.normalMap,
-    roughnessMap: slateTex.roughnessMap,
-    roughness: 0.85,
-    metalness: 0.08,
-    envMapIntensity: 0.25,
-  });
+  const slateHandle = createFacadeSlateMaterial({ onChange: () => ctx.requestRender() });
+  const slate = slateHandle.material;
   const downlight = selfLit(new THREE.MeshStandardMaterial({ color: 0xffefd4, emissive: 0xffdfab, emissiveIntensity: 0 }), 'light-source');
   const finishes = {
     FacadeSlate: slate,
@@ -201,8 +194,9 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     fallback.traverse(obj => { if (obj instanceof THREE.Mesh) geometries.add(obj.geometry); });
     geometries.forEach(geometry => geometry.dispose());
     fallback.clear();
+    slateHandle.dispose();
     Object.values(finishes).forEach(material => material.dispose());
-    [tile.map, tile.bumpMap, soldier.map, soldier.normalMap, soldier.roughnessMap, slateTex.map, slateTex.normalMap, slateTex.roughnessMap].forEach(texture => texture?.dispose());
+    [tile.map, tile.bumpMap, soldier.map, soldier.normalMap, soldier.roughnessMap].forEach(texture => texture?.dispose());
   };
   group.userData.dispose = dispose;
   group.addEventListener('removed', dispose);

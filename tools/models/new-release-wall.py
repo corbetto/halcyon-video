@@ -8,7 +8,7 @@ import bpy, bmesh, math, json, sys
 from mathutils import Vector
 ROOT = Path(__file__).resolve().parents[2]
 HEIGHTS = [.42, 1.295, 2.17, 3.045, 3.92, 4.795, 5.67, 6.545]
-WIDTH, DEPTH, CLEARANCE, SLOPE = 8., .70, .08, math.tan(math.radians(5))
+WIDTH, DEPTH, CLEARANCE, SLOPE = 8., 1.10, .08, math.tan(math.radians(5))
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 fixture = bpy.data.collections.new('New Release — eight-foot construction'); bpy.context.scene.collection.children.link(fixture)
 study = bpy.data.collections.new('Capacity study — NOT exported'); bpy.context.scene.collection.children.link(study)
@@ -39,8 +39,10 @@ def sweep(name, profile, width, mat, collection=fixture, x=0):
 def box(name, x,y,z, w,h,d, mat, collection=fixture):
     return sweep(name,[(y-h/2,z-d/2),(y-h/2,z+d/2),(y+h/2,z+d/2),(y+h/2,z-d/2)],w,mat,collection,x)
 
+def depth_at(y): return DEPTH - (DEPTH-.55)*max(0,min(8,y))/8
 front=CLEARANCE+DEPTH
 for i,y in enumerate(HEIGHTS):
+    front=CLEARANCE+depth_at(y)
     # 3/4 inch particleboard tray: front support plane matches stock anchors.
     bottom=y+.02-.0625
     p=[(bottom,CLEARANCE+.022),(bottom,front-.006),(bottom+.006,front),
@@ -61,9 +63,11 @@ box('Backing',0,4,CLEARANCE,7.875,8,.04,laminate)
 # In authentic 1990 perimeter wall shelving, the vertical carcass uprights
 # enclose the sloped shelves and front price rails, extending slightly proud (carcass_front = front + .035)
 # with a clean, continuous vertical front face from floor (y=0) to top (y=8) without an artificial toe cutout.
+front=CLEARANCE+DEPTH
 carcass_front=front+.035
+carcass_top=CLEARANCE+depth_at(8)+.035
 for name,x in [('LeftEnd',-3.96875),('RightEnd',3.96875)]:
-    ob=sweep(name,[(0,CLEARANCE),(0,carcass_front),(7.994,carcass_front),(8,carcass_front-.006),(8,CLEARANCE)],.0625,edge,x=x)
+    ob=sweep(name,[(0,CLEARANCE),(0,carcass_front),(7.994,carcass_top),(8,carcass_top-.006),(8,CLEARANCE)],.0625,edge,x=x)
 
 # Toe kick:
 # Plinth board extends from floor (y=0) up to the underside of the bottom shelf tray
@@ -83,7 +87,7 @@ bpy.context.scene['capacity']='8 facings x 5 tiers for one title; 3 Amray behind
 for ob in fixture.objects: ob.select_set(True)
 bpy.context.preferences.filepaths.save_version=0
 bpy.ops.export_scene.gltf(filepath=str(ROOT/'public/models/new-release-wall.glb'),export_format='GLB',use_selection=True,export_yup=True,export_apply=True,export_extras=True)
-metrics={'section_width_ft':WIDTH,'depth_ft':DEPTH,'tiers':HEIGHTS,'slope_degrees':5,'facings_per_study_row':8,'popular_title_study_rows':5,'comfortable_rental_depth':3,'tight_rental_depth':4,'meshes':len(fixture.objects),'triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in fixture.objects),'glb_bytes':(ROOT/'public/models/new-release-wall.glb').stat().st_size}
+metrics={'section_width_ft':WIDTH,'depth_ft':DEPTH,'tiers':HEIGHTS,'top_depth_ft':.55,'slope_degrees':5,'facings_per_study_row':8,'popular_title_study_rows':5,'comfortable_rental_depth':3,'tight_rental_depth':4,'meshes':len(fixture.objects),'triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in fixture.objects),'glb_bytes':(ROOT/'public/models/new-release-wall.glb').stat().st_size}
 (ROOT/'tools/models/new-release-wall-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 
 # Non-exported capacity study: nominal cases (4.38 x 8 x 1.10 inches), with

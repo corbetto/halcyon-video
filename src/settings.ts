@@ -605,23 +605,6 @@ export function registerCoreSettings(): void {
   });
 
   registerSetting({
-    key: 'bb_corner',
-    label: 'Corner Step',
-    kind: 'cycle',
-    group: 'Store Look',
-    values: [
-      { id: 'standard', label: 'Standard' },
-      { id: 'wide', label: 'Wide' },
-      { id: 'shallow', label: 'Shallow' },
-      { id: 'none', label: 'None' },
-    ],
-    default: 'standard',
-    applyMode: 'rebuild-scene',
-    hint: 'Stepped back-right corner for New Releases. None = flat.',
-    subpage: 'Building & Storefront',
-  });
-
-  registerSetting({
     key: 'bb_walldecor',
     label: 'Wall Displays',
     kind: 'toggle',

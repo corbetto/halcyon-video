@@ -31,7 +31,7 @@ def mat(name,c,metal=0,r=.8,cloth=False):
   tex=ns.new('ShaderNodeTexImage');tex.image=grain;nm=ns.new('ShaderNodeNormalMap');nm.inputs['Strength'].default_value=.2;ls.new(tex.outputs['Color'],nm.inputs['Color']);ls.new(nm.outputs[0],p.inputs['Normal'])
   tex=ns.new('ShaderNodeTexImage');tex.image=image(name+'_micro_roughness',np.repeat((r+.025*np.sin(x*1.7+y*.3))[:,:,None],3,2));ls.new(tex.outputs['Color'],p.inputs['Roughness'])
  return m
-cotton=mat('ShirtCotton',(.34,.44,.48),cloth=True);rib=mat('RibAndStitch',(.26,.34,.37),cloth=True);cap=mat('CapTwill',(.48,.37,.23),cloth=True);metal=mat('SatinNickel',(.48,.51,.54),.85,.3);rubber=mat('SuctionRubber',(.33,.36,.38),0,.65)
+cotton=mat('ShirtCotton',(.90,.90,.90),cloth=True);rib=mat('RibAndStitch',(.83,.83,.83),cloth=True);cap=mat('CapTwill',(.87,.87,.87),cloth=True);metal=mat('SatinNickel',(.48,.51,.54),.85,.3);rubber=mat('SuctionRubber',(.33,.36,.38),0,.65)
 parts=[]
 def mesh(name,vs,fs,ma,solid=0):
  me=bpy.data.meshes.new(name);me.from_pydata([(a,-c,b) for a,b,c in vs],[],fs);me.update();o=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(o);me.materials.append(ma)
@@ -80,13 +80,14 @@ for edge,name in [([6,7,8,9,10],'Neck_rib'),([0,1],'Hem'),([3,4],'Right_cuff'),(
     z=.20+side*.06+(.060*math.sin(10*a+1.7*b)+.020*math.sin(18*a-3*b))*(.25+.75*(1-min(b/2.05,1)))+.035*math.sin(b*4+a*3)
     pts.append((a-.65,b,z))
   tube(name+str(side),pts,.016 if name=='Neck_rib' else .008,rib)
-# Six-gore structured baseball crown: opening faces wall, crown bulges outward.
-cx=1.15;cy=1.87;N=48;R=16
-vs=[(cx,cy,.78)]
+# Upright six-gore baseball cap: crown above the sweatband, visor projects
+# forward from its lower rim and gently droops. It never curls up into a bowl.
+cx=1.15;cy=1.55;N=48;R=16
+vs=[(cx,cy+.55,.43)]
 for i in range(1,R+1):
  t=i/R*math.pi/2
  for j in range(N):
-  a=j*math.tau/N;vs.append((cx+.36*math.sin(t)*math.cos(a),cy+.43*math.sin(t)*math.sin(a),.22+.56*math.cos(t)))
+  a=j*math.tau/N;vs.append((cx+.36*math.sin(t)*math.cos(a),cy+.55*math.cos(t),.43+.38*math.sin(t)*math.sin(a)))
 fs=[(0,1+j,1+(j+1)%N) for j in range(N)]
 for i in range(R-1):
  for j in range(N):fs.append((1+i*N+j,1+i*N+(j+1)%N,1+(i+1)*N+(j+1)%N,1+(i+1)*N+j))
@@ -94,20 +95,19 @@ mesh('Cap_six_panel_crown',vs,fs,cap,.012)
 for j in range(6):
  a=j*math.tau/6;pts=[]
  for i in range(1,33):
-  t=i/32*math.pi/2;pts.append((cx+.364*math.sin(t)*math.cos(a),cy+.434*math.sin(t)*math.sin(a),.22+.566*math.cos(t)))
+  t=i/32*math.pi/2;pts.append((cx+.364*math.sin(t)*math.cos(a),cy+.554*math.cos(t),.43+.384*math.sin(t)*math.sin(a)))
  tube('Crown_felled_seam_'+str(j),pts,.004,cap)
-# Curved laminated visor at lower opening; stitched perimeter, exposed underside.
 vs=[];fs=[]
 for i in range(9):
  t=i/8
  for j in range(33):
   a=-math.pi/2+j*math.pi/32
-  vs.append((cx+(.36+.05*t)*math.sin(a),cy-(.43+.38*t)*math.cos(a),.22+.28*t+.025*t*math.sin(a)**2))
+  vs.append((cx+(.36+.035*t)*math.sin(a),cy-.025-.055*t-.045*math.sin(a)**2,.43+(.38+.42*t)*math.cos(a)))
 for i in range(8):
  for j in range(32):q=i*33+j;fs.append((q,q+1,q+34,q+33))
-mesh('Cap_curved_laminated_visor',vs,fs,cap,.025);tube('Visor_edge_binding',vs[-33:],.009,cap)
-tube('Cap_inner_sweatband',[(cx+.355*math.cos(a),cy+.425*math.sin(a),.22) for a in [j*math.tau/64 for j in range(65)]],.025,rib)
-tube('Cap_rear_hanging_strap',[(cx-.15,cy+.34,.22),(cx,cy+.30,.12),(cx+.15,cy+.34,.22)],.023,cap)
+mesh('Cap_curved_laminated_visor',vs,fs,rib,.025);tube('Visor_edge_binding',vs[-33:],.009,rib)
+tube('Cap_inner_sweatband',[(cx+.355*math.cos(a),cy,.43+.375*math.sin(a)) for a in [j*math.tau/64 for j in range(65)]],.025,rib)
+tube('Cap_rear_hanging_strap',[(cx-.14,cy,.06),(cx,cy+.42,.14),(cx+.14,cy,.06)],.023,cap)
 # Clear load paths: broad suction pads seated on glass, bent J hooks and
 # shoulder clips capture cloth. Cap strap passes over the third hook.
 def mount(x,y):
@@ -129,7 +129,7 @@ for o in parts:
   for uv in o.data.uv_layers.active.data:uv.uv *= 16
 # Keep optional print work isolated from neutral garment geometry.
 art=bpy.data.collections.new('Optional_artwork_anchors');bpy.context.scene.collection.children.link(art)
-for name,loc,size in [('Artwork_ShirtChest',(-.65,-.33,1.25),(.65,.6)),('Artwork_CapFront',(cx,-.80,cy),(.25,.18))]:
+for name,loc,size in [('Artwork_ShirtChest',(-.65,-.33,1.25),(.65,.6)),('Artwork_CapFront',(cx,-.78,cy+.23),(.25,.18))]:
  o=bpy.data.objects.new(name,None);art.objects.link(o);o.location=loc;o.empty_display_size=.06;o['max_print_width_height_ft']=list(size)
  o['usage']='Optional local decal anchor. No artwork included or baked into cloth.'
 # Audit real closed shell topology after thickness; deliberate garment openings
@@ -147,6 +147,7 @@ for screen in bpy.data.screens:
  for area in screen.areas:
   if area.type=='VIEW_3D':
    region=area.spaces.active.region_3d;region.view_distance=5;region.view_location=Vector((0,-.25,1.2));region.view_rotation=Vector((.2,-1,.1)).to_track_quat('Z','Y')
+bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=ROOT+'/tools/models/counter-apparel.blend')
 # Join by material for runtime, keeping named source parts in the .blend.
 for ma in [cotton,rib,cap,metal,rubber]:

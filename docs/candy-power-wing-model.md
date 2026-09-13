@@ -1,4 +1,6 @@
-# Cardboard candy power wing (#204)
+# Retired candy power wing
+
+This original cardboard study is no longer placed in the 1993 store. The owner rejected its appearance. Its source record confirms that no reference photo was used. The permanent queue rack replaces its placement; ordinary candy packaging and header print have no emission and the added display point light is removed. The optional model remains available only as an unplaced asset study.
 
 Original generic bulk-tray design, integrated as the 1993 hardware variant of
 `candy-display-front` in both shield and square-U counter layouts. This uses

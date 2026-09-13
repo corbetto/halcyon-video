@@ -1,6 +1,6 @@
 {
   "section_width_ft": 8.0,
-  "depth_ft": 0.7,
+  "depth_ft": 1.1,
   "tiers": [
     0.42,
     1.295,
@@ -11,6 +11,7 @@
     5.67,
     6.545
   ],
+  "top_depth_ft": 0.55,
   "slope_degrees": 5,
   "facings_per_study_row": 8,
   "popular_title_study_rows": 5,
@@ -18,5 +19,5 @@
   "tight_rental_depth": 4,
   "meshes": 28,
   "triangles": 728,
-  "glb_bytes": 60888
+  "glb_bytes": 60884
 }

@@ -107,3 +107,7 @@ passes. The standard-counter audit records the same three initial
 `structure:counter-inner-left` intrusions before and after (first .067 seconds);
 this pre-existing clerk spawn issue is outside the rack change. It is recorded
 in the evidence rather than presented as a passing full-store navigation audit.
+
+## 1993 placement correction
+
+The permanent sloping queue rack now serves the 1993 counter layouts as well. The invented cardboard power wing is no longer selected by either placement. The documented 1993 Part II frame above was re-inspected; it shows a dark rack with broad, densely stocked sloping shelves and side packets. Ordinary stock has no emissive material and there is no rack point light. The existing optional local reconstruction is retained in ignored user-assets; the public hardware remains the original generic construction.
