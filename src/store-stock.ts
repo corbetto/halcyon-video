@@ -448,8 +448,12 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
           frontMesh.frustumCulled = true;
           initInstancesHidden(frontMesh);
 
-          // rental back mesh is always regular (false)
-          const backMesh = new THREE.InstancedMesh(createClonedCaseGeometry(used, false, true), getGlobalBackMaterials(false), used);
+          // Previously viewed stock is sold as retail boxes, including the rear copy.
+          const retailBackstock = scene.slottedFixtures.some(f =>
+            `fixture_${f.placement.id}` === key && f.placement.options?.retailBackstock === true);
+          const backMesh = new THREE.InstancedMesh(
+            retailBackstock ? frontMesh.geometry.clone() : createClonedCaseGeometry(used, false, true),
+            retailBackstock ? frontMesh.material : getGlobalBackMaterials(false), used);
           backMesh.castShadow = true;
           backMesh.receiveShadow = true;
           backMesh.frustumCulled = true;
@@ -897,7 +901,8 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const instIdx = currentInstanceIdx.get(fixtureKey) || 0;
       currentInstanceIdx.set(fixtureKey, instIdx + 1);
 
-      const backJitter = (seededRandom01(movie.id) - 0.5) * COPY_X_JITTER_RANGE;
+      const retailBackstock = fixture.placement.options?.retailBackstock === true;
+      const backJitter = retailBackstock ? 0 : (seededRandom01(movie.id) - 0.5) * COPY_X_JITTER_RANGE;
       const slot: MovieSlot = {
         movie,
         libraryIdx: 0,
@@ -934,8 +939,8 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
         backJitter,
         backX: backJitter,
         backZ: -slotRentalHalfDepth(movie, tilt),
-        rentalRestZ: -slotRentalHalfDepth(movie, tilt),
-        backYLift: slotRentalLift(movie),
+        rentalRestZ: retailBackstock ? -depth / 2 - .015 : -slotRentalHalfDepth(movie, tilt),
+        backYLift: retailBackstock ? 0 : slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
         loadShelfDetails: () => {},

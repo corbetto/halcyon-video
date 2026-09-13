@@ -45,6 +45,11 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
   assert.ok(triangles < 2500); assert.ok(bytes.length < 400000);
   const ray = new THREE.Raycaster(new THREE.Vector3(-.5, 2.55, 1.1), new THREE.Vector3(0, 0, -1));
   assert.equal(ray.intersectObject(scene.getObjectByName('ChuteLaminate')!, true).length, 0, 'shell aperture passes through');
+  const roof = new THREE.Raycaster(new THREE.Vector3(0, 4.3, -.8), new THREE.Vector3(0, -1, 0), 0, 1).intersectObject(scene, true);
+  assert.ok(roof.length > 0, 'continuous top covers the collection cavity');
+  assert.ok(Math.abs(roof[0].point.y - 3.85) < .01);
+  const rear = new THREE.Raycaster(new THREE.Vector3(.6, 2, -.8), new THREE.Vector3(0, 0, -1), 0, .8);
+  assert.equal(rear.intersectObject(scene, true).length, 0, 'hollow receiver remains accessible from the rear');
   const flap = scene.getObjectByName('ChuteFlap')!;
   assert.ok(flap.position.distanceTo(new THREE.Vector3(-.5, 2.665, .743)) < .0001);
   flap.rotation.x += Math.PI / 2 - .24; scene.updateMatrixWorld(true);

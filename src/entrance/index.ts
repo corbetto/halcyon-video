@@ -64,7 +64,7 @@ import { CheckoutBag } from '../checkout-bag';
 import { ReturnSlot } from './return-slot';
 import { activeStoreFormat } from '../store-format';
 import type { Movie } from '../jellyfin';
-import { CRT_BLACK, CRT_GOLD, CRT_INK, CRT_TEXT } from '../crt-theme';
+import { counterCrtPalette } from '../crt-theme';
 import { brandString } from '../brand-pack';
 import { textureArrayManager } from '../poster-textures';
 import { counterMonitorAsset, fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
@@ -295,7 +295,7 @@ export class EntranceCheckout implements StoreFixture {
     // is closed by a solid, wall-colored capping soffit instead — see
     // "Solid soffit cap" below.
     const soffitCapY = vestibuleCeilingY(this.ctx.ceilingY);
-    const wallH = Math.min(soffitCapY, WINDOW_HEAD_Y);
+    const wallH = Math.min(hasChamber ? soffitCapY - 1.5 : soffitCapY, WINDOW_HEAD_Y);
     const wallT = 0.12;          // glazing thickness
 
     // ----- Materials -----
@@ -494,6 +494,7 @@ export class EntranceCheckout implements StoreFixture {
         const capGeo = new THREE.BoxGeometry(boxW, capH, boxDepth);
         if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
         const cap = new THREE.Mesh(capGeo, capMat);
+        cap.name = 'vestibule-solid-cap';
         cap.position.set(cx, wallH + capH / 2, (frontZ + backZ) / 2);
         cap.castShadow = true;
         cap.receiveShadow = true;
@@ -1276,7 +1277,8 @@ export class EntranceCheckout implements StoreFixture {
     if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
     const W = canvas.width, H = canvas.height;
-    ctx.fillStyle = CRT_BLACK;
+    const palette = counterCrtPalette(getActiveTheme().id);
+    ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, W, H);
 
     // Safe area. The screen plane matches the authored CRT's tube opening
@@ -1297,10 +1299,10 @@ export class EntranceCheckout implements StoreFixture {
 
     // ── Title bar: solid gold, dark text (the DOS-era POS sandwich, top) ──
     ctx.textBaseline = 'top';
-    ctx.fillStyle = CRT_GOLD;
+    ctx.fillStyle = palette.bar;
     ctx.fillRect(PAD_X - CH * 0.5, PAD_Y, SAFE_W + CH, BAR_H);
     ctx.font = `bold ${FONT_PX}px "Courier New", monospace`;
-    ctx.fillStyle = CRT_INK;
+    ctx.fillStyle = palette.ink;
     ctx.fillText(brandString('pos-system-title', 'HALCYON RENTAL SYSTEM'), PAD_X, PAD_Y + (BAR_H - FONT_PX) / 2);
 
     // The idle screen is also the manager terminal's only in-world signpost
@@ -1328,7 +1330,7 @@ export class EntranceCheckout implements StoreFixture {
       '>',
     ];
     ctx.font = `${FONT_PX}px "Courier New", monospace`;
-    ctx.fillStyle = CRT_TEXT;
+    ctx.fillStyle = palette.text;
     // Body starts one blank row below the title bar; the footer bar (drawn
     // below) reserves its own strip so text never collides with it. The tube's
     // curve eats more of the canvas at the BOTTOM than the side padding does
@@ -1368,10 +1370,10 @@ export class EntranceCheckout implements StoreFixture {
     });
 
     // ── Footer bar: solid gold status strip (the sandwich, bottom) ──
-    ctx.fillStyle = CRT_GOLD;
+    ctx.fillStyle = palette.bar;
     ctx.fillRect(PAD_X - CH * 0.5, footTop, SAFE_W + CH, BAR_H);
     ctx.font = `bold ${FONT_PX}px "Courier New", monospace`;
-    ctx.fillStyle = CRT_INK;
+    ctx.fillStyle = palette.ink;
     const footY = footTop + (BAR_H - FONT_PX) / 2;
     // feedback/037 (owner: reword all "be kind rewind" to "please rewind") —
     // was 'BE KIND' paired with the left-aligned 'REMEMBER TO REWIND'.

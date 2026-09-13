@@ -202,11 +202,33 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
   
   let nrLogoBodyMats: THREE.MeshStandardMaterial[] | null = null;
   let nrLogoYellowMats: THREE.MeshStandardMaterial[] | null = null;
+  let nrLogoBounds = { u: 0, v: 0, w: 1, h: 1, aspect: 1.6666 };
 
   const getLogoMaterials = () => {
     if (!nrLogoBodyMats || !nrLogoYellowMats) {
       const bodyTex = getCachedTexture('logo-body', () => createBrandLogoBodyTexture());
       const yellowTex = getCachedTexture('logo-yellow', () => createBrandLogoTextTexture());
+      // Normalize the visible emblem, rather than its transparent carrier canvas.
+      const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d')!;
+      const bodyImage = bodyTex.image as HTMLCanvasElement;
+      const textImage = yellowTex.image as HTMLCanvasElement;
+      ctx.drawImage(bodyImage, 0, 0, 256, 256);
+      ctx.drawImage(textImage, 0, 0, 256, 256);
+      const pixels = ctx.getImageData(0, 0, 256, 256).data;
+      let x0 = 256, y0 = 256, x1 = -1, y1 = -1;
+      for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+        if (pixels[(y * 256 + x) * 4 + 3] < 8) continue;
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+      if (x1 >= x0 && y1 >= y0) {
+        x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1);
+        x1 = Math.min(255, x1 + 1); y1 = Math.min(255, y1 + 1);
+        nrLogoBounds = { u: x0 / 256, v: 1 - (y1 + 1) / 256,
+          w: (x1 - x0 + 1) / 256, h: (y1 - y0 + 1) / 256,
+          aspect: (x1 - x0 + 1) / (y1 - y0 + 1) * bodyImage.width / bodyImage.height };
+      }
       nrLogoBodyMats = createExtrudedMaterials(bodyTex, 4);
       nrLogoYellowMats = createExtrudedMaterials(yellowTex, 2);
     }
@@ -323,8 +345,9 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
 
       const signW = 11.0;
       const signH = signW / 6.6666;
-      const logoW = 2.6;
-      const logoH = logoW / 1.6666;
+      const logoMats = getLogoMaterials();
+      const logoW = Math.min(3.6, 1.9 * nrLogoBounds.aspect);
+      const logoH = logoW / nrLogoBounds.aspect;
       const margin = 0.2;
 
       // #143: the ticket logo and the "NEW RELEASES" lettering read as one
@@ -344,7 +367,6 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
       const shelfLenUnit = SECTION_COLS * BOX_SPACING; // "one shelf length"
       const pairPitch = pairWidth + 2 * shelfLenUnit; // + two bare shelf-lengths before the next pair
 
-      const logoMats = getLogoMaterials();
       const textMats = getCachedExtrudedMats('new-releases-wall', () => createNewReleasesSignTexture());
 
       if (pairWidth + 2 * margin <= length) {
@@ -357,6 +379,17 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
           const baseX = numPairs > 1 ? cStart + (cEnd - cStart) * i / (numPairs - 1) : (cStart + cEnd) / 2;
 
           const logoItem = create3DDoubleLayeredSign(logoMats.bodyMats, logoMats.yellowMats, logoW, logoH, extrudeDepth, Math.min(0.0417, extrudeDepth));
+          const normalized = new Set<THREE.BufferGeometry>();
+          logoItem.traverse(o => {
+            if (!(o instanceof THREE.Mesh) || normalized.has(o.geometry)) return;
+            normalized.add(o.geometry);
+            const uv = o.geometry.getAttribute('uv');
+            for (let j = 0; j < uv.count; j++) uv.setXY(j,
+              nrLogoBounds.u + uv.getX(j) * nrLogoBounds.w,
+              nrLogoBounds.v + uv.getY(j) * nrLogoBounds.h);
+            uv.needsUpdate = true;
+          });
+          logoItem.name = 'normalized-wall-emblem';
           logoItem.position.set(baseX - pairWidth / 2 + logoW / 2, 0, localZ);
           wallGroup.add(logoItem);
 

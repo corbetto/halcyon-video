@@ -466,74 +466,32 @@ const COUNTER_BAND_KINDS = new Set([
  * is what holds the shelf runs far enough off the back wall for the alcove to
  * stand in front of it, so the two numbers are read together.
  */
-export function curtainedAlcovePlacements(): FixturePlacement[] {
+export function curtainedAlcovePlacements(roomDepth = 5): FixturePlacement[] {
   return [{
     id: 'curtained-alcove',
     kind: 'curtained-alcove',
     position: { x: STORE_CENTER_X, z: 0 }, // derived in the fixture — see above
     yaw: 0,
-    options: { cornerSide: 'right' },
+    options: { cornerSide: 'right', roomDepth },
   }];
 }
 
 /**
  * Potted plants for mom-and-pop mode (StoreFormatSpec.plants).
- * Authentic houseplants placed where independent video stores kept them:
- * catching sun by the storefront windows, tucked into the desk corner,
- * and beside the back-room beaded curtain.
+ * Plants sit on reserved shelf-end ledges, leaving the aisle floor clear.
  */
 export function momAndPopPlantPlacements(
-  storeWidth: number,
-  backWallZ: number,
-  _openEnds: { worldX: number; frontLocalZ: number }[] = [],
+  _storeWidth: number,
+  _backWallZ: number,
+  openEnds: { worldX: number; frontLocalZ: number; unit: { lineId: number } }[] = [],
 ): FixturePlacement[] {
-  const wallX = STORE_CENTER_X - storeWidth / 2;
-  const outerRightX = STORE_CENTER_X + storeWidth / 2;
-  const innerAlcoveX = outerRightX - 7.5;
-  const alcoveFrontZ = backWallZ + 5.0;
-
-  return [
-    // Tall floor palm by the front window right of the door, basking in daylight
-    {
-      id: 'plant-front-window',
-      kind: 'potted-plant',
-      position: { x: STORE_CENTER_X + 4.5, z: 13.6 },
-      yaw: 0.4,
-      options: { variant: 'floor-palm' }
-    },
-    // Upright snake plant in the front-left corner beside the side window & desk
-    {
-      id: 'plant-desk-corner',
-      kind: 'potted-plant',
-      position: { x: wallX + 1.8, z: 13.6 },
-      yaw: -0.6,
-      options: { variant: 'snake-plant' }
-    },
-    // Floor palm softening the return corner beside the back room beaded curtain
-    {
-      id: 'plant-alcove',
-      kind: 'potted-plant',
-      position: { x: innerAlcoveX - 1.4, z: alcoveFrontZ + 0.8 },
-      yaw: -0.85,
-      options: { variant: 'floor-palm', frondScale: 0.72, fanSpan: Math.PI * 1.1 }
-    },
-    // Tall ficus tree on the front-left corner of the center shelf
-    {
-      id: 'plant-shelves-left',
-      kind: 'potted-plant',
-      position: { x: 8.6, z: 1.65 },
-      yaw: 0.6,
-      options: { variant: 'tall-ficus' }
-    },
-    // Tall ficus tree on the front-right corner of the center shelf
-    {
-      id: 'plant-shelves-right',
-      kind: 'potted-plant',
-      position: { x: 13.4, z: 1.65 },
-      yaw: -0.6,
-      options: { variant: 'tall-ficus' }
-    },
-  ];
+  return openEnds.slice(0, Math.min(2, Math.max(0, openEnds.length - 1))).map((end) => ({
+    id: `plant-endcap-${end.unit.lineId}`,
+    kind: 'potted-plant',
+    position: { x: end.worldX, z: end.frontLocalZ + 0.46 },
+    yaw: 0,
+    options: { variant: 'pothos', surfaceY: 3.0, endcapShelf: true, lineId: end.unit.lineId },
+  }));
 }
 
 /**
@@ -666,20 +624,6 @@ export function counterAnchoredPlacements(
         yaw: 0
       },
       {
-        // On the front band top, left of centre. 6.9, not 8.6: the
-        // 'register-left' PLEASE REWIND tent stands on this same band top at
-        // cx - 1.8 = 9.2 (entrance/index.ts registerLeftOnBand), and at 8.6
-        // the 2.2 ft tray (7.5..9.7) swallowed the tent whole (visual sweep
-        // 2026-09-04). 6.9 puts the tray at 5.8..8.0 — 0.75 ft short of the
-        // tent and still 0.5 ft clear of the bag's wait spot at the band's
-        // left end (store-checkout.ts WAIT_DX/DZ off the island rest spot).
-        id: 'tape-cleaner-display-counter',
-        kind: 'tape-cleaner-display',
-        position: { x: 6.9, z: -2.85 },
-        yaw: Math.PI, // labels toward the store side (-z)
-        options: { count: 10 }
-      },
-      {
         // Tip jar: same band top, right of centre — the far side from the
         // cleaner display and clear of the bag's wait stretch at the gap end.
         id: 'tip-jar-counter',
@@ -750,20 +694,7 @@ export function counterAnchoredPlacements(
       position: { x: 13.9, z: -0.27 },
       yaw: -0.6697
     },
-    // Tape-cleaner display on the band's blue top — moved from the left
-    // FRONT segment (old #57 spot (4.61, 0.52)) to the left SHOULDER
-    // segment, 2.5 ft down its edge from the back corner (4.8, 8.5), labels
-    // facing the exit corridor: the old spot is now the checkout bag's WAIT
-    // stretch at the band's gap end (store-checkout.ts exit ritual), and
-    // anywhere else on the front segment blocks that ritual's stand-camera
-    // sightline. Exiting customers walk right past the labels instead.
-    {
-      id: 'tape-cleaner-display-counter',
-      kind: 'tape-cleaner-display',
-      position: { x: 7.5, z: 7.75 },
-      yaw: Math.PI,
-      options: { count: 10 }
-    },
+    // Head-cleaner merchandise remains dormant.
     // Tip jar on the FRONT-RIGHT band top, 3.4 ft up the segment from the
     // apex: the stretch a customer stands at while the clerk works the
     // register, and the opposite end of the counter from the bag's wait spot

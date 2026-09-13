@@ -29,3 +29,10 @@ export const CRT_BLACK = '#0a0700';
 /** Dark ink used INSIDE the gold bars / reverse-video selections (near-black
  *  terminal navy — same #000a1c the DOM selection rule uses). */
 export const CRT_INK = '#000a1c';
+
+/** Counter terminals adopted white-on-blue in the later store eras. */
+export function counterCrtPalette(themeId: string) {
+  return themeId === 'bb-2000' || themeId === 'bb-2010'
+    ? { background: '#001ca8', text: '#ffffff', bar: '#ffffff', ink: '#001ca8' }
+    : { background: CRT_BLACK, text: CRT_TEXT, bar: CRT_GOLD, ink: CRT_INK };
+}

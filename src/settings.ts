@@ -448,6 +448,14 @@ export function registerCoreSettings(): void {
     },
   });
 
+  registerSetting({
+    key: 'bb_above_r_room', label: 'NC-17 / X back room', kind: 'toggle',
+    group: 'Store Look', default: false, applyMode: 'rebuild-scene',
+    visibleWhen: () => localStorage.getItem(STORE_FORMAT_KEY) === 'mom-and-pop'
+      || localStorage.getItem('bb_theme') === 'mom-and-pop',
+    hint: 'Separate explicitly rated NC-17 or X movies. Empty rooms stay hidden.',
+  });
+
   // Store Brand -------------------------------------------------------------
   // Brand pack selection lives with the logo editor and its preview.
   registerSetting({
@@ -474,6 +482,13 @@ export function registerCoreSettings(): void {
   // represented studios instead (topStudiosInLibrary); blank keeps the old
   // curated-list behavior, which is still the right default for a library
   // with no saved preference.
+  registerSetting({
+    key: 'bb_browse_camera', label: 'Shelf Camera', kind: 'cycle', group: 'Store Look',
+    values: [{ id: 'steady', label: 'Steady' }, { id: 'floaty', label: 'Walking Glide' }],
+    default: 'steady', applyMode: 'rebuild-scene',
+    hint: 'Gently angle along the aisle in your direction of travel. Shelf height stays the same.',
+  });
+
   registerSetting({
     key: 'bb_studio_picks',
     label: 'Featured Studios',

@@ -38,12 +38,12 @@ clear acrylic sheen, theme color and label ownership remain in the application.
 Run Blender with an absolute script path and `-b -t 2 -P`.
 Material roles: `ChuteLaminate`, `ChuteSteel`, `ChuteReveal`. Laminate uses the
 active counter-top color at runtime. All three retain embedded tangent-space fine
-grain and roughness textures (two shared 256² images). Authored base-color channels
-are at least 0.08, steel metalness is 0.85, laminate 0.03, reveal 0.10; roughness
+grain and roughness textures (two shared 256² images). The shell is blue laminate and the slot is white, nonmetallic painted metal.
+Laminate metalness is 0.03 and reveal metalness 0.10; roughness
 varies approximately 0.44–0.56. UV islands are packed per physical part and tiled 8× for fine physical grain.
 The light baffle sits at Z 0.05, giving 0.85 ft of visible depth ahead of the
 existing counter band; it masks the blue counter behind the receiving throat.
-Cost: 2,324 triangles, four mesh draws, three materials, 348,056 GLB bytes.
+Cost: 2,240 triangles, four mesh draws, three materials, 342,748 GLB bytes.
 Decoded image pixels total 512 KiB before mipmaps; loader texture objects can
 share image data. The existing runtime label adds its original draws/textures.
 
@@ -68,9 +68,9 @@ captures block only the new GLB. Each run clears localStorage and uses the corpo
 finishes and counter anchors. Photographs and verification logs are delivered in the task outbox;
 these are local in-store previews, not a deployment.
 
-## Staff collection well
+## Staff collection cavity
 
-The white housing opens onto a fitted dark receiver tub containing twenty
+The blue housing opens at the rear onto a fitted dark receiver tub containing twenty
 rental cases. The staff-side counter opening is cut in Blender for both shield
 and square surrounds; the white front, slot aperture and moving flap keep their
 existing bounds and anchors. A blue backing retains the existing label contrast.
@@ -83,3 +83,5 @@ and surrounding counter exposes the staff-side tub and returned cases.
 The mouth anchor, hinge, overall dimensions, collision and drop timing stay
 unchanged. The opening is checked in the installed counter as well as the
 public fallback model.
+
+The housing retains a continuous blue crown above the hollow receiver. Staff access remains through the rear counter socket; the collection cavity no longer cuts through the top. The slot, flap pivot, outer bounds and four render batches are unchanged.

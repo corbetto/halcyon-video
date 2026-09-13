@@ -175,19 +175,10 @@ test('mom-and-pop shelving does not taper (a 7ft top tier would vanish)', () => 
   assert.ok(taperedDepth < 1.0, 'the taper this format opts out of really would collapse');
 });
 
-test('the back room has floor to stand on', () => {
-  // fixtures/curtained-alcove.ts builds a 5 ft deep room against the back wall,
-  // and backAisleClearance is what holds the shelf runs off that wall. If the
-  // clearance ever drops below the room's depth the runs walk into it, which
-  // the layout validator would only report as an overlap after the fact.
-  const ALCOVE_DEPTH = 5.0;
-  assert.equal(momAndPop.curtainedSection, true);
-  assert.ok(
-    momAndPop.backAisleClearance >= ALCOVE_DEPTH + 2.5,
-    `back clearance ${momAndPop.backAisleClearance}ft must fit a ${ALCOVE_DEPTH}ft room plus a cross-aisle`,
-  );
-  // The corporate box has no such room, so it keeps the plain 8 ft back margin.
-  assert.equal(corporate.curtainedSection, false);
+test('the independent shop removes the unstocked room and retains rear shelf clearance', () => {
+  assert.equal(momAndPop.curtainedSection, false);
+  assert.ok(momAndPop.backAisleClearance >= 6, 'wall shelving plus a clear cross-aisle');
+  assert.ok(momAndPop.backAisleClearance < corporate.backAisleClearance);
 });
 
 test('mom-and-pop mode enables indoor houseplants', () => {

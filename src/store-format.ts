@@ -18,8 +18,7 @@
 //                  9 ft ceiling; brown shag on the floor; no floor displays and
 //                  no New Releases wall — the walls belong to the regular
 //                  library and new releases get at most one run of their own.
-//                  Behind a beaded curtain at the back is the small curtained-off
-//                  section every one of these stores had.
+//                  A regular library occupies one-sided shelving along a wall.
 //
 // WHY THIS IS DATA AND NOT A BRANCH: the corporate spec below holds *today's
 // literal constants*, so store-layout.ts derives its exported geometry from
@@ -115,9 +114,8 @@ export interface StoreFormatSpec {
   widthCap: number;
   /**
    * Grow the store wider while the estimated depth exceeds this fraction of the
-   * width. Corporate's 0.9 keeps the big box roughly square; mom-and-pop's 1.8
-   * lets it run deep and narrow, which is the shape of a real strip-mall unit —
-   * it only adds aisles across once it is already nearly twice as deep as wide.
+   * width. Corporate's 0.9 keeps the big box roughly square; mom-and-pop's 1.25
+   * preserves a modest strip-mall shape without wasting a long rear corridor.
    */
   depthToWidthRatio: number;
 
@@ -485,22 +483,16 @@ const MOM_AND_POP: StoreFormatSpec = {
   forcedArrangement: 'straight',
   singleField: true,
   centerWalkway: 0,
-  // 2.6 ft off the side walls: enough to walk the end of a run and turn into
-  // the next aisle, and nothing more. The chain leaves 7.5.
-  wallMargin: 2.6,
+  // Leave room for inward-facing wall shelving plus a clear browse aisle.
+  wallMargin: 5.6,
   // 6.2 − UNIT_DEPTH(2.16) = 4.04 ft of clear aisle.
   runSpacing: 6.2,
   // Half the chain's cross-aisle break: 3 ft of dead floor between run chunks
   // is a luxury this store doesn't have.
   runBreakGap: 1.5,
   fieldZFront: -6.4,
-  // 8.0, not the 3 ft a cramped aisle would otherwise want, because THE BACK
-  // ROOM stands in this strip: the curtained alcove is 5 ft deep against the
-  // back wall (fixtures/curtained-alcove.ts), leaving ~3 ft of cross-aisle in
-  // front of its curtain. The two numbers are read together — shrink this and
-  // the shelf runs walk into the alcove. Every other format leaves its back
-  // strip as plain circulation.
-  backAisleClearance: 8.0,
+  // No unused curtained room: retain a clear rear cross-aisle.
+  backAisleClearance: 6.0,
   // Long runs are the POINT here ("one long shelf run down the middle"), so the
   // run length starts where the chain's tops out and climbs from there.
   baseRunUnits: 6,
@@ -509,7 +501,7 @@ const MOM_AND_POP: StoreFormatSpec = {
   // A mom-and-pop never becomes a warehouse. Past 44 ft it only gets deeper —
   // which is exactly how a strip-mall unit grows.
   widthCap: 44.0,
-  depthToWidthRatio: 1.8,
+  depthToWidthRatio: 1.25,
 
   frontPanesBaseline: 2,
   sidePanesBaseline: 2,
@@ -574,7 +566,7 @@ const MOM_AND_POP: StoreFormatSpec = {
   // GH #110: no headroom for the ceiling rig (see ceilingTvs), but the room
   // should still have a television.
   counterTv: true,
-  curtainedSection: true,
+  curtainedSection: false,
   plants: true,
   ceilingMirror: false,
   overheadSignage: false,

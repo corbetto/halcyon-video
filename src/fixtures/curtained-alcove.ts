@@ -57,7 +57,7 @@ export class CurtainedAlcove implements StoreFixture {
   private ctx: FixtureContext;
   private group: THREE.Group | null = null;
   private disposables: Array<{ dispose(): void }> = [];
-  private footprint: Footprint | null = null;
+  private wallFootprints: Footprint[] = [];
   private removeCurtainModel: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
@@ -119,6 +119,10 @@ export class CurtainedAlcove implements StoreFixture {
       mesh.receiveShadow = true;
       group.add(mesh);
       this.ctx.addCollider(mesh);
+      if (y - h / 2 < .1) this.wallFootprints.push({
+        label: `structure:curtained-alcove-wall-${this.wallFootprints.length}`,
+        kind: 'structure', cx: x, cz: z, w, d, yaw: 0,
+      });
       return mesh;
     };
 
@@ -132,8 +136,8 @@ export class CurtainedAlcove implements StoreFixture {
     const doorCenterZ = frontZ - 0.35 - DOOR_W / 2; // opening biased toward the sales floor
     const pierFrontD = Math.max(0.01, frontZ - (doorCenterZ + DOOR_W / 2));
     const pierBackD = Math.max(0.01, (doorCenterZ - DOOR_W / 2) - backZ);
-    if (pierFrontD > 0.02) {
-      slab(WALL_T, ceilingY, pierFrontD, innerX, ceilingY / 2, frontZ - pierFrontD / 2);
+    if (pierFrontD > WALL_T / 2 + 0.02) {
+      slab(WALL_T, ceilingY, pierFrontD - WALL_T / 2, innerX, ceilingY / 2, frontZ - (pierFrontD + WALL_T / 2) / 2);
     }
     if (pierBackD > 0.02) {
       slab(WALL_T, ceilingY, pierBackD, innerX, ceilingY / 2, backZ + pierBackD / 2);
@@ -172,16 +176,8 @@ export class CurtainedAlcove implements StoreFixture {
     this.ctx.scene.add(group);
     this.ctx.requestShadowRefresh();
 
-    // The footprint is the WHOLE room, so the floor planner and the clerk's nav
-    // grid both treat it as solid building rather than as walkable floor. The
-    // doorway is deliberately not carved out of it: nothing but the player goes
-    // in there, and a 3 ft slot in a 5 ft rect rasterizes shut on the nav grid's
-    // half-foot cells anyway (the same trap the counter's walk-through gap hit).
-    this.footprint = {
-      label: 'structure:curtained-alcove',
-      kind: 'structure',
-      cx, cz, w: roomW, d: roomD, yaw: 0,
-    };
+    // Only the partitions are solid; the stocked interior and doorway are walkable.
+
   }
 
   /**
@@ -311,8 +307,10 @@ export class CurtainedAlcove implements StoreFixture {
   update(_timeMs: number): void {}
 
   getFootprint(): Footprint | null {
-    return this.footprint;
+    return null;
   }
+
+  getFootprints(): Footprint[] { return this.wallFootprints; }
 
   dispose(): void {
     this.removeCurtainModel?.();

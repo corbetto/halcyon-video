@@ -24,7 +24,7 @@ export function createNrBayWash(scene: StoreScene) {
       originals.set(material, { compile, key, release });
       material.addEventListener('dispose', release);
       const priorKey = key.call(material);
-      material.customProgramCacheKey = () => priorKey + ':nr-bay-wash-v1:' + layout.length;
+      material.customProgramCacheKey = () => priorKey + ':nr-bay-wash-v2:' + layout.length;
       material.onBeforeCompile = function(shader, renderer) {
         compile.call(this, shader, renderer);
         shader.uniforms.nrWashRuns = { value: layout };
@@ -50,7 +50,9 @@ export function createNrBayWash(scene: StoreScene) {
               vec2 facing = vec2(-tangent.y, tangent.x);
               vec2 delta = vNrWashWorld.xz - run.xy;
               float along = dot(delta, tangent), depth = dot(delta, facing);
-              if (abs(along) > run.w * .5 + .1 || depth < -.15 || depth > 4.5 || vNrWashWorld.y > nrWashHeight) continue;
+              if (abs(along) > run.w * .5 + 1.5 || depth < -.5 || depth > 7.5 || vNrWashWorld.y > nrWashHeight) continue;
+              float boundary = (1.0 - smoothstep(run.w * .5, run.w * .5 + 1.5, abs(along)))
+                * smoothstep(-.5, 0.0, depth) * (1.0 - smoothstep(4.5, 7.5, depth));
               float cell = floor((along + run.w * .5) / ${NR_BAY_WIDTH.toFixed(8)} - .5);
               vec3 normalLocal = vec3(dot(worldNormal.xz,tangent),worldNormal.y,dot(worldNormal.xz,facing));
               for (int j = 0; j < 2; j++) {
@@ -62,7 +64,7 @@ export function createNrBayWash(scene: StoreScene) {
                 vec3 direction = toLamp * inversesqrt(d2);
                 vec3 axis = normalize(vec3(0.0, nrWashHeight-3.5, 1.2));
                 float cone = smoothstep(cos(.78), cos(.42), dot(direction,axis));
-                energy += 95.0 / d2 * cone * max(dot(normalLocal,direction),0.0);
+                energy += boundary * 95.0 / d2 * cone * max(dot(normalLocal,direction),0.0);
               }
             }
             return vec3(1.0,.87,.70) * energy;

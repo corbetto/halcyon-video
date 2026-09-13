@@ -127,6 +127,7 @@ export function buildWindowBays(
     // a solid one.
     const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.3, 0.34), kneeTrimMat);
     kick.position.set(cxSeg, 0.15, -.15);
+    kick.castShadow = true;
     kick.receiveShadow = true;
     group.add(kick);
   });

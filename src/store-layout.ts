@@ -887,6 +887,8 @@ export interface LibraryLayout {
 export type ArrangementId = 'herringbone' | 'straight' | 'diagonal';
 
 export interface ShelvingUnit {
+  /** Wall-backed case: only the inward browse-front face is built and stocked. */
+  singleSided?: boolean;
   libraryIdx: number;
   unitIdxInLibrary: number;
   cols: number;

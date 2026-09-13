@@ -1,3 +1,4 @@
+import { ABOVE_R_LIBRARY_ID, partitionAboveRRoom } from './above-r-room';
 import { createNrBayWash } from './nr-bay-wash';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { activeStoreFormat } from './store-format';
@@ -1101,7 +1102,8 @@ export class StoreScene {
   ) {
     this.container = container;
     this.onConsoleLog = onConsoleLog;
-    this.libraries = libraries;
+    this.libraries = partitionAboveRRoom(libraries, activeStoreFormat().id === 'mom-and-pop'
+      && localStorage.getItem('bb_above_r_room') === '1');
     this.catalogLibraries = catalog?.libraries ?? libraries;
     this.catalogGames = catalog?.games ?? gameMovies;
     // The store renders on demand, so a live brand repaint has to ask for a
@@ -1164,6 +1166,7 @@ export class StoreScene {
       let shelfLib: JellyfinLibrary | null = null;
       let best = -1;
       for (const lib of this.libraries) {
+        if (lib.id === ABOVE_R_LIBRARY_ID) continue;
         const n = lib.movies.filter((m) => !m.isSeries && !m.game && !m.collectionGap).length;
         if (n > best) { best = n; shelfLib = lib; }
       }
@@ -1223,7 +1226,7 @@ export class StoreScene {
       const leftEdge = 11.0 - sw / 2;
       const rightEdge = 11.0 + sw / 2;
       // How much back wall New Releases gets is the FORMAT's call (GH #33).
-      [this.nrBackLeftX, this.nrBackRightEdgeX] = newReleasesWallSpan(leftEdge + (this.plan.clubhouse ? 18 : this.LEFT_SLIVER), rightEdge - 0.2);
+      [this.nrBackLeftX, this.nrBackRightEdgeX] = newReleasesWallSpan(leftEdge + (this.plan.clubhouse ? 18 : this.LEFT_SLIVER), rightEdge - 0.2 - (this.plan.aboveRRoom ? this.plan.aboveRRoom.width + .5 : 0));
       // Stepped-corner footprint comes from the shell spec (T07). Width sets how
       // far left the step begins; depth is clamped to the section width so the
       // NR connector run is never longer than the section it wraps, and stays
@@ -1292,6 +1295,7 @@ export class StoreScene {
     // in it is a lie the aisle sticker treatment doesn't excuse.
     const allMoviesMap = new Map<string, Movie>();
     this.libraries.forEach((lib) => {
+      if (lib.id === ABOVE_R_LIBRARY_ID) return;
       lib.movies.forEach((m) => {
         if (m.discovery || m.collectionGap || m.comingSoon) return;
         allMoviesMap.set(m.id, m);
@@ -1642,6 +1646,7 @@ export class StoreScene {
   // Everything a swappable fixture (ambient TVs, entrance, ...) needs from the
   // scene, bundled so fixture classes never hold a reference to StoreScene.
   public fixtureContext(): FixtureContext {
+    const roomIds = new Set(this.libraries.find(lib => lib.id === ABOVE_R_LIBRARY_ID)?.movies.map(movie => movie.id));
     return {
       scene: this.scene,
       camera: this.camera,
@@ -1649,11 +1654,11 @@ export class StoreScene {
       backWallZ: this.backWallZ,
       ceilingY: this.ceilingY,
       storefrontSpec: this.storefrontSpec,
-      libraries: this.libraries,
+      libraries: this.libraries.filter(lib => lib.id !== ABOVE_R_LIBRARY_ID),
       jellyfinUrl: this.jellyfinUrl,
       jellyfinToken: this.jellyfinToken,
       gameMovies: this.gameMovies,
-      staffPickMovies: this.staffPickMovies,
+      staffPickMovies: this.staffPickMovies.filter(movie => !roomIds.has(movie.id)),
       log: this.onConsoleLog,
       addCollider: (obj) => this.shelves.push(obj),
       requestShadowRefresh: () => {

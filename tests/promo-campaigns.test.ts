@@ -164,86 +164,6 @@ test('titles with no rental copy are excluded', () => {
 
 // ─── studio spotlight ───────────────────────────────────────────────────────
 
-function studioLib(): JellyfinLibrary[] {
-  return [lib('Movies', [
-    ...Array.from({ length: 20 }, (_, i) => mk(`Ghibli ${i}`, { studios: ['Studio Ghibli'] })),
-    ...Array.from({ length: 15 }, (_, i) => mk(`Pixar ${i}`, { studios: ['Pixar'] })),
-    // A distributor, deliberately the biggest pool in the library.
-    ...Array.from({ length: 80 }, (_, i) => mk(`WB ${i}`, { studios: ['Warner Bros. Pictures'] })),
-  ])];
-}
-
-test('a distributor never wins a studio spotlight, however much it stocks', () => {
-  const c = buildPromoCampaign(['studio-spotlight:0'], studioLib(), ROWS, COLS)!;
-  assert.equal(c.topper, 'STUDIO GHIBLI');
-});
-
-test('one subject shouts from all four sides', () => {
-  const c = buildPromoCampaign(['studio-spotlight:0'], studioLib(), ROWS, COLS)!;
-  assert.deepEqual(new Set(c.faces.map((f) => f.label)), new Set(['STUDIO GHIBLI']));
-  c.faces.forEach((f) => assert.equal(f.movies.length, PER_FACE));
-});
-
-test('pick index selects a different studio, so two stands never collide', () => {
-  const a = buildPromoCampaign(['studio-spotlight:0'], studioLib(), ROWS, COLS)!;
-  const b = buildPromoCampaign(['studio-spotlight:1'], studioLib(), ROWS, COLS)!;
-  assert.notEqual(a.topper, b.topper);
-});
-
-test('a studio too thin for a whole stand is not viable', () => {
-  const libs = [lib('Movies', Array.from({ length: 8 }, (_, i) =>
-    mk(`Ghibli ${i}`, { studios: ['Studio Ghibli'] })))];
-  assert.equal(buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS), null);
-});
-
-test('a stand never falls back to a DIFFERENT index\'s studio (issue #26, "duplicate facings")', () => {
-  // Only ONE curated studio clears the viability floor in this library.
-  const libs = [lib('Movies', Array.from({ length: 20 }, (_, i) =>
-    mk(`Ghibli ${i}`, { studios: ['Studio Ghibli'] })))];
-  assert.equal(buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!.topper, 'STUDIO GHIBLI');
-  // Asking for the next index must DECLINE, not repeat index 0's studio.
-  // Two stands whose chains list studio-spotlight:1 with a studio-spotlight:0
-  // fallback (as promo-stand-front-right's config used to) would otherwise
-  // both land on Studio Ghibli — the same tower shown twice in the store,
-  // which is what the issue reported. See the CALLER CONTRACT note on
-  // studioSpotlight() in promo-campaigns.ts and the fixed chain in
-  // store-fixtures-config.ts.
-  assert.equal(buildPromoCampaign(['studio-spotlight:1'], libs, ROWS, COLS), null);
-});
-
-test('every face of a studio stand is 9/9 with no title repeated ACROSS faces', () => {
-  // Exactly at the viability floor: PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE
-  // distinct titles for the whole studio, none to spare — de-duplication
-  // under the most pressure it can be.
-  const total = PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE;
-  const libs = [lib('Movies', Array.from({ length: total }, (_, i) =>
-    mk(`Thin ${i}`, { studios: ['Studio Ghibli'] })))];
-  const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
-  assert.ok(c, 'a pool at exactly the viability floor should still be viable');
-  assert.equal(c.faces.length, PROMO_FACE_COUNT);
-  const seenAcrossFaces = new Set<string>();
-  c.faces.forEach((f) => {
-    assert.equal(f.movies.length, PER_FACE, 'every face must be 9/9 — a short face is the bug this replaced');
-    // WITHIN a face, a short pool legitimately repeats down a column
-    // (layoutFace) — that's documented, intentional behavior. What must
-    // never happen is the SAME title landing on two DIFFERENT faces.
-    new Set(f.movies.map((m) => m.id)).forEach((id) => {
-      assert.ok(!seenAcrossFaces.has(id), `title ${id} appeared on more than one face`);
-      seenAcrossFaces.add(id);
-    });
-  });
-  assert.equal(seenAcrossFaces.size, total, 'all distinct titles used exactly once, across the 4 faces');
-});
-
-// ─── user-configurable studio picks (issue #26) ─────────────────────────────
-// The old hardcoded PROMO_STUDIOS pick meant nothing to a library it had no
-// curated entry for. featuredStudioPicks() reads the user's own choice
-// (settings row "Featured Studios", localStorage key bb_studio_picks) off a
-// menu built by topStudiosInLibrary — see promo-campaigns.ts for why handing
-// that ranking to a human, rather than auto-selecting off it, is what keeps
-// this from walking into the exact "distributor wins" trap PROMO_STUDIOS was
-// created to avoid.
-
 function withStudioPicks(picks: string, fn: () => void) {
   const g = globalThis as { localStorage?: unknown };
   const had = 'localStorage' in g;
@@ -254,59 +174,55 @@ function withStudioPicks(picks: string, fn: () => void) {
   }
 }
 
-test('with no saved picks, the curated list still guards against the distributor trap', () => {
-  const libs = [lib('Movies', [
-    ...Array.from({ length: 80 }, (_, i) => mk(`WB ${i}`, { studios: ['Warner Bros. Pictures'] })),
-    ...Array.from({ length: 15 }, (_, i) => mk(`Ghibli ${i}`, { studios: ['Studio Ghibli'] })),
-  ])];
-  assert.equal(featuredStudioPicks().length, 0);
-  const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
-  assert.equal(c.topper, 'STUDIO GHIBLI', 'Warner Bros has 5x the titles but is not curated');
-});
 
-test('saved picks override the curated list outright, ranked by title count', () => {
-  const libs = [lib('Movies', [
-    ...Array.from({ length: 15 }, (_, i) => mk(`A24 ${i}`, { studios: ['A24'] })),
-    ...Array.from({ length: 20 }, (_, i) => mk(`BH ${i}`, { studios: ['Blumhouse Productions'] })),
-  ])];
-  withStudioPicks('A24, Blumhouse Productions', () => {
-    assert.deepEqual(featuredStudioPicks(), ['A24', 'Blumhouse Productions']);
+const studioNames = ['Studio Ghibli', 'Pixar', 'DreamWorks Animation', 'Marvel Studios'];
+function studioLib(names = studioNames, count = 9): JellyfinLibrary[] {
+  return [lib('Movies', names.flatMap(studio => Array.from({length: count}, (_, i) =>
+    mk(studio + i, {studios: [studio]}))))];
+}
+test('four studios each get nine distinct titles, including co-productions only once', () => {
+  const libs = studioLib(studioNames, 10);
+  libs[0].movies[0].studios = studioNames;
+  libs[0].movies.push({ ...libs[0].movies[0], id: 'another-library-copy' });
+  const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
+  assert.ok(c);
+  assert.equal(new Set(c.faces.map(f => f.label)).size, 4);
+  assert.equal(new Set(c.faces.flatMap(f => f.movies.map(m => m.id))).size, 36);
+  assert.equal(new Set(c.faces.flatMap(f => f.movies.map(m => m.title.toLowerCase()+m.year))).size, 36);
+  c.faces.forEach(f => {
+    assert.equal(f.movies.length, 9);
+    assert.equal(new Set(f.movies.map(m => m.id)).size, 9);
+    f.movies.forEach(m => assert.ok(m.studios?.some(s => s.toUpperCase() === f.source)));
+  });
+});
+test('a large distributor cannot displace a curated studio', () => {
+  const libs = studioLib();
+  libs[0].movies.push(...Array.from({length: 80}, (_, i) => mk('WB'+i, {studios: ['Warner Bros. Pictures']})));
+  const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
+  assert.ok(c.faces.every(f => !f.source?.includes('WARNER')));
+});
+test('a thin face or fewer than four studios declines without repeated fillers', () => {
+  for (const libs of [studioLib(studioNames, 8), studioLib(studioNames.slice(0,3), 30)]) {
+    assert.equal(buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS), null);
+  }
+});
+test('another stand uses another group of studios and never wraps', () => {
+  const names = ['One','Two','Three','Four','Five','Six','Seven','Eight'];
+  withStudioPicks(names.join(','), () => {
+    const libs = studioLib(names, 9);
     const a = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
     const b = buildPromoCampaign(['studio-spotlight:1'], libs, ROWS, COLS)!;
-    assert.equal(a.topper, 'BLUMHOUSE PRODUCTIONS'); // 20 titles, biggest pool first
-    assert.equal(b.topper, 'A24');
+    assert.equal(new Set([...a.faces,...b.faces].map(f => f.source)).size, 8);
+    assert.equal(new Set([...a.faces,...b.faces].flatMap(f => f.movies.map(m => m.id))).size, 72);
+    assert.equal(buildPromoCampaign(['studio-spotlight:2'], libs, ROWS, COLS), null);
   });
 });
-
-test('a picked studio absent from the curated list still works — it is real user data, not a regex', () => {
-  const libs = [lib('Movies', Array.from({ length: 15 }, (_, i) =>
-    mk(`Indie ${i}`, { studios: ['Neon'] })))];
-  withStudioPicks('Neon', () => {
-    const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
-    assert.equal(c.topper, 'NEON');
-  });
-});
-
-test('picks match the raw Studios field case-insensitively', () => {
-  const libs = [lib('Movies', Array.from({ length: 15 }, (_, i) =>
-    mk(`Indie ${i}`, { studios: ['neon'] })))];
-  withStudioPicks('NEON', () => {
-    const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
-    assert.equal(c.topper, 'NEON');
-  });
-});
-
-test('a picked studio too thin for a whole stand is not viable, and does not fall back to a sibling pick', () => {
-  const libs = [lib('Movies', [
-    ...Array.from({ length: 8 }, (_, i) => mk(`Thin ${i}`, { studios: ['Small House'] })),
-    ...Array.from({ length: 15 }, (_, i) => mk(`Big ${i}`, { studios: ['Big House'] })),
-  ])];
-  withStudioPicks('Small House, Big House', () => {
-    // Big House (15) outranks Small House, but Small House (8) never clears
-    // PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE and drops out of the scored
-    // list entirely, so pick 1 must be null — not a second wrap of Big House.
-    assert.equal(buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!.topper, 'BIG HOUSE');
-    assert.equal(buildPromoCampaign(['studio-spotlight:1'], libs, ROWS, COLS), null);
+test('saved studio picks override the curated list and match case-insensitively', () => {
+  const names = ['Neon','A24','Blumhouse Productions','Small House'];
+  withStudioPicks(names.join(',').toUpperCase(), () => {
+    assert.equal(featuredStudioPicks().length, 4);
+    const c = buildPromoCampaign(['studio-spotlight:0'], studioLib(names), ROWS, COLS)!;
+    assert.deepEqual(new Set(c.faces.map(f => f.source)), new Set(names.map(n=>n.toUpperCase())));
   });
 });
 

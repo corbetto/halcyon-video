@@ -484,31 +484,33 @@ function studioCandidates(libs: JellyfinLibrary[], picks: string[]): { display: 
   }));
 }
 
-/**
- * One studio across all four sides. `pick` is the Nth-best studio by title
- * count, which is how two stands select different studios without sharing
- * any state — same trick the old displayIndex used.
- *
- * CALLER CONTRACT (issue #26): a single stand's `campaigns` chain must list
- * at most one `studio-spotlight:N` entry, and different stands must use
- * different N. Chaining `studio-spotlight:1` with a `studio-spotlight:0`
- * fallback used to seem like a safety net for a thin candidate list, but it
- * means two DIFFERENT stands can both land on index 0 — the same studio,
- * same stock, on two towers in the same store, which is the "duplicate
- * facings" the issue reported. A stand whose one index isn't viable should
- * fall through to a different KIND of campaign (or build nothing, which is
- * correct on a thin library — see FourSidedDisplay.ensureCampaign), never to
- * another stand's index.
+/** Each face features a different studio and a full set of distinct titles.
+ * Sparse catalogs decline the campaign instead of manufacturing duplicates.
+ * Earlier stand groups consume their titles before the next index is dealt.
  */
 function studioSpotlight(libs: JellyfinLibrary[], rows: number, cols: number, pick: number): PromoCampaign | null {
-  const candidates = studioCandidates(libs, featuredStudioPicks());
-  const scored = candidates
-    .filter((x) => x.pool.length >= PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE)
+  const perFace = rows * cols;
+  const candidates = studioCandidates(libs, featuredStudioPicks())
     .sort((a, b) => b.pool.length - a.pool.length || a.display.localeCompare(b.display));
-  const chosen = scored[pick];
-  if (!chosen) return null;
-  const faces = spreadFaces(chosen.display, chosen.pool.slice().sort(byPromoOrder), PROMO_FACE_COUNT, rows, cols);
-  return faces ? { id: `studio-spotlight:${pick}`, topper: chosen.display, faces } : null;
+  const used = new Set<string>(), studios = new Set<string>();
+  const titleKey = (m: Movie) => `${m.isSeries ? 'show' : 'film'}:${m.title.trim().toLowerCase()}:${m.year ?? ''}`;
+  for (let stand = 0; stand <= Math.max(0, pick); stand++) {
+    const faces: PromoFace[] = [];
+    for (const candidate of candidates) {
+      if (studios.has(candidate.display)) continue;
+      const distinct = new Map(candidate.pool.map(m => [titleKey(m), m]));
+      const stock = [...distinct.values()].filter(m => !used.has(titleKey(m))).sort(byPromoOrder);
+      if (stock.length < perFace) continue;
+      const movies = stock.slice(0, perFace);
+      studios.add(candidate.display);
+      movies.forEach(m => used.add(titleKey(m)));
+      faces.push({ label: candidate.display, source: candidate.display, movies });
+      if (faces.length === PROMO_FACE_COUNT) break;
+    }
+    if (faces.length !== PROMO_FACE_COUNT) return null;
+    if (stand === Math.max(0, pick)) return { id: `studio-spotlight:${pick}`, topper: 'STUDIO SPOTLIGHT', faces };
+  }
+  return null;
 }
 
 /** The current month's seasonal promotion, in one rating band. */

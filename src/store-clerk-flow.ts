@@ -1,3 +1,5 @@
+import { ABOVE_R_LIBRARY_ID } from './above-r-room';
+import { activeStoreFormat } from './store-format';
 // Clasp -> clerk recommendation flow & person endcaps — extracted from
 // StoreScene (three-scene.ts keeps one-line delegating stubs): the ASK FOR
 // RECOMMENDATIONS clasp cursor + walk-mode focus, calling the clerk over,
@@ -8,7 +10,7 @@
 import * as THREE from 'three';
 import { Movie } from './jellyfin';
 import { posterQueue, CASE_HEIGHT, CASE_DEPTH, posterPixelCache, releaseEndcapPosterTexture, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, restampCollectionGapCase } from './video-case';
-import { AISLE_SHELF_HEIGHTS, LEAN_ANGLE, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, SECTION_CAPACITY, MovieSlot, storeCategory, FixturePlacement, ShelvingUnit } from './store-layout';
+import { LEAN_ANGLE, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, SECTION_CAPACITY, MovieSlot, storeCategory, FixturePlacement, ShelvingUnit } from './store-layout';
 import { ENDCAP_CORE_DEPTH } from './fixtures/genre-endcap';
 import { getLastUserActivity } from './user-activity';
 import { showClerkToast, hideClerkToast } from './carried-tapes';
@@ -441,6 +443,7 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   const seen = new Set<string>();
   const movies: Movie[] = [];
   scene.libraries.forEach((lib) => {
+    if (lib.id === ABOVE_R_LIBRARY_ID) return;
     lib.movies.forEach((m) => {
       if (seen.has(m.id)) return;
       if ((m.actors || []).includes(person) || m.director === person) {
@@ -481,14 +484,21 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
     activeUnit = scene.shelvingUnits.find(u => u.isLineFront);
   }
 
-  // Find the front endcap mesh of this run
+  // Only an open run end has enough floor for the actor display's camera.
+  // A chunk boundary in the tight shop points straight into the next shelf.
+  const openActorLines = new Set(scene.plan.openLineFrontEnds().map(end => end.unit.lineId));
+  const canHostActor = (cap: THREE.Mesh) => cap.userData.isFront && !cap.userData.plantReserved
+    && (activeStoreFormat().id !== 'mom-and-pop' || openActorLines.has(cap.userData.lineId));
+  // Find the front endcap mesh of this run.
   let leftCap: THREE.Mesh | undefined;
   if (activeUnit) {
     const frontUnit = scene.shelvingUnits.find(u => u.libraryIdx === activeUnit.libraryIdx && u.lineId === activeUnit.lineId && u.isLineFront);
     if (frontUnit) {
-      leftCap = scene.libraryEndCaps.find(cap => cap.userData.lineId === frontUnit.lineId && cap.userData.isFront);
+      leftCap = scene.libraryEndCaps.find(cap => cap.userData.lineId === frontUnit.lineId && canHostActor(cap));
     }
   }
+
+  if (!leftCap) leftCap = scene.libraryEndCaps.find(canHostActor);
 
   if (!leftCap) {
     scene.onConsoleLog(`[System] Could not find front endcap for shelving run.`, "system");
@@ -502,6 +512,7 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   const maxTitles = 13;
   const shown = movies.slice(0, maxTitles);
   const rowCapacities = [3, 3, 3, 4];
+  const displayShelfHeights = [0.5, 1.333, 2.167, 3.0];
 
   // Build moviePositions to determine row/col coordinates for each movie (filling top shelf first)
   const moviePositions: { row: number, col: number, rowCount: number }[] = [];
@@ -522,11 +533,12 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   // Add the showcase group directly as a child of the physical front endcap mesh!
   leftCap.add(group);
 
-  // Clear acrylic material for the shelves (highly transparent, glossy, smooth)
+  // Timber ledges on the independent shop, acrylic on the chain endcap.
+  const woodDisplay = activeStoreFormat().shelfFinish === 'wood';
   const clearAcrylicMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.08, // more transparent
+    color: woodDisplay ? activeStoreFormat().shelfWoodHex! : 0xffffff,
+    transparent: !woodDisplay,
+    opacity: woodDisplay ? 1 : 0.08,
     roughness: 0.02, // smooth and glossy
     metalness: 0.1,
     side: THREE.DoubleSide
@@ -537,7 +549,7 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   // Draw clear acrylic shelves + front lips on the endcap face (only as many shelves as needed)
   for (let r = 0; r < numShelves; r++) {
     const shelfIdx = 3 - r;
-    const yPos = AISLE_SHELF_HEIGHTS[shelfIdx];
+    const yPos = displayShelfHeights[shelfIdx];
     const localY = yPos - UNIT_FRAME_HEIGHT / 2;
     const widthAtY = unitDepthAtHeight(yPos);
     const shelfWidth = widthAtY - 0.08;
@@ -562,7 +574,7 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   const signH = 0.60;
   const signMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e4, roughness: 0.2, metalness: 0.1 });
   const sign = new THREE.Mesh(new THREE.BoxGeometry(signW, signH, 0.08), signMat);
-  sign.position.set(0, UNIT_FRAME_HEIGHT / 2 + signH / 2 + 0.05, 0.05);
+  sign.position.set(0, 4.6 + signH / 2 + 0.05 - UNIT_FRAME_HEIGHT / 2, 0.10);
   sign.castShadow = true;
   group.add(sign);
 
@@ -680,8 +692,8 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
     const row = pos.row;
     const col = pos.col;
     const rowMoviesCount = pos.rowCount;
-    const shelfIdx = (AISLE_SHELF_HEIGHTS.length - 1) - row;
-    const shelfY = AISLE_SHELF_HEIGHTS[shelfIdx];
+    const shelfIdx = displayShelfHeights.length - 1 - row;
+    const shelfY = displayShelfHeights[shelfIdx];
     const localY = shelfY - UNIT_FRAME_HEIGHT / 2;
 
     // Center the cases horizontally on the row using the adaptive spacing
@@ -1009,7 +1021,7 @@ export function staffPickEndcapPlacements(
   // SHARE of the library's real stock carrying each genre, so a dedicated
   // library (Animation ~1.0) outbids a general one (Animation ~0.05)
   // regardless of size; equal scores fall to the larger library.
-  const libProfiles = scene.libraries.map((lib) => {
+  const libProfiles = scene.libraries.filter(lib => lib.id !== ABOVE_R_LIBRARY_ID).map((lib) => {
     const real = (lib?.movies ?? []).filter(
       (m) => !m.collectionGap && !m.discovery && !m.comingSoon && !m.game
     );

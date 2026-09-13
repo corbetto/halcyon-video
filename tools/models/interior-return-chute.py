@@ -55,8 +55,9 @@ def cut(name,x0,x1,y0,y1,z0,z1):
  bpy.ops.object.modifier_apply(modifier=mod.name); parts.remove(cutter); bpy.data.objects.remove(cutter,do_unlink=True)
 cut('Open rear counter socket',-1.06,1.06,.08,3.46,-1.60,.76)
 cut('Through aperture',-1,0,2.4,2.7,.70,1.0)
-cut('Open staff collection well',-1.06,1.06,1.6,4.0,-1.60,-.14)
-# Drop receiver: a fitted tub beneath the open well, with four retaining walls.
+# The staff retrieves the tub through the open rear socket. Keep the crown
+# continuous above it: the hollow cavity stops below the blue top skin.
+# Drop receiver: a fitted tub inside the hollow housing, with rear staff access.
 box('Receiver floor',-1.06,1.06,.83,.91,-1.49,.24,dark)
 box('Receiver rear rim',-1.06,1.06,.91,1.62,-1.49,-1.41,dark)
 box('Receiver front rim',-1.06,1.06,.91,1.62,.16,.24,dark)
