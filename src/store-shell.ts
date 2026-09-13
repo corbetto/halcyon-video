@@ -2315,7 +2315,7 @@ export function buildStore(scene: StoreScene) {
     // ...and the franchise-collection ends, on whatever run ends were left.
     ...collectionEndcaps,
     // The back room, on the formats that have one (GH #33).
-    ...(activeStoreFormat().curtainedSection ? curtainedAlcovePlacements() : []),
+    ...(scene.plan.aboveRRoom ? curtainedAlcovePlacements(scene.plan.aboveRRoom.depth) : []),
     // Potted plants in mom-and-pop mode
     ...plantPlacements,
   ], {

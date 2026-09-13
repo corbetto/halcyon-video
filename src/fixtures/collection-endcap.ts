@@ -1,3 +1,4 @@
+import { ABOVE_R_LIBRARY_ID } from '../above-r-room';
 // COLLECTION ENDCAP — the franchise-collection aisle end.
 //
 // Reference: public/user-assets/reference/video-stores-flickr-2026-07-26
@@ -1219,6 +1220,7 @@ function isOwnedStock(m: Movie): boolean {
 export function qualifyingCollections(scene: StoreScene): CollectionCandidate[] {
   const byName = new Map<string, { members: Movie[]; perLib: Map<number, number> }>();
   scene.libraries.forEach((lib, libIdx) => {
+    if (lib.id === ABOVE_R_LIBRARY_ID) return;
     for (const m of lib?.movies ?? []) {
       if (!m.collectionName || !isOwnedStock(m)) continue;
       let g = byName.get(m.collectionName);

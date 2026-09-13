@@ -1,3 +1,4 @@
+import { ABOVE_R_LIBRARY_ID, ABOVE_R_ROOM_WIDTH } from './above-r-room.ts';
 // The store's floor-plan brain: decides what goes where. Sorts each library
 // into the store wall categories (padded to whole signboard sections), hatches
 // the floor with shelf runs for the active arrangement, pours every library's
@@ -68,6 +69,7 @@ export class StorePlan {
   public shelvingUnits: ShelvingUnit[] = [];
   // Z of the back wall: a clear margin behind the deepest planned island.
   public backWallZ = -35.0;
+  public aboveRRoom: { libraryIdx: number; width: number; depth: number; units: number } | null = null;
   public clubhouse: ClubhouseHost | null = null;
   // Pivot Z for the diagonal aisle rotation (centre of the aisle cluster).
   public aislePivotZ = 0;
@@ -104,6 +106,12 @@ export class StorePlan {
   // transform. This is the single source of truth for placement AND orientation.
   plan(theme = '', ceiling = 13.5) {
     this.buildLibraryLayouts();
+    this.blockOrderCache.clear();
+    const roomLibrary = this.libraries.findIndex(lib => lib.id === ABOVE_R_LIBRARY_ID);
+    const roomUnits = roomLibrary >= 0 ? Math.ceil(this.layoutFor(roomLibrary).entries.length / UNIT_SIDE_CAPACITY) : 0;
+    this.aboveRRoom = FORMAT.singleField && roomUnits ? { libraryIdx: roomLibrary,
+      width: ABOVE_R_ROOM_WIDTH, units: roomUnits,
+      depth: Math.max(5, roomUnits * ((MAX_SHELF_COLS - 1) * BOX_SPACING + 1) + 1.2) } : null;
     this.planRuns();
 
     // Back wall sits a clear margin behind the deepest island so there is always
@@ -114,7 +122,7 @@ export class StorePlan {
     // overflow still deepens the store past this (the ribbon then re-quantizes
     // to whole panes as close to half-depth as it can — see three-scene.ts).
     let minZ = FRONT_GLASS_Z - baselineStoreDepth();
-    const backClear = FORMAT.backAisleClearance;
+    const backClear = this.aboveRRoom ? this.aboveRRoom.depth + 3 : FORMAT.backAisleClearance;
     this.shelvingUnits.forEach(u => {
       const halfLen = ((u.cols - 1) * BOX_SPACING + 1.0) / 2;
       const backLocalZ = this.aisleZCenter(u) - halfLen;
@@ -137,6 +145,22 @@ export class StorePlan {
       this.clubhouse = clubhouseHost(left, minZ, familyTitles);
     }
     this.backWallZ = minZ;
+    if (this.aboveRRoom) {
+      const room = this.aboveRRoom;
+      const length = (MAX_SHELF_COLS - 1) * BOX_SPACING + 1;
+      const x = STORE_CENTER_X + this.getStoreWidth() / 2 - .26;
+      const lineId = Math.max(-1, ...this.shelvingUnits.map(unit => unit.lineId)) + 1;
+      for (let index = 0; index < room.units; index++) {
+        const along = room.units - 1 - index; // screen-left starts at the rear on this inward face
+        this.shelvingUnits.push({ libraryIdx: room.libraryIdx, unitIdxInLibrary: index,
+          singleSided: true, cols: MAX_SHELF_COLS, xCenter: x, anchorX: x,
+          zPos: minZ + room.depth - .6 - along * length - FIELD_Z_FRONT,
+          lineId, rowGroupId: lineId, posInLine: along,
+          isLineFront: along === 0, isLineBack: along === room.units - 1,
+          yaw: 0, browseSign: -1 });
+      }
+    }
+
 
     // Pivot the diagonal aisle rotation about the centre of the aisle cluster so the
     // angled islands stay inside the room rather than swinging into the walls.
@@ -509,12 +533,13 @@ export class StorePlan {
     // Put a small library (or its first twelve face blocks) along the left
     // side wall. The rest retains the ordinary double-sided floor plan.
     const wallLibrary = FORMAT.singleField ? this.libraries.map((_, i) => i)
-      .filter(i => this.layoutFor(i).entries.some(Boolean))
+      .filter(i => i !== this.aboveRRoom?.libraryIdx && this.layoutFor(i).entries.some(Boolean))
       .sort((a, b) => this.layoutFor(a).entries.length - this.layoutFor(b).entries.length)[0] : undefined;
     const wallBlocks = wallLibrary === undefined ? 0
       : Math.min(12, Math.ceil(this.layoutFor(wallLibrary).entries.length / UNIT_SIDE_CAPACITY));
     const queue: { lib: number; u: number }[] = [];
     for (let i = 0; i < N; i++) {
+      if (i === this.aboveRRoom?.libraryIdx) continue;
       // Padded layout length (not raw movie count): category padding claims
       // whole sections, so the units must be sized for the padded shelf order.
       const numUnits = i === wallLibrary

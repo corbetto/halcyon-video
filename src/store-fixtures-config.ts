@@ -466,13 +466,13 @@ const COUNTER_BAND_KINDS = new Set([
  * is what holds the shelf runs far enough off the back wall for the alcove to
  * stand in front of it, so the two numbers are read together.
  */
-export function curtainedAlcovePlacements(): FixturePlacement[] {
+export function curtainedAlcovePlacements(roomDepth = 5): FixturePlacement[] {
   return [{
     id: 'curtained-alcove',
     kind: 'curtained-alcove',
     position: { x: STORE_CENTER_X, z: 0 }, // derived in the fixture — see above
     yaw: 0,
-    options: { cornerSide: 'right' },
+    options: { cornerSide: 'right', roomDepth },
   }];
 }
 

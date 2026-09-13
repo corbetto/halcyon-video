@@ -1,3 +1,4 @@
+import { ABOVE_R_LIBRARY_ID } from './above-r-room';
 import { activeStoreFormat } from './store-format';
 // Clasp -> clerk recommendation flow & person endcaps — extracted from
 // StoreScene (three-scene.ts keeps one-line delegating stubs): the ASK FOR
@@ -442,6 +443,7 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   const seen = new Set<string>();
   const movies: Movie[] = [];
   scene.libraries.forEach((lib) => {
+    if (lib.id === ABOVE_R_LIBRARY_ID) return;
     lib.movies.forEach((m) => {
       if (seen.has(m.id)) return;
       if ((m.actors || []).includes(person) || m.director === person) {
@@ -1019,7 +1021,7 @@ export function staffPickEndcapPlacements(
   // SHARE of the library's real stock carrying each genre, so a dedicated
   // library (Animation ~1.0) outbids a general one (Animation ~0.05)
   // regardless of size; equal scores fall to the larger library.
-  const libProfiles = scene.libraries.map((lib) => {
+  const libProfiles = scene.libraries.filter(lib => lib.id !== ABOVE_R_LIBRARY_ID).map((lib) => {
     const real = (lib?.movies ?? []).filter(
       (m) => !m.collectionGap && !m.discovery && !m.comingSoon && !m.game
     );

@@ -448,6 +448,14 @@ export function registerCoreSettings(): void {
     },
   });
 
+  registerSetting({
+    key: 'bb_above_r_room', label: 'NC-17 / X back room', kind: 'toggle',
+    group: 'Store Look', default: false, applyMode: 'rebuild-scene',
+    visibleWhen: () => localStorage.getItem(STORE_FORMAT_KEY) === 'mom-and-pop'
+      || localStorage.getItem('bb_theme') === 'mom-and-pop',
+    hint: 'Separate explicitly rated NC-17 or X movies. Empty rooms stay hidden.',
+  });
+
   // Store Brand -------------------------------------------------------------
   // Brand pack selection lives with the logo editor and its preview.
   registerSetting({
