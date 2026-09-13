@@ -469,6 +469,8 @@ export class StoreScene {
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
     onEnvironmentRebaked: () => {
+      mirrors.updateMirrorThrottle(this, true);
+      this.requestRender();
       this.rebuildSSAOExclusionList();
       this.generateReflectionProbes();
       this.updateLOD();
@@ -536,6 +538,7 @@ export class StoreScene {
   // (user: "carpet is dark as night"). Real troffers pour direct light DOWN;
   // brighten the key spots after dark so the carpet actually receives it.
   private applyModeLighting(mode: OutsideMode) {
+    this.exterior?.setOutsideMode(mode);
     setWindowAwningLighting(this.scene, mode);
     setFacadeEntryLighting(this.scene, mode);
     // Day 110 -> 145 -> 180 chased a dark carpet by raising energy, but the
@@ -548,7 +551,7 @@ export class StoreScene {
     // and the env's ceiling hemisphere is mostly dark acoustic tile, so the
     // floor (normal up, integrating exactly that hemisphere) has no other
     // source. Real troffers are what light a store floor; give them the energy.
-    const spotIntensity = mode === 'night' ? 120 : 105; // candela — see trofferKeyLights
+    const spotIntensity = (mode === 'night' ? 120 : 105) * 1.3; // candela — see trofferKeyLights
     for (const key of this.trofferKeyLights ?? []) key.intensity = spotIntensity;
     this.requestRender();
   }
@@ -770,6 +773,7 @@ export class StoreScene {
   // come through here: they refresh the sun's map alone.
   public queueStructuralShadowRefresh(frames = 3) {
     this.shadowRefreshFrames = frames;
+    this.exterior?.refreshShadows();
     for (const key of this.trofferKeyLights) {
       if (key.castShadow) key.shadow.needsUpdate = true;
     }
@@ -2758,7 +2762,7 @@ export class StoreScene {
     this.scene.add(ambient);
     // Low-frequency interior bounce, reflected up from floor and fixtures.
     // Unlike material emission this obeys normals, albedo and light intensity.
-    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 1.25);
+    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 0.30);
     interiorBounce.name = 'interior-diffuse-bounce';
     interiorBounce.userData.interiorBounce = true;
     this.scene.add(interiorBounce);
@@ -2793,9 +2797,8 @@ export class StoreScene {
     this.scene.add(sunLight.target);
     this.topLights.push(sunLight);
 
-    // Near-zero camera headlight: just a legibility floor for dark-side box titles.
-    // A camera-aligned light flattens whatever it touches, so it stays tiny.
-    this.headlight = new THREE.DirectionalLight('#fff5e6', 0.05);
+    // Keep the camera rig for compatibility, but let scene sources light titles.
+    this.headlight = new THREE.DirectionalLight('#fff5e6', 0);
     this.headlight.castShadow = false;
     this.scene.add(this.headlight);
     this.scene.add(this.headlight.target);

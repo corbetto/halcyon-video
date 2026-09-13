@@ -14,14 +14,9 @@ import { CEILING_Y } from './store-layout';
 
 export type OutsideMode = 'day' | 'night' | 'sunset';
 
-// Display gain applied to the baked environment in DAY (and sunset, which
-// shares day's quality-compensated ambient lift). Exported because it is the
-// reference mode every near-mirror surface is tuned against: glass materials
-// carry a userData.envGainTarget of "the strength I want x this", and
-// StoreScene.applyExteriorEnvClamp divides it back out per mode so a pane's
-// effective reflection never rides the night gain up to 3.0. See
-// src/glass-reflection.ts.
-export const DAY_ENV_DISPLAY_GAIN = 1.42;
+// Restrained shared bounce preserves contrast between windows and the back.
+// Glass reflection materials also use this as their reference display gain.
+export const DAY_ENV_DISPLAY_GAIN = 0.7;
 
 // Sky pools — CC0 8K equirect panos from Poly Haven (polyhaven.com),
 // downscaled to 4096x2048; every mode (day/sunset/night) rolls one per visit
@@ -413,17 +408,10 @@ export class OutdoorLightingRig {
       hemisphereSky = '#' + new THREE.Color('#bfd0f0')
         .lerp(new THREE.Color('#e8c49a'), interiorWarmAmt).getHexString();
       hemisphereGround = '#222225';
-      hemisphereIntensity = 0.36; // 0.3 -> 0.36: lifts the troffer-shadow side of the floor
+      hemisphereIntensity = 0.05; // Restrained sky fill lets window distance read.
       fogColor = '#' + new THREE.Color('#a0b0d0')
         .lerp(new THREE.Color('#c9a583'), warmAmt).getHexString();
-      // Lift the room's ambient (0.95 -> 1.3 -> 1.42): the WINDOW_HEAD_Y
-      // resize shed glazing area and the store started reading dim. The last
-      // step (1.3 -> 1.42) is quality compensation — the env fill is the only
-      // light that reaches INTO the troffer/SSAO shadows that switch on at high
-      // quality, so raising it is what keeps the shadowed floor from crating on
-      // a real GPU (the software/low preview casts none of those shadows).
-      // Display gain only — the bake itself stays at 0.95 (see bakeEnvironment),
-      // and the sun/shadow contrast is untouched so the light rake keeps its mood.
+      // Window and ceiling sources supply the light; the shared bake is only fill.
       envIntensity = DAY_ENV_DISPLAY_GAIN;
     } else if (this.outsideMode === 'night') {
       // A lit night pano (streetlamp glow, lit shopfronts/windows) — the view
@@ -439,12 +427,10 @@ export class OutdoorLightingRig {
       sunIntensity = 0.0;
       hemisphereSky = '#040812';
       hemisphereGround = '#010205';
-      hemisphereIntensity = 0.05;
+      hemisphereIntensity = 0.015;
       fogColor = '#010206';
-      // No sun: the troffers captured in the environment bake ARE the room
-      // lighting after dark, so the env carries the whole store. (Raised with
-      // the troffer emissive cut 3.5 -> 2.5 so the room stays as bright.)
-      envIntensity = 3.0;
+      // Ceiling fixtures and parking sources carry the night scene.
+      envIntensity = 0.8;
     } else {
       // sunset
       texUrl = assetUrl(SUNSET_SKIES[this.sunsetSkyIndex].file);
@@ -459,9 +445,9 @@ export class OutdoorLightingRig {
       // glass and the interior spill agree with the photo.
       hemisphereSky = '#e0b28e';
       hemisphereGround = '#242225';
-      hemisphereIntensity = 0.3;
+      hemisphereIntensity = 0.05;
       fogColor = '#c9a183';
-      envIntensity = DAY_ENV_DISPLAY_GAIN; // same quality-compensated ambient lift as 'day'
+      envIntensity = DAY_ENV_DISPLAY_GAIN; // same restrained bounce as day
     }
 
     this.envDisplayIntensity = envIntensity;

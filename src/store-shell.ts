@@ -808,13 +808,8 @@ export function buildStore(scene: StoreScene) {
     // far brighter than any lit surface — like real fluorescent diffusers. AgX
     // rolls the panels themselves off to clean white instead of clipping, and
     // the 1.1 bloom threshold gives them the faint halo real diffusers have.
-    // Was 3.5 — pulled back so the fixtures read lit, not glaring; the night
-    // env display gain (updateSkybox) compensates for the lost bake energy.
-    // Nudged 1.25 -> 1.4 to lift the whole baked interior ever so slightly.
-    // 1.4 -> 1.55 with the lens emissiveMap: the map's edge falloff and dark
-    // lattice cells absorb ~10% of the panel's average energy, and the night
-    // bake leans on that energy — this keeps the room's light budget level.
-    emissiveIntensity: 1.55,
+    // Raise emitted bounce alongside the direct ceiling keys by thirty percent.
+    emissiveIntensity: 1.55 * 1.3,
     roughness: 0.4,
     metalness: 0.0
   }), 'light-source');
@@ -1134,7 +1129,9 @@ export function buildStore(scene: StoreScene) {
     // unchanged, the uncast ones simply don't ground their own fixtures.
     // Fewer depth passes at bake time is a straight perf win too.
     const MATERIAL_SAMPLER_RESERVE = 8; // worst lit material (retail cases with poster arrays) needs 8 samplers + envMap
-    const OTHER_SHADOW_LIGHTS = scene.outdoor.logoLight?.castShadow ? 2 : 1; // the sun (directional) + the storefront logo (point)
+    let OTHER_SHADOW_LIGHTS = 0;
+    // Include the parking sources before allocating the remaining troffer samplers.
+    scene.scene.traverse(o => { if (o instanceof THREE.Light && o.castShadow) OTHER_SHADOW_LIGHTS++; });
     const spotShadowBudget = Math.max(0,
       scene.renderer.capabilities.maxTextures - MATERIAL_SAMPLER_RESERVE - OTHER_SHADOW_LIGHTS);
     // Spacing is set by where a pool actually still reads, not by the cone's
@@ -1203,7 +1200,7 @@ export function buildStore(scene: StoreScene) {
         // lets the cones reach the floor and overlap into even coverage; the
         // shadow camera's far plane still clips the depth pass at the floor.
         const key = new THREE.SpotLight(
-          0xf3f6ff, 110 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
+          0xf3f6ff, (scene.outdoor.outsideMode === 'night' ? 120 : 105) * 1.3 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
         key.position.set(kx, ky, kz);
         // A hair off vertical: a perfectly straight-down lookAt runs
         // parallel to the shadow camera's up vector. Same offset on every

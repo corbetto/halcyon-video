@@ -2,7 +2,7 @@ import { buildEntranceBollards } from './entrance-bollards';
 import { selfLit } from './material-lighting';
 // T15 exterior/environment pass: everything beyond the storefront glass that
 // exists purely to be *seen* through it — sidewalk/curb, street furniture,
-// street lamps with fake light pools, a handful of parked cars, and a
+// street lamps with shadowed window spill and decorative light pools, a handful of parked cars, and a
 // storefront light-spill decal.
 //
 // Deliberately dumb and cheap: every mesh here is a box/cylinder/plane with a
@@ -33,6 +33,7 @@ export interface ExteriorEnvironment {
   // GH #144: retarget the ground-blend ring's color to the active pano's
   // sampled ground (see ground-blend.ts) — called live as panos load/change.
   setGroundColor(color: THREE.Color): void;
+  refreshShadows(): void;
   dispose(): void;
 }
 
@@ -154,9 +155,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   group.add(slot);
   track(installExteriorReturnKiosk(scene, group, [newsBox, slot], rightEdgeX + 2.6, frontZ + 1.3, requestRender));
 
-  // ─── Street lamps with fake pooled light ────────────────────────────────
-  // "Fake" per the ticket: no real THREE.Light, just an emissive head plus a
-  // radial-gradient decal on the asphalt. Intensity/opacity swap with mode.
+  // Street lamps combine shadowed window spill with a decorative asphalt pool.
   const poleMat = track(new THREE.MeshStandardMaterial({ color: '#3a3d40', roughness: 0.6, metalness: 0.5 }));
   const lampHeadMat = track(selfLit(new THREE.MeshStandardMaterial({
     color: '#fff3d6', emissive: new THREE.Color('#ffdca0'), emissiveIntensity: 0.05, roughness: 0.4,
@@ -177,6 +176,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   // Every head/pool shares one material each, so flipping lampHeadMat/poolMat
   // in setOutsideMode() below updates all of them at once — no per-instance
   // bookkeeping needed.
+  const windowLights: THREE.SpotLight[] = [];
   const lampAnchors = lampPositions.map(([lx, lz], i) => {
     const root = new THREE.Group();
     root.name = `parking-lamp-${i}`;
@@ -200,6 +200,19 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     pool.rotation.x = -Math.PI / 2;
     pool.position.set(lx, -0.02, lz);
     group.add(pool);
+    // Sodium spill enters through glazing; static shadows keep it off solid walls.
+    const light = new THREE.SpotLight('#ffb454', 0, 0, Math.PI / 3, .6, 2);
+    light.name = 'parking-window-source';
+    light.position.set(lx, 13.1, lz);
+    light.target.position.set(lx, 0, frontZ - 6);
+    light.castShadow = true;
+    light.shadow.mapSize.set(highQuality ? 1024 : 512, highQuality ? 1024 : 512);
+    light.shadow.camera.near = .5; light.shadow.camera.far = 120;
+    light.shadow.normalBias = .03; light.shadow.bias = -.0002;
+    light.shadow.autoUpdate = false; light.shadow.needsUpdate = true;
+    group.add(light, light.target);
+    windowLights.push(light);
+    track(light.shadow);
     return { root, fallback };
   });
   track(installParkingLampModels(scene, lampAnchors, assetUrl('models/parking-lamp.glb'),
@@ -367,11 +380,19 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     // Dusk: lot lamps come on before dark (photocells trip around sunset),
     // but their pools barely register against the remaining daylight.
     const dusk = mode === 'sunset';
+    for (const light of windowLights) {
+      light.intensity = night ? 2600 : 0;
+      light.shadow.needsUpdate = true;
+    }
     lampHeadMat.emissiveIntensity = night ? 3.2 : dusk ? 2.2 : 0.05;
     poolMat.opacity = night ? 0.5 : dusk ? 0.15 : 0.04;
     spillMat.opacity = night ? 0.55 : dusk ? 0.12 : 0.0;
   }
   setOutsideMode('day');
+
+  function refreshShadows() {
+    for (const light of windowLights) light.shadow.needsUpdate = true;
+  }
 
   function dispose() {
     if (disposed) return;
@@ -381,5 +402,5 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     scene.remove(group);
   }
 
-  return { group, setOutsideMode, setGroundColor, dispose };
+  return { group, setOutsideMode, setGroundColor, refreshShadows, dispose };
 }
