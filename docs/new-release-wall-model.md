@@ -4,11 +4,11 @@ Original Blender mesh construction for Halcyon's existing shelf layout. No downl
 
 The construction contract uses particleboard with beige vinyl laminate, eight tiers in eight-foot sections, high-backed angled shelves, and space for three rental cases behind a cover comfortably (four tightly). A separate capacity study demonstrates five shelves of eight facings; it is not a historical store recreation.
 
-The reconstruction uses an **8 ft wide × 8 ft high × 0.70 ft deep** carcass, 3/4-inch tray boards, a 5° tray slope rising toward the customer, 0.65 ft high individual backs, wrapped end panels with toe recesses, and recessed price-card channels. Height, depth, angle, sheet thickness, edge profiles and hardware details are modeling assumptions, not measured historical specifications. Tier elevations match the existing scene: 0.42 through 6.545 ft at 0.875 ft intervals. This preserves clearance for the existing VHS cases and sign anchors.
+The reconstruction uses an **8 ft wide × 8 ft high × 0.70 ft deep** carcass, 3/4-inch tray boards, a 5° tray slope rising toward the customer, 0.65 ft high individual backs, continuous full-height vertical end uprights enclosing the sloped shelves and front price rails, a grounded recessed toe kick plinth, and recessed price-card channels. Height, depth, angle, sheet thickness, edge profiles and hardware details are modeling assumptions, not measured historical specifications. Tier elevations match the existing scene: 0.42 through 6.545 ft at 0.875 ft intervals. This preserves clearance for the existing VHS cases and sign anchors.
 
 - Editable source: `tools/models/new-release-wall.blend`.
 - Deterministic authoring: `tools/models/new-release-wall.py`.
-- Runtime: `public/models/new-release-wall.glb` (61,740 bytes, 744 triangles, 28 separate mesh parts).
+- Runtime: `public/models/new-release-wall.glb` (60,888 bytes, 728 triangles, 28 separate mesh parts).
 - Metrics: `tools/models/new-release-wall-metrics.json`.
 - Material roles: `BeigeVinylLaminate`, `BeigeVinylEdgeBand`, `SatinPriceChannel`; opaque PBR, zero metalness, no texture downloads.
 

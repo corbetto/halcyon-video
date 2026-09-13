@@ -17,9 +17,9 @@ def material(name, color, rough=.6):
     m=bpy.data.materials.new(name); m.diffuse_color=(*color,1); m.use_nodes=True
     bs=m.node_tree.nodes.get('Principled BSDF'); bs.inputs['Base Color'].default_value=(*color,1); bs.inputs['Roughness'].default_value=rough
     return m
-laminate=material('BeigeVinylLaminate', (.69,.61,.46))
-edge=material('BeigeVinylEdgeBand', (.59,.51,.37))
-rail=material('SatinPriceChannel', (.49,.46,.39), .5)
+laminate=material('BeigeVinylLaminate', (.78,.73,.62))
+edge=material('BeigeVinylEdgeBand', (.68,.62,.50))
+rail=material('SatinPriceChannel', (.74,.70,.60), .45)
 
 # Sweep a deliberately drawn closed Y/Z cross-section across X. Every part is
 # a manifold solid, including the recessed channel lips; no alpha planes.
@@ -56,10 +56,21 @@ for i,y in enumerate(HEIGHTS):
         (y+.027,front+.013),(y+.027,front+.025),(y+.041,front+.025),
         (y+.047,front+.019),(y+.047,front)],7.875,rail)
 box('Backing',0,4,CLEARANCE,7.875,8,.04,laminate)
+
+# Carcass depth and endcap profile:
+# In authentic 1990 perimeter wall shelving, the vertical carcass uprights
+# enclose the sloped shelves and front price rails, extending slightly proud (carcass_front = front + .035)
+# with a clean, continuous vertical front face from floor (y=0) to top (y=8) without an artificial toe cutout.
+carcass_front=front+.035
 for name,x in [('LeftEnd',-3.96875),('RightEnd',3.96875)]:
-    ob=sweep(name,[(0,CLEARANCE),(0,front-.12),(.25,front-.12),(.25,front),
-        (7.994,front),(8,front-.006),(8,CLEARANCE)],.0625,edge,x=x)
-box('Toe',0,.17,front-.14,7.875,.30,.0625,edge)
+    ob=sweep(name,[(0,CLEARANCE),(0,carcass_front),(7.994,carcass_front),(8,carcass_front-.006),(8,CLEARANCE)],.0625,edge,x=x)
+
+# Toe kick:
+# Plinth board extends from floor (y=0) up to the underside of the bottom shelf tray
+# (toe_h = HEIGHTS[0] + .02 - .0625 = 0.3775 ft), set back under the shelf front (front - .14 ft),
+# providing a grounded, authentic store plinth without floating gaps.
+toe_h=HEIGHTS[0]+.02-.0625
+box('Toe',0,toe_h/2,front-.14,7.875,toe_h,.0625,edge)
 
 # Construction/capacity markers are editable empties, not runtime draw calls.
 for row in range(5):
@@ -77,6 +88,7 @@ metrics={'section_width_ft':WIDTH,'depth_ft':DEPTH,'tiers':HEIGHTS,'slope_degree
 
 # Non-exported capacity study: nominal cases (4.38 x 8 x 1.10 inches), with
 # slightly thicker 1.25-inch Amray stock. Neutral original cover graphics.
+# Tapes are positioned snug behind the front channel lip, matching authentic retail presentation.
 blue=material('Study — Amray blue',(.025,.085,.30)); yellow=material('Study — yellow wall',(.88,.59,.035)); cover=material('Study — coverbox',(.06,.20,.35)); white=material('Study — lettering',(.93,.84,.54))
 for ob in fixture.objects: ob.select_set(False)
 box('Reference yellow accent wall',0,5,-.10,10,10,.12,yellow,study)
@@ -86,10 +98,10 @@ for row,y in enumerate(HEIGHTS):
         xx=-3.5+col
         count=4 if col==7 else 3
         for k in range(count+1):
-            z=.67-k*.108; d=.092 if k==0 else .1042
+            z=.72-k*.108; d=.092 if k==0 else .1042
             yy=y+.02+SLOPE*(z-front)+.667/2
             box(f'Study_r{row}_c{col}_copy{k}',xx,yy,z,.365,.667,d,(cover if row < 5 else other_covers[row-5]) if k==0 else blue,study)
-        box(f'Cover label {row} {col}',xx,y+.36,.718,.30,.09,.002,white,study)
+        box(f'Cover label {row} {col}',xx,y+.36,.768,.30,.09,.002,white,study)
 def text(label,x,y,z,size,mat):
     cu=bpy.data.curves.new(label,'FONT'); cu.body=label; cu.align_x='CENTER'; cu.size=size; cu.extrude=.001
     ob=bpy.data.objects.new(label,cu); study.objects.link(ob); ob.location=(x,-z,y); ob.rotation_euler=(math.pi/2,0,0); cu.materials.append(mat)
