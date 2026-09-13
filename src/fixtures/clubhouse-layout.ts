@@ -22,7 +22,10 @@ export function clubhouseFeet(host: ClubhouseHost): Footprint[] {
     ['rear',0,-6.9,13.6,.2,0], ['left',-6.9,0,.2,13.6,0],
     ['front-panel',-3.2,6.9,7.4,.2,0], ['side-panel',6.9,-3.2,.2,7.4,0],
     ['front-jamb',.75,6.85,.5,.5,0], ['side-jamb',6.85,.75,.5,.5,0],
-    ['tv-cabinet',-4.9,-4.9,3.5,3.5,0],
+    ...Array.from({length: 10}, (_, i): [string,number,number,number,number,number] => {
+      const depth = .5475, width = 5.475 - i * depth;
+      return [`tv-cabinet-${i}`, -6.8 + width / 2, -6.8 + (i + .5) * depth, width, depth, 0];
+    }),
     ...[-5.1,-1.4].flatMap((u,i): [string,number,number,number,number,number][] => [
       [`family-front-${i}`,u,7.6,3.7,1.2,0], [`family-side-${i}`,7.6,u,3.7,1.2,Math.PI/2],
     ]),

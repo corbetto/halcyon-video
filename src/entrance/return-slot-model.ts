@@ -27,6 +27,7 @@ export function installReturnSlotModel(
         valid &&= m instanceof THREE.MeshStandardMaterial && !!m.normalMap && !!m.roughnessMap;
         if (m instanceof THREE.MeshStandardMaterial) {
           if (m.name === 'ChuteLaminate') m.color.set(blue);
+          if (m.name === 'ChuteSteel') { m.color.set(0xf4f4f0); m.metalness = 0; m.roughness = .45; }
           m.envMapIntensity = .2 / Math.max(.2, ctx.scene.environmentIntensity);
         }
       }

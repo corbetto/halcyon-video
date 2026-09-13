@@ -597,6 +597,7 @@ export function updateBackCoverHighlight(scene: StoreScene) {
   }
 
   scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
+  scene.applyNrBayWash?.(scene.heroFrontMesh);
 
   // Flipping changes the pose, never the physical rental construction.
   if (scene.heroBackMesh) {
@@ -651,6 +652,7 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     scene.heroFrontMesh.geometry = movie.isSeries ? getSeriesBoxsetGeometry() : detailedCaseGeometry(getCaseGeometry(isAnimated, gameDims));
     scene.heroBackMesh.geometry = detailedCaseGeometry(getRentalCaseGeometry(false, shellDims));
     scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
+    scene.applyNrBayWash?.(scene.heroFrontMesh);
     // Jewel-case platforms carry their clear-lid dressing on the hero mesh;
     // keyed internally, so a movie/cartridge title strips it right back off.
     syncJewelDressing(scene.heroFrontMesh, movie, gameDims);
@@ -659,6 +661,7 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     scene.heroBackMesh.material = nrCase
       ? withCaseConstructionMaterials(getGoldCaseMaterials())
       : createHeroRentalMaterials(movie, wantDetail !== null, probeIdx);
+    scene.applyNrBayWash?.(scene.heroBackMesh);
     perfTrace.end(SP_HERO);
     if (movie.isSeries) scene.ensureSeriesEpisodes(movie);
     // Poster may still be streaming in — either never decoded yet, or its
@@ -670,6 +673,7 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
       posterQueue.load(movie, 3, () => {
         if (scene.heroMovieId === movie.id && scene.heroFrontMesh) {
           scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
+          scene.applyNrBayWash?.(scene.heroFrontMesh);
           // This callback can land after the scene idled (render-on-demand) —
           // wake it, same as any other post-decode material swap.
           scene.requestRender();

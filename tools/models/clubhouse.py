@@ -76,6 +76,13 @@ slab('Console recessed toe', poly_toe, 0, .18, 'CabinetLaminate')
 slab('Console left side', [(-6.8, -6.8), (-6.68, -6.8), (-6.68, -3.27), (-6.8, -3.15)], .18, 2.18, 'CabinetLaminate')
 slab('Console rear side', [(-6.8, -6.8), (-6.8, -6.68), (-3.27, -6.68), (-3.15, -6.8)], .18, 2.18, 'CabinetLaminate')
 
+# Deeper corner console supports the complete rotated television footprint.
+for o in parts:
+ if o.name.startswith('Console '):
+  for v in o.data.vertices:
+   v.co.x=-6.8+(v.co.x+6.8)*1.5
+   v.co.y=6.8+(v.co.y-6.8)*1.5
+
 # Wall posters mounted along the kids clubhouse interior walls at authentic youth movie proportions.
 # Fitted right-window sill and inner jamb liners; keep the eye-level opening.
 box('Right window sill',6.98,-3.05,.56,6.85,3.45,3.57,'PanelLaminate')
@@ -119,7 +126,7 @@ for o in parts:
    v=o.data.vertices[o.data.loops[li].vertex_index].co
    uv.data[li].uv=(((-v.y) if axis==0 else v.x)*10, ((-v.y) if axis==2 else v.z)*10)
 # Source retains individual named construction parts. Export batches by finish role.
-for name,xyz in [('floor_origin',(0,0,0)),('tv_support',(-5.6,-2,2.3)),('header',(4,4,8.97)),('entry',(4,4,0))]:
+for name,xyz in [('floor_origin',(0,0,0)),('tv_support',(-4.9,-4.9,2.3)),('header',(4,4,8.97)),('entry',(4,4,0))]:
  o=bpy.data.objects.new(name,None);o.location=(xyz[0],-xyz[1],xyz[2]);bpy.context.collection.objects.link(o)
 bpy.context.scene.unit_settings.system='IMPERIAL';bpy.context.scene.unit_settings.scale_length=.3048
 bpy.context.preferences.filepaths.save_version=0

@@ -156,3 +156,13 @@ The interior has continuous dark skirting. Family shelves use pale laminate and
 matching shelf-edge hardware independently of the plaster liners. The painted
 stripe reaches the 10.6-foot dropped soffit, and the adjacent diffusers clear
 its wall faces. The existing family catalog slots and open windows remain live.
+
+## F8 console support and corner join, 2026-09-13
+
+The triangular TV console now has 5.475-foot legs instead of 3.65-foot legs,
+retaining its corner origin and 2.30-foot support height. The existing rotated
+television stays at (-4.9, 2.3, -4.9); all four corners of its footprint are
+ray-tested against the exported top. Ten narrow collision rectangles follow
+the triangle, keeping the chairs and central turning area open. The room's
+paint strip stops at the clubhouse's contiguous liner, eliminating the
+coplanar fragment visible at the left wall join.

@@ -153,7 +153,7 @@ export class ReturnSlot {
     );
 
     const theme = getActiveTheme();
-    const blueHex = '#f4f4f0';
+    const blueHex = theme.palette.counterTop;
     const goldHex = theme.palette.secondary;
 
     // Same laminate mottle the counter band wears, so the chute reads as a
@@ -207,7 +207,7 @@ export class ReturnSlot {
     if (rightW > 0.01) box(rightW, SLOT_H, FRONT_T, CHUTE_W / 2 - rightW / 2, SLOT_Y, faceZ, blueMat);
     // Brushed-metal slot frame (the footage flap unit reads stainless, not
     // white trim) + the flap plate itself resting tilted into the throat.
-    const metalMat = new THREE.MeshStandardMaterial({ color: 0xb9bcbf, roughness: 0.35, metalness: 0.85 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.45, metalness: 0 });
     this.ownedMats.push(metalMat);
     const LINER = 0.03;
     box(SLOT_W, LINER, FRONT_T, SLOT_X, slotTop - LINER / 2, faceZ, metalMat, false);

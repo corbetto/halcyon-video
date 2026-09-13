@@ -74,3 +74,12 @@ The white housing opens onto a fitted dark receiver tub containing twenty
 rental cases. The staff-side counter opening is cut in Blender for both shield
 and square surrounds; the white front, slot aperture and moving flap keep their
 existing bounds and anchors. A blue backing retains the existing label contrast.
+
+## F8 finish correction, 2026-09-13
+
+The shell retains the active counter blue and its rounded crown. Only the
+slot liner and hinged flap are white. A fitted opening in both the chute
+and surrounding counter exposes the staff-side tub and returned cases.
+The mouth anchor, hinge, overall dimensions, collision and drop timing stay
+unchanged. The opening is checked in the installed counter as well as the
+public fallback model.

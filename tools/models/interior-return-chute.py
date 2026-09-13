@@ -24,8 +24,8 @@ def material(name,color,metal,roughness):
  nm=nodes.new('ShaderNodeNormalMap'); nm.inputs['Strength'].default_value=.45; links.new(tex.outputs['Color'],nm.inputs['Color']); links.new(nm.outputs['Normal'],p.inputs['Normal'])
  tex=nodes.new('ShaderNodeTexImage'); tex.image=rm; links.new(tex.outputs['Color'],p.inputs['Roughness'])
  return m
-body=material('ChuteLaminate',(.9,.9,.87),.03,.45)
-metal=material('ChuteSteel',(.48,.50,.53),.85,.36)
+body=material('ChuteLaminate',(.018,.065,.36),.03,.45)
+metal=material('ChuteSteel',(.9,.9,.87),0,.45)
 dark=material('ChuteReveal',(.09,.10,.12),.1,.62)
 parts=[]
 def mesh(name,verts,faces,mat,bevel=.006):
@@ -55,7 +55,7 @@ def cut(name,x0,x1,y0,y1,z0,z1):
  bpy.ops.object.modifier_apply(modifier=mod.name); parts.remove(cutter); bpy.data.objects.remove(cutter,do_unlink=True)
 cut('Open rear counter socket',-1.06,1.06,.08,3.46,-1.60,.76)
 cut('Through aperture',-1,0,2.4,2.7,.70,1.0)
-cut('Open staff collection well',-1.06,1.06,1.6,4.0,-1.60,.20)
+cut('Open staff collection well',-1.06,1.06,1.6,4.0,-1.60,-.14)
 # Drop receiver: a fitted tub beneath the open well, with four retaining walls.
 box('Receiver floor',-1.06,1.06,.83,.91,-1.49,.24,dark)
 box('Receiver rear rim',-1.06,1.06,.91,1.62,-1.49,-1.41,dark)

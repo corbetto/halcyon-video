@@ -57,7 +57,7 @@ export class Clubhouse implements SlottedFixture {
         for(const y of this.shelfHeights){box(g,0,y+.04,0,3.7,.08,1.2,finishes.ShelfLaminate);box(g,0,y+.13,.57,3.7,.1,.06,finishes.ShelfEdge);}
       } else if(tv){
         const cabinet=new THREE.Group();cabinet.position.set(x,0,z);cabinet.rotation.y=f.yaw;fallback.add(cabinet);
-        box(cabinet,0,1.15,0,3.5,2.3,3.5,finishes.CabinetLaminate);
+        box(cabinet,0,1.15,0,f.w,2.3,f.d,finishes.CabinetLaminate);
       } else box(fallback,x,h/2,z,f.w,h,f.d,(f.label.endsWith('-rear')||f.label.endsWith('-left'))?finishes.PanelLaminate:finishes.FramePaint,f.yaw);
       const proxy=box(root,x,h/2,z,f.w,h,f.d,this.own(new THREE.MeshBasicMaterial({visible:false})),f.yaw);
       this.proxies.push(proxy);this.ctx.addCollider(proxy);

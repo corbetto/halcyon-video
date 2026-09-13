@@ -5,8 +5,7 @@ import { NR_BAY_WIDTH } from './nr-run-layout';
 import { installDownlightModels } from './downlight-model';
 import { selfLit } from './material-lighting';
 
-/** One recessed fitting per bay. Six local beams are reused as the visitor moves,
- * keeping lighting cost independent of the length of the store perimeter. */
+/** One recessed fitting per bay; static shelf wash is evaluated by nr-bay-wash. */
 export function buildNrBayLighting(scene: StoreScene): void {
   scene.nrBayLightAnchors = []; scene.nrBayLightingUpdate = null;
   if (getActiveTheme().id !== 'bb-1990') return;
@@ -55,23 +54,4 @@ export function buildNrBayLighting(scene: StoreScene): void {
     }
     scene.requestRender();
   });
-  const lights = Array.from({ length: Math.min(6, anchors.length) }, () => {
-    const light = new THREE.SpotLight(0xfff0d6, 65, 19, .36, .55, 2);
-    light.name = 'New Release shelf beam'; root.add(light, light.target); return light;
-  });
-  let lastX = Infinity, lastZ = Infinity, generation = 0;
-  scene.nrBayLightingUpdate = () => {
-    const camera = scene.camera.position;
-    if (Math.abs(camera.x - lastX) + Math.abs(camera.z - lastZ) < .4) return;
-    lastX = camera.x; lastZ = camera.z; generation++;
-    for (const a of anchors) a.distance = (a.x - camera.x) ** 2 + (a.z - camera.z) ** 2;
-    for (const light of lights) {
-      let best = anchors[0], distance = Infinity;
-      for (const a of anchors) if (a.chosen !== generation && a.distance < distance) { best = a; distance = a.distance; }
-      best.chosen = generation;
-      light.position.set(best.x, best.y - .08, best.z); light.target.position.set(best.tx, 3.5, best.tz);
-      light.updateMatrixWorld(); light.target.updateMatrixWorld();
-    }
-  };
-  scene.nrBayLightingUpdate();
 }

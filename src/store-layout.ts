@@ -195,16 +195,13 @@ export function baselineStoreDepth(): number {
   return 2 * (FRONT_WINDOW_CORNER_MARGIN + SIDE_PANES_BASELINE * WINDOW_BAY_TARGET_WIDTH);
 }
 
-// Fractions along the wall (0 = left edge, 1 = right edge) that get a
-// suspended poster, matching the spread the storefront's original fixed
-// 10-bay layout used (bays 0, 2, 7, 9). Exposed so three-scene.ts's window
-// poster placement and this module's own mullion suppression (below) agree
-// on exactly the same bays no matter how many bays a given wall resolves to.
-const POSTER_BAY_FRACTIONS = [0.0, 0.2, 0.7, 0.9];
+// Alternate posters within each glazed wing, leaving both edge panes clear.
+// Mullion suppression uses this same layout so a poster never straddles a bar.
 export function posterBayIndices(bayCount: number): number[] {
-  if (bayCount <= 0) return [];
-  const idxs = POSTER_BAY_FRACTIONS.map((f) => Math.min(bayCount - 1, Math.round(f * bayCount)));
-  return Array.from(new Set(idxs));
+  const wing = Math.floor(bayCount / 2);
+  const indices: number[] = [];
+  for (let i = 1; i < wing - 1; i += 2) indices.push(i, bayCount - 1 - i);
+  return indices.sort((a, b) => a - b);
 }
 
 // Whole-pane bay layout: every pane is EXACTLY WINDOW_BAY_TARGET_WIDTH ft

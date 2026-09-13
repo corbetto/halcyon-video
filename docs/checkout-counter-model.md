@@ -95,3 +95,12 @@ Other eras retain their existing perimeter. The 2010 shield and half-square
 public models have closed recessed drawer reveals on their clerk-facing
 work cabinets. They remain original generic furniture; private cabinet
 reconstructions retain their separate loader priority and source.
+
+## F8 follow-up, 2026-09-13
+
+All shield-era surrounds now use the same straight 3.6-foot staff entrance,
+1.0–4.6 feet along the left shoulder from the rear corner. The former corner
+gap is closed, and the tape-cleaner display moves onto the rear band. Collision
+and clerk navigation follow the same segment endpoints as the Blender mesh.
+The shared authoring helper cuts an open staff receiver behind the tape-return
+slot. It is also reused by locally installed reference cabinet models.

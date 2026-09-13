@@ -1,3 +1,4 @@
+import { createNrBayWash } from './nr-bay-wash';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { activeStoreFormat } from './store-format';
 import { planNrRuns, nrSlotTransform, type NrRun } from './nr-run-layout';
@@ -552,7 +553,7 @@ export class StoreScene {
     // and the env's ceiling hemisphere is mostly dark acoustic tile, so the
     // floor (normal up, integrating exactly that hemisphere) has no other
     // source. Real troffers are what light a store floor; give them the energy.
-    const spotIntensity = (mode === 'night' ? 120 : 105) * 1.3; // candela — see trofferKeyLights
+    const spotIntensity = (mode === 'night' ? 120 : 105) * 1.56; // candela — see trofferKeyLights
     for (const key of this.trofferKeyLights ?? []) key.intensity = spotIntensity;
     this.requestRender();
   }
@@ -797,6 +798,7 @@ export class StoreScene {
   // carries matching bays, ending before the service-door clearance.
   public nrBayLightAnchors: { x: number; y: number; z: number }[] = [];
   public nrBayLightingUpdate: (() => void) | null = null;
+  public applyNrBayWash: ((mesh: THREE.Mesh) => void) | null = null;
   public nrRuns: NrRun[] = [];
   public nrLeftWallCols = 36;
   // Side-window ribbon z-span shared by BOTH side walls (null = no ribbon,
@@ -1458,7 +1460,10 @@ export class StoreScene {
     }
     this.setupLighting();
     this.buildStore();
-    this.disposeSurfaceFinishes = installStoreSurfaceFinishes(this.scene);
+    const wash = createNrBayWash(this);
+    this.applyNrBayWash = wash.apply;
+    const finishes = installStoreSurfaceFinishes(this.scene, wash.apply);
+    this.disposeSurfaceFinishes = () => { finishes(); wash.dispose(); this.applyNrBayWash = null; };
     this.installMirrorThrottle();
     // Prebaked shadows (shadowMap.autoUpdate = false) only render the sun's shadow
     // map when needsUpdate is set. The reflection-probe and mirror cube renders below

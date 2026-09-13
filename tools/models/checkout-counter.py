@@ -185,15 +185,33 @@ def shield(modern=False):
     a = points[1] + (points[2]-points[1]).normalized()*2.2
     b = points[1] + (points[0]-points[1]).normalized()*2.2
     path = [a, points[2], points[3], points[4], points[0], b]
-    if modern:
-        t0 = (points[1]-points[0]).normalized()
-        path = [points[0]+t0*4.6,points[1],points[2],points[3],points[4],points[0],points[0]+t0*1.0]
+    t0 = (points[1]-points[0]).normalized()
+    path = [points[0]+t0*4.6,points[1],points[2],points[3],points[4],points[0],points[0]+t0*1.0]
     t = (points[2]-points[1]).normalized()
     n = Vector((-t.y,t.x))
     apex = Vector((0,-14.1 + 1.5/n.y))
     left = Vector((-6.6, apex.y + 6.6*7.76/9.8))
     right = Vector((6,apex.y + 6*7.76/9.8))
     return [path], [left,apex,right]
+
+
+def cut_return_receiver(objects, shape):
+    anchor = (8.0, -3.22) if shape == 'shield' else (6.8, -3.3)
+    yaw = math.atan2(6.24, 3.6) if shape == 'shield' else math.pi/2
+    center_z = -.70
+    cx = anchor[0] + math.sin(yaw)*center_z
+    cz = anchor[1] + math.cos(yaw)*center_z
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx,-cz,2.75))
+    cutter=bpy.context.object;cutter.name='Return receiver clearance'
+    cutter.data.materials.append(MATERIALS[0])
+    cutter.dimensions=(2.12,1.80,2.5);cutter.rotation_euler.z=yaw
+    bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+    for obj in objects:
+        bpy.context.view_layer.objects.active=obj
+        cut=obj.modifiers.new('Open staff return receiver','BOOLEAN');cut.operation='DIFFERENCE';cut.object=cutter
+        bpy.ops.object.modifier_apply(modifier=cut.name)
+        bm=bmesh.new();bm.from_mesh(obj.data);assert all(e.is_manifold for e in bm.edges),obj.name;bm.free()
+    bpy.data.objects.remove(cutter,do_unlink=True)
 
 
 variants = []
@@ -215,25 +233,8 @@ for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
         for i, path in enumerate(paths):
             objects.append(sweep(f'{shape}-surround-{i}', path, 1.5, rounded=style == 'rounded'))
         objects.append(sweep(f'{shape}-work-cabinet', island, 1.6, island=True, rounded=style == 'rounded', drawers=modern))
-        # Staff-access receiver cut into the surround behind the tape-return slot.
-        # The customer face below the chute remains continuous; the inner side
-        # and worktop are open to the bin instead of sealing its mouth.
         if shape != 'desk' and not modern:
-            anchor = (8.0, -3.22) if shape == 'shield' else (6.8, -3.3)
-            yaw = math.atan2(6.24, 3.6) if shape == 'shield' else math.pi/2
-            center_z = -.70
-            cx = anchor[0] + math.sin(yaw)*center_z
-            cz = anchor[1] + math.cos(yaw)*center_z
-            bpy.ops.mesh.primitive_cube_add(size=1, location=(cx,-cz,2.75))
-            cutter=bpy.context.object;cutter.name='Return receiver clearance'
-            cutter.dimensions=(2.12,1.80,2.5);cutter.rotation_euler.z=yaw
-            bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
-            for obj in objects[:-1]:
-                bpy.context.view_layer.objects.active=obj
-                cut=obj.modifiers.new('Open staff return receiver','BOOLEAN');cut.operation='DIFFERENCE';cut.object=cutter
-                bpy.ops.object.modifier_apply(modifier=cut.name)
-                bm=bmesh.new();bm.from_mesh(obj.data);assert all(e.is_manifold for e in bm.edges),obj.name;bm.free()
-            bpy.data.objects.remove(cutter,do_unlink=True)
+            cut_return_receiver(objects[:-1], shape)
         for obj in objects:
             for owner in list(obj.users_collection):
                 owner.objects.unlink(obj)

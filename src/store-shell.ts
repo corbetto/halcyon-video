@@ -812,8 +812,8 @@ export function buildStore(scene: StoreScene) {
     // far brighter than any lit surface — like real fluorescent diffusers. AgX
     // rolls the panels themselves off to clean white instead of clipping, and
     // the 1.1 bloom threshold gives them the faint halo real diffusers have.
-    // Raise emitted bounce alongside the direct ceiling keys by thirty percent.
-    emissiveIntensity: 1.55 * 1.3,
+    // Keep emitted bounce proportional to the brighter direct ceiling keys.
+    emissiveIntensity: 1.55 * 1.56,
     roughness: 0.4,
     metalness: 0.0
   }), 'light-source');
@@ -1204,7 +1204,7 @@ export function buildStore(scene: StoreScene) {
         // lets the cones reach the floor and overlap into even coverage; the
         // shadow camera's far plane still clips the depth pass at the floor.
         const key = new THREE.SpotLight(
-          0xf3f6ff, (scene.outdoor.outsideMode === 'night' ? 120 : 105) * 1.3 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
+          0xf3f6ff, (scene.outdoor.outsideMode === 'night' ? 120 : 105) * 1.56 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
         key.position.set(kx, ky, kz);
         // A hair off vertical: a perfectly straight-down lookAt runs
         // parallel to the shadow camera's up vector. Same offset on every
@@ -1691,21 +1691,16 @@ export function buildStore(scene: StoreScene) {
     // 1. Poster Mesh — fully opaque (issue #61): these are printed posters,
     // not translucent film, so nothing behind them should show through.
     const posterMat = selfLit(new THREE.MeshBasicMaterial({
-      side: THREE.DoubleSide
+      side: THREE.FrontSide
     }), 'window-poster');
 
     // GH #140: Window posters read forwards from inside the store across both
     // formats. The mesh is rotated Math.PI with inverted UVs so the primary
     // face points into the store with correct text orientation.
     const posterGeo = new THREE.PlaneGeometry(posterW, posterH);
-    posterGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
-      1, 1,
-      0, 1,
-      1, 0,
-      0, 0,
-    ]), 2));
     const posterMesh = new THREE.Mesh(posterGeo, posterMat);
-    posterMesh.rotation.y = Math.PI;
+    posterMesh.rotation.y = 0;
+    // Both prints face their viewer with standard, forward-reading UVs.
 
     // Center vertically in the GLAZED pane itself — knee wall top (2.0, the
     // window builders' KNEE_H) up to the glazing head. It used to center
@@ -1716,6 +1711,14 @@ export function buildStore(scene: StoreScene) {
 
     posterMesh.position.set(0, posterCenterY, 0);
     posterGroup.add(posterMesh);
+    // A separate outward print shares the artwork but has its own forward UVs.
+    // No exterior bulb anchors are registered.
+    const outerGeo = new THREE.PlaneGeometry(posterW, posterH);
+    const outerPrint = new THREE.Mesh(outerGeo, posterMat);
+    outerPrint.name = 'window-poster-outside';
+    outerPrint.rotation.y = Math.PI;
+    outerPrint.position.set(0, posterCenterY, -.24);
+    posterGroup.add(outerPrint);
 
     // Window groups face inward; the print's extra rotation only serves its UVs.
     const hardware = new THREE.Group();

@@ -80,10 +80,25 @@ test('upper paint band meets the wall stripe and finish UVs retain physical scal
  test('chairs face the corner wedge console and leave viewing clearance',()=>{
   const host=clubhouseHost(0,0,20);
   const [chair]=childrenChairPlacements({...host,theme:'bb-1990'});
-  const cabinet=clubhouseFeet(host).find(f=>f.label.endsWith('tv-cabinet'))!;
+  const cabinet={cx:host.center.x-4.9,cz:host.center.z-4.9,yaw:0};
   // Diagonal chairs facing the wedge (yaw is -135 degrees)
   assert.ok(Math.abs(Math.sin(chair.yaw) - Math.sin(-3*Math.PI/4)) < .001);
   assert.ok(Math.abs(chair.position.z-cabinet.cz) > 2.0); // No longer aligned to Z
   assert.ok(chair.position.x-cabinet.cx > 2.0);
   assert.equal(cabinet.yaw,0); // Footprint yaw is 0 now
+});
+
+test('the TV console supports the complete television footprint', async () => {
+  const {GLTFLoader}=await import('three/examples/jsm/loaders/GLTFLoader.js');
+  const {Raycaster,Vector3}=await import('three');
+  const bytes=readFileSync(new URL('../public/models/clubhouse.glb',import.meta.url));
+  const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  scene.updateMatrixWorld(true);
+  // Four corners of the 2.2 by 1.85 foot television, rotated into the corner.
+  for (const x of [-1.1,1.1]) for (const z of [-.925,.925]) {
+    const yaw=-3*Math.PI/4;
+    const world=new Vector3(-4.9+x*Math.cos(yaw)+z*Math.sin(yaw),2.31,-4.9-x*Math.sin(yaw)+z*Math.cos(yaw));
+    const hit=new Raycaster(world,new Vector3(0,-1,0),0,.04).intersectObject(scene,true)[0];
+    assert.ok(hit,'every television corner has a supporting top directly beneath it');
+  }
 });

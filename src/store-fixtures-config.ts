@@ -1,4 +1,3 @@
-import { getActiveTheme } from './themes';
 import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/department-arch-layout';
 // Service-wall dressing follows the live facade/door datum, not a fixed floor placement.
 export { WALL_COURTESY_PHONE } from './fixtures/wall-courtesy-telephone';
@@ -713,7 +712,7 @@ export function counterAnchoredPlacements(
   // other at the mitred joints, and the walk-through gap near (1.2, 2.26)
   // (GAP_TRIM 2.2 in counter.ts) is left open.
   return [
-    ...(getActiveTheme().id === 'bb-2010' ? (() => {
+    ...(() => {
       const a={x:4.8,z:8.5}, b={x:1.2,z:2.26}, c={x:11,z:-5.5};
       const length=Math.hypot(b.x-a.x,b.z-a.z), tx=(b.x-a.x)/length, tz=(b.z-a.z)/length;
       const at=(d:number)=>({x:a.x+tx*d,z:a.z+tz*d});
@@ -721,26 +720,11 @@ export function counterAnchoredPlacements(
       // The built counter supplies the complete collision and clerk boundaries.
       return [[a,at(1)],[at(4.6),b],[b,c]].map(([p,q],i)=>{
         const len=Math.hypot(q.x-p.x,q.z-p.z), nx=-(q.z-p.z)/len,nz=(q.x-p.x)/len;
-        return {id:`counter-band-modern-left-${i}`,kind:'structure-footprint',
+        return {id:`counter-band-doorway-left-${i}`,kind:'structure-footprint',
           position:{x:(p.x+q.x)/2+nx*.75,z:(p.z+q.z)/2+nz*.75},
           yaw:Math.atan2(-(q.z-p.z),q.x-p.x),options:{footprintWidth:Math.max(.35,len-2.8),footprintDepth:1.5}};
       });
-    })() : [
-    {
-      id: 'counter-band-shoulder-left',
-      kind: 'structure-footprint',
-      position: { x: 3.85, z: 5.35 },
-      yaw: 2.0941,
-      options: { footprintWidth: 3.6, footprintDepth: 1.5 }
-    },
-    {
-      id: 'counter-band-front-left',
-      kind: 'structure-footprint',
-      position: { x: 6.88, z: -1.28 },
-      yaw: 0.6697,
-      options: { footprintWidth: 8.9, footprintDepth: 1.5 }
-    },
-    ]),
+    })(),
     {
       id: 'counter-band-front-right',
       kind: 'structure-footprint',
@@ -792,8 +776,8 @@ export function counterAnchoredPlacements(
     {
       id: 'tape-cleaner-display-counter',
       kind: 'tape-cleaner-display',
-      position: getActiveTheme().id === 'bb-2010' ? { x: 7.5, z: 7.75 } : { x: 4.20, z: 5.96 },
-      yaw: getActiveTheme().id === 'bb-2010' ? Math.PI : -1.0473,
+      position: { x: 7.5, z: 7.75 },
+      yaw: Math.PI,
       options: { count: 10 }
     },
     // Tip jar on the FRONT-RIGHT band top, 3.4 ft up the segment from the

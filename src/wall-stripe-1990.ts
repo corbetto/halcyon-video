@@ -138,11 +138,11 @@ function perimeterRuns(scene: StoreScene, bandBottomY: number): StripeRun[] {
   const clearsGlazing = bandBottomY >= WINDOW_HEAD_Y;
   const sideFrontZ = clearsGlazing || !scene.sideRibbon ? FRONT_GLASS_Z : scene.sideRibbon.backZ;
 
-  add(leftX, backZ, stepX, backZ, 0);                       // back wall
+  add(scene.plan.clubhouse ? leftX + 14.2 : leftX, backZ, stepX, backZ, 0);                       // back wall
   add(stepX, backZ, stepX, stepZ, -Math.PI / 2);            // notch connector (faces -X)
   add(stepX, stepZ, rightX, stepZ, 0);                      // stepped-forward face
   add(rightX, stepZ, rightX, sideFrontZ, -Math.PI / 2);     // right wall
-  add(leftX, backZ, leftX, sideFrontZ, Math.PI / 2);        // left wall
+  add(leftX, scene.plan.clubhouse ? backZ + 14.2 : backZ, leftX, sideFrontZ, Math.PI / 2);        // left wall
   if (clearsGlazing) {
     // Front wall, in the two spans that flank the vestibule — the same pair
     // the interior wall band above the glazing is built in (store-shell.ts).

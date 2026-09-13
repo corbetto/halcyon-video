@@ -406,7 +406,6 @@ export function buildCheckoutCounter(
     extrudeSegment(A_out, B_out, B_in, A_in, (bandH + 0.14) - (STRIPE_Y + GROOVE_HALF), STRIPE_Y + GROOVE_HALF, counterTopBlue);
   };
 
-  const GAP_TRIM = 2.2;
   // Band segment list as [edge index, trimA, trimB] — the edge index rides
   // along because one edge may contribute several built pieces (the usquare
   // left side below) and the safety stripe needs each piece's true normal.
@@ -437,18 +436,10 @@ export function buildCheckoutCounter(
         [1, 0, 0],                   // front run
         [2, 0, 0.01],                // right side
       ]
-    : theme.id === 'bb-2010'
-    ? [
+    : [
         [0, 0, P_out[0].distanceTo(P_out[1]) - 1.0],
         [0, 4.6, 0],
         [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
-      ]
-    : [
-        [0, 0, GAP_TRIM],
-        [1, GAP_TRIM, 0],
-        [2, 0, 0],
-        [3, 0, 0],
-        [4, 0, 0],
       ];
   const bandSegs = bandSegDefs.map(([edge, trimA, trimB]) =>
     ({ edge, trimA, trimB, e: segEnds(edge, trimA, trimB) }));

@@ -12,7 +12,12 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
   for (const m of gltf.materials) {
     assert.ok(m.normalTexture);
     assert.ok(m.pbrMetallicRoughness.metallicRoughnessTexture);
-    assert.ok(m.pbrMetallicRoughness.baseColorFactor.slice(0, 3).every((v: number) => v >= .079));
+    const [red, green, blue] = m.pbrMetallicRoughness.baseColorFactor;
+    if (m.name === 'ChuteLaminate') assert.ok(blue > red * 3 && blue > green * 3, 'body retains blue laminate');
+    if (m.name === 'ChuteSteel') {
+      assert.ok(Math.min(red, green, blue) > .8, 'only the slot is white');
+      assert.equal(m.pbrMetallicRoughness.metallicFactor, 0);
+    }
     // Node has no image decoder. Validate texture records above; parse geometry below.
     delete m.normalTexture;
     delete m.pbrMetallicRoughness.metallicRoughnessTexture;

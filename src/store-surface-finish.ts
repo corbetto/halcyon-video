@@ -70,13 +70,14 @@ function projectFinishUV(mesh: THREE.Mesh): void {
 /** Finish the built scene and later model arrivals. Group-add events do the
  * work once; there is no render-loop traversal. Every listener/map is owned by
  * this scene, including groups subsequently removed by a fixture rebuild. */
-export function installStoreSurfaceFinishes(root: THREE.Object3D): () => void {
+export function installStoreSurfaceFinishes(root: THREE.Object3D, shade?: (mesh: THREE.Mesh) => void): () => void {
   const tiles = new Map<Finish, { texture: THREE.DataTexture; users: number }>();
   const materials = new Map<THREE.MeshStandardMaterial, () => void>();
   const groups = new Set<THREE.Object3D>();
   const handled = new WeakSet<THREE.Material>();
   const finish = (object: THREE.Object3D) => {
     if (!(object instanceof THREE.Mesh) || !object.geometry.hasAttribute('normal')) return;
+    shade?.(object);
     for (const m of Array.isArray(object.material) ? object.material : [object.material]) {
       if (handled.has(m)) { projectFinishUV(object); continue; }
       if (!needsSurfaceFinish(m)) continue;
