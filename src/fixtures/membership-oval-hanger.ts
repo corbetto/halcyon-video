@@ -82,7 +82,7 @@ const QUAD_CENTER_V = (FRAME_V0 + FRAME_V1) / 2;
 // stays well under the cash-wrap soffit at 11.5 ft, leaving a believable ~2.8 ft
 // of monofilament rather than a sign glued to the lid.
 const OVAL_CENTER_Y = 7.5;
-const OVAL_YAW = 0.35 + Math.PI / 6 + Math.PI / 2; // Owner pin 114: quarter-turn counterclockwise from above
+const OVAL_YAW = Math.PI / 2; // Pins 114/121: parallel to the side wall, perpendicular to the entrance
 
 // Loaded user art survives signage rebuilds (clearActiveSignage disposes
 // materials and geometries, not maps) and is only fetched once per session.
