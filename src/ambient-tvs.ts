@@ -1,3 +1,4 @@
+import { publishAmbientPicture, ambientReceiverInFrustum } from './ambient-screen';
 import { selfLit } from './material-lighting';
 // Ceiling-hung CRT TVs playing an ambient movie streamed from the store's media
 // server, with HRTF positional audio. Self-contained fixture: owns its <video>
@@ -816,6 +817,7 @@ export class AmbientTvs implements StoreFixture {
     // so the one just detached would otherwise never be freed.
     this.pictureMat?.dispose();
     this.pictureMat = dead;
+    publishAmbientPicture(this.ctx.scene, dead);
     this.ctx.requestRender();
   }
 
@@ -837,6 +839,7 @@ export class AmbientTvs implements StoreFixture {
     for (const mesh of this.screenMeshes) mesh.material = testCardMat;
     this.pictureMat?.dispose();
     this.pictureMat = testCardMat;
+    publishAmbientPicture(this.ctx.scene, testCardMat);
     this.ctx.requestRender();
   }
 
@@ -1143,6 +1146,7 @@ export class AmbientTvs implements StoreFixture {
     // Kept so goDeadGlass can retire the picture later: whether a source turns
     // out to be playable is not knowable at build time.
     this.pictureMat = screenMat;
+    publishAmbientPicture(this.ctx.scene, screenMat);
     // Static tube overlay (crt-tube.ts): rounded corners falling off dark,
     // edge vignette, faint scanlines — the PHOSPHOR side of the tube, all of
     // which only darkens. The room reflection is the glass pane below.
@@ -1637,6 +1641,7 @@ export class AmbientTvs implements StoreFixture {
 
     this._projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._projScreen);
+    if (ambientReceiverInFrustum(this.ctx.scene, this._frustum)) return true;
 
     for (let i = 0; i < this.tvWorldSpheres.length; i++) {
       if (this._frustum.intersectsSphere(this.tvWorldSpheres[i])) {
@@ -1786,6 +1791,7 @@ export class AmbientTvs implements StoreFixture {
   }
 
   dispose(): void {
+    publishAmbientPicture(this.ctx.scene, null);
     this.disposed = true; // gates the async GLB upgrade against a dead scene
     if (this.gestureUnlock) {
       window.removeEventListener('pointerdown', this.gestureUnlock, true);

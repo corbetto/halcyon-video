@@ -583,7 +583,7 @@ export class EntranceCheckout implements StoreFixture {
     const counterResult = buildCheckoutCounter(this.ctx, group, cx, backZ, spec, this.ctx.storeWidth);
     this.counterModelReady = counterResult.modelReady;
     const officeAnchor = counterOfficeKitAnchor(spec.counterShape, cx, backZ);
-    if (officeAnchor && activeStoreFormat().counterDressing) {
+    if (officeAnchor && this.ctx.activeTheme.id !== 'bb-2010' && activeStoreFormat().counterDressing) {
       installCounterOfficeKit(this.ctx, group, officeAnchor);
     }
     const labelGunAnchor = priceLabelGunAnchor(spec.counterShape, cx, backZ, this.ctx.activeTheme.id);

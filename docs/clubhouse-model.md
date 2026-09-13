@@ -18,8 +18,8 @@ Scene units are feet. Blender (X, -store Z, height) exports to runtime
 (X, height, store Z). The origin is the enclosure center; rear is -Z and left
 is -X. The enlarged enclosure is 14 by 14, with a diagonal cut between local
 (1,7) and (7,1). Each shoulder is 8 feet long, up from 6 in the superseded draft.
-Two 3.7-foot shelf bays per shoulder give 80 interactive family-title slots:
-five columns per bay, four tiers. The total fixture envelope is 15.2 square.
+Two 3.7-foot shelf bays per shoulder give 60 interactive family-title slots:
+five columns per bay, three tiers. The total fixture envelope is 15.2 square.
 The center is 7.2 feet inward from each adjoining wall, leaving .2 feet for
 installation. Shelves, not just the header, occupy the corner reservation.
 
@@ -132,5 +132,20 @@ sits at 2.3 and faces +X; the chairs face -X. Console fallback construction now
 has the same open shelf slot. All loads use the existing lifecycle/disposal path.
 
 The right cutout gains a fitted cream sill and secondary inner jamb liners.
-The open sightline, all 80 interactive Family stock slots and shelf positions
+The open sightline, all 60 interactive Family stock slots and shelf positions
 remain intact. No character standee or reference artwork has been invented.
+
+## September 2026 shoulder and program correction
+
+The four bays now have three trays at 0.50, 1.38 and 2.26 feet, 60 total
+interactive facings. Uprights and backs end at 3.40 feet; both shoulder
+openings start at 3.50 feet, with the fitted sill at 3.45–3.57 feet.
+This supersedes the older four-tier, 80-slot descriptions above.
+
+The liners borrow the actual store wall material, with physical texture
+scale; colored paint borrows its plaster normal and roughness maps.
+Four distinct Family catalog posters replace the blank modeled sheets.
+Unavailable artwork leaves the ordinary wall visible. The television and
+VCR face diagonally into the store. The television borrows the ambient
+player's picture material and keeps that decoder active while its screen
+is visible. No second video or audio pipeline is added.

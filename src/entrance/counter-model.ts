@@ -22,7 +22,8 @@ export function installCounterModel(
     CounterBody: finishes.body, CounterTop: finishes.top,
     CounterInlay: finishes.inlay, CounterWorktop: finishes.worktop,
   };
-  const filename = `checkout-counter-${shape}-${rounded ? 'rounded' : 'laminate'}.glb`;
+  const edition = getActiveTheme().id === 'bb-2010' && shape !== 'desk' ? '-2010' : '';
+  const filename = `checkout-counter-${shape}-${rounded ? 'rounded' : 'laminate'}${edition}.glb`;
   const rel = `fixtures/checkout-counter/${getActiveTheme().id}-${shape}-${rounded ? 'rounded' : 'laminate'}.glb`;
   const pack = brandPackDir();
   const paths = [...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`, `models/${filename}`];

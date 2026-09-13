@@ -38,7 +38,7 @@ for(const arrangement of ['straight','diagonal','herringbone'] as const) test(`$
 test('shipped host uses UVs, named materials, modest cost and floor/ceiling bounds',()=>{
   const bytes=readFileSync(new URL('../public/models/clubhouse.glb',import.meta.url));
   const gltf=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
-  assert.ok(bytes.length<650000);assert.equal(gltf.meshes.length,6);assert.equal(gltf.images?.length??0,0);
+  assert.ok(bytes.length<650000);assert.equal(gltf.meshes.length,5);assert.equal(gltf.images?.length??0,0);
   let triangles=0,minY=Infinity,maxY=-Infinity;
   for(const mesh of gltf.meshes)for(const p of mesh.primitives){
     assert.ok(p.attributes.TEXCOORD_0!==undefined);assert.ok(gltf.materials[p.material].name);
@@ -53,7 +53,7 @@ test('open side windows transmit a sightline through the exported mesh',async()=
   const bytes=readFileSync(new URL('../public/models/clubhouse.glb',import.meta.url));
   const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   scene.updateMatrixWorld(true);
-  for(const [origin,direction] of [[[-3,5.5,9],[0,0,-1]],[[9,5.5,-3],[-1,0,0]]]){
+  for(const [origin,direction] of [[[-3,3.9,9],[0,0,-1]],[[9,3.9,-3],[-1,0,0]]]){
     const hit=new Raycaster(new Vector3(...origin),new Vector3(...direction)).intersectObject(scene,true)[0];
     assert.ok(hit&&hit.distance>15,'first visible surface must be the far room wall, beyond the open window');
   }

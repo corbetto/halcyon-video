@@ -314,6 +314,14 @@ export function moveLeftInternal(scene: StoreScene) {
             scene.selectedSide = 'front'; scene.selectedCol = scene.colsCount - 1;
             scene.updateCameraTarget(); return;
           }
+          if (fixture?.placement.kind === 'pv-drape-table') {
+            const toSide = scene.selectedSide === 'front' ? 'back' : 'front';
+            if (fixture.getSlots().some(slot => slot.side === toSide)) {
+              scene.selectedSide = toSide; scene.selectedCol = scene.colsCount - 1;
+              scene.updateCameraTarget();
+            }
+            return;
+          }
           // Step around the corner to the face on the viewer's left; you
           // arrive at that face's screen-RIGHT end, which is its LAST col.
           if (scene.selectedSide === 'front') scene.selectedSide = 'left';
@@ -476,6 +484,14 @@ export function moveRightInternal(scene: StoreScene) {
             if (scene.selectedSide === 'right') return;
             scene.selectedSide = 'right'; scene.selectedCol = 0;
             scene.updateCameraTarget(); return;
+          }
+          if (fixture?.placement.kind === 'pv-drape-table') {
+            const toSide = scene.selectedSide === 'front' ? 'back' : 'front';
+            if (fixture.getSlots().some(slot => slot.side === toSide)) {
+              scene.selectedSide = toSide; scene.selectedCol = 0;
+              scene.updateCameraTarget();
+            }
+            return;
           }
           // Step around the corner to the face on the viewer's right; you
           // arrive at that face's screen-LEFT end, which is col 0.

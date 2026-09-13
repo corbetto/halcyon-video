@@ -113,9 +113,9 @@ function getSpineSlatwallMaterial(panelHeightFt: number): THREE.MeshStandardMate
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    // One V tile per 4-inch slat course (same spacing as the end caps'
+    // One V tile per 3-inch slat course (same spacing as the end caps'
     // slatwall); a handful of U tiles across the run for the grain.
-    tex.repeat.set(6, panelHeightFt / (4 / 12));
+    tex.repeat.set(6, panelHeightFt / (3 / 12));
     tex.generateMipmaps = true;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
@@ -319,7 +319,11 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const wireBlackFrame = theme.shelving.frame === 'wire-black';
   const wireFrame = wireBlackFrame && !!materials.wireShelf;
   const modeledSpineMat = wireFrame ? deps.shelfModels.own(materials.shelf.clone()) : materials.shelf;
-  if (wireFrame) modeledSpineMat.color.set(0xeadcbc);
+  if (wireFrame) {
+    modeledSpineMat.color.set(0xeadcbc);
+    modeledSpineMat.roughness = .8;
+    modeledSpineMat.normalScale?.set(.18, .18);
+  }
   const wireMats = new Map<string, THREE.MeshStandardMaterial>();
   const getWireMat = (rx: number, ry: number): THREE.MeshStandardMaterial => {
     const key = `${rx.toFixed(2)}_${ry.toFixed(2)}`;
@@ -470,11 +474,18 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
 
     // Divider where conjoined/contiguous shelf units meet (at the back of the unit if not the end of the line)
     if (!unit.isLineBack) {
-      addDivider(FIELD_Z_FRONT + unit.zPos - shelfLength);
+      const seamZ = FIELD_Z_FRONT + unit.zPos - shelfLength;
+      addDivider(seamZ);
+      if (wireFrame) {
+        // Close the seam between the two trimmed spines, behind the one joint post.
+        const joint = new THREE.Mesh(getBoxTemplate(.5, UNIT_FRAME_HEIGHT, .04), getSpineSlatwallMaterial(UNIT_FRAME_HEIGHT));
+        joint.position.set(xCenter, frameCenterY, seamZ); joint.castShadow=joint.receiveShadow=true;
+        aisleParent.add(joint);
+      }
     }
 
     if (wireFrame) {
-      for (const z of [FIELD_Z_FRONT + unit.zPos - .06, FIELD_Z_FRONT + unit.zPos - shelfLength + .06]) {
+      for (const z of [unit.isLineFront ? FIELD_Z_FRONT + unit.zPos - .06 : null, unit.isLineBack ? FIELD_Z_FRONT + unit.zPos - shelfLength + .06 : null].filter((z): z is number => z !== null)) {
         const support = new THREE.Mesh(getBoxTemplate(.14, UNIT_FRAME_HEIGHT, .09), materials.strip);
         support.position.set(xCenter, frameCenterY, z);
         support.castShadow = support.receiveShadow = true;
@@ -782,7 +793,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
 
       // Front End Cap (built to UNIT_FRAME_HEIGHT, flush with the run top)
       const isBlue = isFrontCapFacingStore;
-      const capMats = createLibraryEndCapMaterial(wireBlackFrame ? !isBlue : false);
+      const capMats = createLibraryEndCapMaterial(wireBlackFrame);
       const leftCap = new THREE.Mesh(capTrapezoidGeo, capMats);
       leftCap.position.set(xCenter, frameCenterY, FIELD_Z_FRONT + unit.zPos + 0.05);
       leftCap.rotation.y = 0; // Face pointing towards +Z
@@ -798,13 +809,13 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       deps.addCollider(leftCap);
       deps.registerEndCap(leftCap);
       deps.shelfModels.add(leftCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
-        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY, physicalUV: wireBlackFrame }], capMats, true);
     }
 
     if (unit.isLineBack) {
       // Back End Cap (built to UNIT_FRAME_HEIGHT, flush with the run top)
       const isBlue = !isFrontCapFacingStore;
-      const capMats = createLibraryEndCapMaterial(wireBlackFrame ? !isBlue : false);
+      const capMats = createLibraryEndCapMaterial(wireBlackFrame);
       const rightCap = new THREE.Mesh(capTrapezoidGeo, capMats);
       rightCap.position.set(xCenter, frameCenterY, FIELD_Z_FRONT + unit.zPos - shelfLength - 0.05);
       rightCap.rotation.y = Math.PI; // Face pointing towards -Z
@@ -820,7 +831,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       deps.addCollider(rightCap);
       deps.registerEndCap(rightCap);
       deps.shelfModels.add(rightCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
-        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY, physicalUV: wireBlackFrame }], capMats, true);
     }
   });
 }

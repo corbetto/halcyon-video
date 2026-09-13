@@ -36,7 +36,7 @@ for name, color, roughness in [
     MATERIALS.append(mat)
 
 
-def section(depth, island=False, rounded=False):
+def section(depth, island=False, rounded=False, drawers=False):
     """(inset, height, material on the following strip). Closed joinery profile."""
     h = 2.82 if island else 3.54
     top = 3 if island else 1
@@ -67,10 +67,18 @@ def section(depth, island=False, rounded=False):
           (depth-.035, h-.25, 0), (depth-.035, .35, 0),
           (depth-.055, .32, 4), (depth-.20, .32, 4),
           (depth-.20, 0, 4)]
+    if drawers and island:
+        # Routed drawer reveals are closed recesses in the same skin.
+        start = p.index((depth-.035, .35, 0))
+        seams = []
+        for y in [2.17, 1.55, .94]:
+            seams += [(depth-.035,y+.015,0),(depth-.06,y+.008,5),
+                      (depth-.06,y-.008,5),(depth-.035,y-.015,0)]
+        p[start:start] = seams
     return p
 
 
-def sweep(name, path, depth, island=False, rounded=False):
+def sweep(name, path, depth, island=False, rounded=False, drawers=False):
     """Welded quad rings, including mitres, routed seams and closed cut ends."""
     pts = [Vector(p) for p in path]
     tangents = [(b-a).normalized() for a, b in zip(pts, pts[1:])]
@@ -98,7 +106,7 @@ def sweep(name, path, depth, island=False, rounded=False):
             t = s/length
             rings.append((a.lerp(b, t), offsets[i].lerp(offsets[i+1], t), distance+s, seam))
         distance += length
-    profile = section(depth, island, rounded)
+    profile = section(depth, island, rounded, drawers)
     verts, faces, materials, uv = [], [], [], []
     perimeter = [0]
     for a, b in zip(profile, profile[1:]):
@@ -171,12 +179,15 @@ def sweep(name, path, depth, island=False, rounded=False):
     return obj
 
 
-def shield():
+def shield(modern=False):
     points = [Vector(p) for p in [(-6.2,-.1),(-9.8,-6.34),(0,-14.1),(9.8,-6.34),(6.2,-.1)]]
     # Same 2.2-foot trims as counter.ts: an open staff entrance at the left shoulder.
     a = points[1] + (points[2]-points[1]).normalized()*2.2
     b = points[1] + (points[0]-points[1]).normalized()*2.2
     path = [a, points[2], points[3], points[4], points[0], b]
+    if modern:
+        t0 = (points[1]-points[0]).normalized()
+        path = [points[0]+t0*4.6,points[1],points[2],points[3],points[4],points[0],points[0]+t0*1.0]
     t = (points[2]-points[1]).normalized()
     n = Vector((-t.y,t.x))
     apex = Vector((0,-14.1 + 1.5/n.y))
@@ -186,9 +197,11 @@ def shield():
 
 
 variants = []
-for shape in ['shield', 'usquare', 'desk']:
+for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
+    modern = variant.endswith('-2010')
+    shape = variant.removesuffix('-2010')
     if shape == 'shield':
-        paths, island = shield()
+        paths, island = shield(modern)
     elif shape == 'usquare':
         paths = [[(-6.8,-5.2),(-6.8,-12.1),(6.8,-12.1),(6.8,-.11)],
                  [(-6.8,-.11),(-6.8,-3.0)]]
@@ -196,12 +209,12 @@ for shape in ['shield', 'usquare', 'desk']:
     else:
         paths, island = [], [(-3,0),(3,0)]
     for style in ['laminate', 'rounded']:
-        collection = bpy.data.collections.new(f'{shape}-{style}')
+        collection = bpy.data.collections.new(f'{variant}-{style}')
         bpy.context.scene.collection.children.link(collection)
         objects = []
         for i, path in enumerate(paths):
             objects.append(sweep(f'{shape}-surround-{i}', path, 1.5, rounded=style == 'rounded'))
-        objects.append(sweep(f'{shape}-work-cabinet', island, 1.6, island=True, rounded=style == 'rounded'))
+        objects.append(sweep(f'{shape}-work-cabinet', island, 1.6, island=True, rounded=style == 'rounded', drawers=modern))
         for obj in objects:
             for owner in list(obj.users_collection):
                 owner.objects.unlink(obj)
@@ -210,7 +223,7 @@ for shape in ['shield', 'usquare', 'desk']:
         for obj in objects:
             obj.select_set(True)
         bpy.context.view_layer.objects.active = objects[0]
-        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}.glb'),
+        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}{"-2010" if modern else ""}.glb'),
                                   export_format='GLB', use_selection=True,
                                   export_extras=True, export_yup=True)
         tris = sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in objects)

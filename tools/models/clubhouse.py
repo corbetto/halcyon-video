@@ -63,9 +63,9 @@ for side in ['front','right']:
  def face(name,u,v,w,d,lo,hi,role,cutters=None):
   return box(side+' '+name,u if side=='front' else v,v if side=='front' else u,w if side=='front' else d,d if side=='front' else w,lo,hi,role,cutters=cutters)
  c_d = 1.0; c_w = 5.0
- cutter = box_cutter(side+' window cutter', -3.2 if side=='front' else 6.9, 6.9 if side=='front' else -3.2, c_w if side=='front' else c_d, c_d if side=='front' else c_w, 4.5, 8.72)
+ cutter = box_cutter(side+' window cutter', -3.2 if side=='front' else 6.9, 6.9 if side=='front' else -3.2, c_w if side=='front' else c_d, c_d if side=='front' else c_w, 3.5, 8.72)
  face('wall',-3.2,6.9,7.4,.25,.12,9.15,'FramePaint',cutters=[cutter])
- face('low accent',-3.2,7.03,7.4,.05,4.05,4.45,'EdgePaint')
+ face('low accent',-3.2,7.03,7.4,.05,3.05,3.45,'EdgePaint')
 # Entrance jambs support the diagonal header without a sill/trip edge.
 for x,z in [(.75,6.85),(6.85,.75)]:box('Entry jamb',x,z,.5,.5,0,8.5,'FramePaint')
 # TV console: triangular wedge nestled into the corner apex (-6.8, -6.8) against solid liners.
@@ -77,19 +77,15 @@ slab('Console left side', [(-6.8, -6.8), (-6.68, -6.8), (-6.68, -3.27), (-6.8, -
 slab('Console rear side', [(-6.8, -6.8), (-6.8, -6.68), (-3.27, -6.68), (-3.15, -6.8)], .18, 2.18, 'CabinetLaminate')
 
 # Wall posters mounted along the kids clubhouse interior walls at authentic youth movie proportions.
-box('Poster L1', -6.79, 0.0, 0.02, 2.25, 3.34, 6.66, 'WallPoster', 0.0)
-box('Poster L2', -6.79, 3.5, 0.02, 2.25, 3.34, 6.66, 'WallPoster', 0.0)
-box('Poster R1', 0.0, -6.79, 2.25, 0.02, 3.34, 6.66, 'WallPoster', 0.0)
-box('Poster R2', 3.5, -6.79, 2.25, 0.02, 3.34, 6.66, 'WallPoster', 0.0)
 # Fitted right-window sill and inner jamb liners; keep the eye-level opening.
-box('Right window sill',6.98,-3.05,.56,6.85,4.45,4.57,'PanelLaminate')
-for z in [-6.47,.37]:box('Right window reveal',6.9,z,.3,.08,4.57,8.72,'EdgePaint',.006)
+box('Right window sill',6.98,-3.05,.56,6.85,3.45,3.57,'PanelLaminate')
+for z in [-6.47,.37]:box('Right window reveal',6.9,z,.3,.08,3.57,8.72,'EdgePaint',.006)
 # Low family shelving, shallow slanted trays with integral raised lips.
 for side in ['front','right']:
  def shelf(name,x,z,w,d,lo,hi,role):return box(side+' '+name,x if side=='front' else z,z if side=='front' else x,w if side=='front' else d,d if side=='front' else w,lo,hi,role)
  for center in [-5.1,-1.4]:
-  for x in [center-1.8,center+1.8]:shelf('shelf upright',x,7.6,.1,1.2,.08,4.3,'PanelLaminate')
-  shelf('shelf back',center,7.08,3.5,.12,.08,4.3,'PanelLaminate')
+  for x in [center-1.8,center+1.8]:shelf('shelf upright',x,7.6,.1,1.2,.08,3.4,'PanelLaminate')
+  shelf('shelf back',center,7.08,3.5,.12,.08,3.4,'PanelLaminate')
   shelf('recessed plinth',center,7.5,3.5,.9,0,.25,'FramePaint')
   for y in [0.5, 1.38, 2.26]:
    shelf('tray',center,7.6,3.5,1.2,y,y+.08,'PanelLaminate')
@@ -145,6 +141,7 @@ exports=[]
 role_parts={role:[o for o in parts if o.data.materials[0].name==role] for role in roles}
 for role in roles:
  bpy.ops.object.select_all(action='DESELECT')
+ if not role_parts[role]:continue
  for o in role_parts[role]:
   o.select_set(True);bpy.context.view_layer.objects.active=o
  bpy.ops.object.join();o=bpy.context.object;o.name=role;exports.append(o)
@@ -152,5 +149,5 @@ bpy.ops.object.select_all(action='DESELECT')
 for o in exports:o.select_set(True)
 path=ROOT/'public/models/clubhouse.glb'
 bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_yup=True)
-metrics={'bytes':path.stat().st_size,'triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in exports),'draws':len(exports),'roles':list(roles),'height':10.6,'envelope':[15.2,15.2],'uv':True}
+metrics={'bytes':path.stat().st_size,'triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in exports),'draws':len(exports),'roles':[role for role in roles if role_parts[role]],'height':10.6,'envelope':[15.2,15.2],'uv':True}
 (ROOT/'public/models/clubhouse.geometry.json').write_text(json.dumps(metrics,indent=2)+'\n');print(metrics)

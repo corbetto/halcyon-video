@@ -82,7 +82,7 @@ const QUAD_CENTER_V = (FRAME_V0 + FRAME_V1) / 2;
 // stays well under the cash-wrap soffit at 11.5 ft, leaving a believable ~2.8 ft
 // of monofilament rather than a sign glued to the lid.
 const OVAL_CENTER_Y = 7.5;
-const OVAL_YAW = 0.35;        // ~20 deg toward the customer side of the wing
+const OVAL_YAW = 0.35 + Math.PI / 6; // ~50 deg toward the right side of the store
 
 // Loaded user art survives signage rebuilds (clearActiveSignage disposes
 // materials and geometries, not maps) and is only fetched once per session.
@@ -197,7 +197,7 @@ export function buildMembershipOvalHanger(
   // a shopper meets after the vestibule's side door. The spot is derived from
   // the live vestibule box so it tracks the counter with the door width: over
   // the wing's counter top, a little back from the customer edge, at the
-  // wing's half-way point. The oval is yawed a fifth of a turn toward the
+  // wing's half-way point. The oval turns farther clockwise toward the right-hand
   // customer side so it reads from the wing AND from the entrance door, and
   // its reverse still reads from the sales floor. (The earlier placement —
   // the walkway centreline a few feet past the apex, the reference photo's

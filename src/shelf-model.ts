@@ -17,6 +17,7 @@ export interface ShelfPart {
   pitch?: number;
   panel?: boolean;
   topDepth?: number;
+  physicalUV?: boolean;
 }
 interface Replacement { fallback: THREE.Mesh; parts: ShelfPart[]; material: THREE.Material | THREE.Material[]; inPlace: boolean }
 
@@ -121,6 +122,14 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     // Use geometry coordinates, not the separated editing positions of the
     // Blender objects. Preserve physical section thickness when extending runs.
     g.scale(sx, sy, sz);
+    if (name === 'Slat') {
+      // Physical planar UVs replace packed islands stretched over an entire run.
+      const pos = g.getAttribute('position'), normal = g.getAttribute('normal'), uv = g.getAttribute('uv');
+      for (let i = 0; i < pos.count; i++) {
+        uv.setXY(i, (Math.abs(normal.getX(i)) > .5 ? pos.getZ(i) : pos.getX(i)) / 4,
+          (Math.abs(normal.getY(i)) > .5 ? pos.getZ(i) : pos.getY(i)) / 4);
+      }
+    }
     g.rotateY(yaw);
     g.translate(x, y, z);
     g.rotateX(p.pitch ?? 0);
@@ -144,7 +153,8 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     if (p.kind === 'cap') {
       const uv = g.getAttribute('uv');
       for (let i = 0; i < pos.count; i++) {
-        uv.setXY(i, pos.getX(i) / p.depth + .5, pos.getY(i) / (p.height ?? 5));
+        uv.setXY(i, p.physicalUV ? pos.getX(i) : pos.getX(i) / p.depth + .5,
+          p.physicalUV ? pos.getY(i) : pos.getY(i) / (p.height ?? 5));
       }
     }
     g.computeVertexNormals();
@@ -187,7 +197,7 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     const count = Math.ceil(height / .25);
     for (let i = 0; i < count; i++) {
       const h = Math.min(.25, height - i * .25);
-      place('Slat', p.depth / .5, h / .25, p.length, 0, -height / 2 + i * .25 + h / 2);
+      place('Slat', p.depth / .5, (h - .002) / .25, p.length, 0, -height / 2 + i * .25 + h / 2);
     }
   } else {
     // Real opaque round wires: no transparent grid planes or alpha sorting.

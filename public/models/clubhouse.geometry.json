@@ -1,14 +1,13 @@
 {
-  "bytes": 458900,
-  "triangles": 6524,
-  "draws": 6,
+  "bytes": 454628,
+  "triangles": 6476,
+  "draws": 5,
   "roles": [
     "FramePaint",
     "HeaderPaint",
     "PanelLaminate",
     "EdgePaint",
-    "CabinetLaminate",
-    "WallPoster"
+    "CabinetLaminate"
   ],
   "height": 10.6,
   "envelope": [

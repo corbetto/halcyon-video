@@ -84,3 +84,14 @@ The checkout millwork reconstruction aligns internal cabinet structure and equip
 - **Staff drawer and cupboard bank**: The clerk-side joinery profile establishes an integrated work surface below the 3.54 ft customer-facing counter ledge, maintaining clear foot kicks and staff service access.
 - **Receipt printer bay**: The extended inner worktop supports the receipt printer to the left of station 0 (`mount_printer`), preserving functional reach and equipment contact occlusion.
 - **Reference confidence**: Exterior customer-facing millwork, counter heights, and equipment placement match primary photographic references; unexposed internal carcass joinery and hidden structural partitions remain estimated.
+
+## 2010 repair variant
+
+The 2010 shield uses a straight 3.6-foot staff opening, 1.0 to 4.6 feet
+along the left shoulder from its rear corner. Its old shoulder-corner gap
+is closed. The collision rig, clerk navigation and fixture reservation use
+the same opening; the cleaner display moves to the supported rear band.
+Other eras retain their existing perimeter. The 2010 shield and half-square
+public models have closed recessed drawer reveals on their clerk-facing
+work cabinets. They remain original generic furniture; private cabinet
+reconstructions retain their separate loader priority and source.

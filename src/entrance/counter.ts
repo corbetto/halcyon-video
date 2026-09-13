@@ -437,6 +437,12 @@ export function buildCheckoutCounter(
         [1, 0, 0],                   // front run
         [2, 0, 0.01],                // right side
       ]
+    : theme.id === 'bb-2010'
+    ? [
+        [0, 0, P_out[0].distanceTo(P_out[1]) - 1.0],
+        [0, 4.6, 0],
+        [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
+      ]
     : [
         [0, 0, GAP_TRIM],
         [1, GAP_TRIM, 0],
