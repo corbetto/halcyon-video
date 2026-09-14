@@ -650,8 +650,9 @@ export function buildStore(scene: StoreScene) {
           roughness: 0.55,
           metalness: 0.05,
           color: new THREE.Color(colorFactor, colorFactor, colorFactor),
-          // Warm self-glow for gold details (text + border)
-          emissive: new THREE.Color(0xffaa00).multiplyScalar(colorFactor),
+          // Reuse the lettering artwork so its glow preserves both brand inks.
+          emissiveMap: scene.entranceLogoYellowTex,
+          emissive: new THREE.Color(colorFactor, colorFactor, colorFactor),
           emissiveIntensity: 3.5, // strong glow for bloom
           side: THREE.FrontSide
         }), 'light-source'));

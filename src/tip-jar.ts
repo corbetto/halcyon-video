@@ -15,7 +15,7 @@
 // nothing on the marquee. It is also switchable off entirely (`bb_tip_jar`),
 // because the same build runs on a family TV where a donation ask is not
 // wanted.
-import { getActiveLogoSpec, HALCYON_CREAM, HALCYON_BLUE } from './logo-spec';
+import { getActiveLogoSpec, HALCYON_WHITE, HALCYON_BLUE } from './logo-spec';
 import { getActiveTheme } from './themes';
 import { BB_ARCHIVO_BLACK, bundledFontReady, ensureBundledFont } from './bundled-fonts';
 import { getSetting } from './settings';
@@ -137,7 +137,7 @@ export function drawTipCard(c: CanvasRenderingContext2D, W: number, H: number): 
 
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillStyle = HALCYON_CREAM;
+  c.fillStyle = HALCYON_WHITE;
   c.font = cardFont(Math.round(bandH * 0.62), '900');
   c.fillText(TIP_HEADLINE, W / 2, bandH * 0.52);
 
@@ -209,7 +209,7 @@ const OVERLAY_CSS = `
 }
 #tip-overlay .tip-overlay-head {
   background: var(--tip-field, ${HALCYON_BLUE});
-  color: var(--tip-knockout, ${HALCYON_CREAM});
+  color: var(--tip-knockout, ${HALCYON_WHITE});
   font-weight: 900; letter-spacing: 0.06em;
   font-size: clamp(13px, 2.2vh, 26px);
   padding: 0.9vh 1.4vh; border-radius: 5px;

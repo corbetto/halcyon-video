@@ -113,6 +113,9 @@ name, colors, and typeface in the live Brand Editor to repaint the store's
 livery together — from burgundy and cream to green and gold. The carpet can
 follow either brand color through Store Look's Carpet Colour setting.
 
+The default Halcyon identity uses white lettering and trim on a blue, rounded
+rectangle, with the board and lettering level across the store.
+
 An SVG or transparent PNG can replace the emblem entirely. The store name
 and subtitle are editable too: make it your video shop, entertainment store,
 or games destination.
