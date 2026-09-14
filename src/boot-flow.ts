@@ -535,6 +535,7 @@ export function hideBootOverlay() {
 export function showBootOverlay() {
   const overlay = document.getElementById('boot-overlay');
   if (overlay) {
+    overlay.classList.remove('preparing-models');
     // Raise it INSTANTLY, not over the stylesheet's 0.6s fade. What follows a
     // showBootOverlay() call is always the store build, which holds the main
     // thread for seconds at catalog scale — so a fade that has not finished by

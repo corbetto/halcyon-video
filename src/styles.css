@@ -3727,3 +3727,8 @@ html, body {
   .emblem-studio .settings-row { font-size: 18px; }
   .emblem-studio .crt-footer-page { display: none; }
 }
+
+/* A brief branded splash while the entrance replaces its loading solids. */
+.boot-model-status { display: none; margin: 0; text-align: center; font-size: 18px; color: #fff; }
+#boot-overlay.preparing-models .boot-model-status { display: block; }
+#boot-overlay.preparing-models .boot-console { display: none; }

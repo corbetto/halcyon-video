@@ -102,6 +102,7 @@ import { retailAudio } from './audio';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
+import { waitForStartupModel } from './startup-reveal';
 import { InputManager, type InputCallbacks } from './input';
 import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
 import { isStreamingChoiceActive, cancelStreamingServiceChoice, setStreamingStockResolver } from './streaming-checkout';
@@ -2788,10 +2789,13 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     logToConsole('[System] Loading store textures...', 'system');
 
-    // The public store is usable as soon as its geometry and input exist.
-    // Cover loading continues through the same budgeted queue after entry.
-    (isPublicDemo ? Promise.resolve() : scene.texturesReadyPromise).then(() => {
+    // Keep the existing splash over the counter's crude loading solids. Covers
+    // still stream progressively in the public store; the model grace is bounded.
+    (isPublicDemo ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
+      document.getElementById('boot-overlay')?.classList.add('preparing-models');
+      await waitForStartupModel(scene.entrance?.whenCounterModelReady());
       if (contextLossGaveUp) {
+        document.getElementById('boot-overlay')?.classList.remove('preparing-models');
         // A boot-time context loss already exhausted its retries and put the
         // give-up message on screen (see installContextLossRecovery) — decode
         // finishing later doesn't change that the GPU context is still dead,
