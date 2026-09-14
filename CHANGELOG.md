@@ -5,6 +5,66 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.19.0] — 2026-09-13
+
+### CHANGELOG
+- V0.18.0
+
+### General
+- Make the mom-and-pop shop compact and fit its fixtures
+- Frame the refreshed storefront photo around the store
+- Make default Halcyon branding level and white on blue
+- Explain emblem design and coordinated store branding
+- Lead the README with the store experience and highlight its tour and date pin
+- Resolve new F8 camera, display, lighting and independent-store pins
+- Make the independent store back room optional and stock explicit NC-17 or X titles
+- Fix independent-store shelving, actor displays and storefront pins
+- Align membership hanger with the side wall
+- Repair F8 store details and reduce lighting render cost
+- Make clerk conversations useful and reliable
+- Fix F8 counter, shelf lighting, and storefront follow-ups
+- Repair store shelving, lighting, storefront and return fixtures
+- Repair store shelving, 2010 counter and Kids Club finishes (Closes [#332](https://github.com/halcyon-video/halcyon-video/issues/332), [#333](https://github.com/halcyon-video/halcyon-video/issues/333), [#334](https://github.com/halcyon-video/halcyon-video/issues/334), [#335](https://github.com/halcyon-video/halcyon-video/issues/335), [#336](https://github.com/halcyon-video/halcyon-video/issues/336), [#337](https://github.com/halcyon-video/halcyon-video/issues/337), [#338](https://github.com/halcyon-video/halcyon-video/issues/338), [#339](https://github.com/halcyon-video/halcyon-video/issues/339))
+- Balance store lighting and refresh mirrors after lighting changes
+- Keep visible shelf covers and initialize finite instance bounds
+- Correct 1993 store shelves, counter apparel, candy rack and slate finishes
+- Fix(halcyon): align New Release wall shelving to authentic store reference
+- Fix(halcyon): refine facade, awning, clubhouse millwork, and candy stand finishes
+- Consolidate verified store models, finishes and interaction fixes (Closes [#206](https://github.com/halcyon-video/halcyon-video/issues/206), [#283](https://github.com/halcyon-video/halcyon-video/issues/283))
+- Fix(halcyon): resolve #309 - Games department: RomM library shelves fail to appear in store
+- Fix(halcyon): resolve #312 - Store settings: clearing pinned Media Release Date does not restore full catalog
+- Fix(halcyon): resolve issue #307 - Overhead CRT TVs: surface stream fallback diagnostics and improve playback status visibility
+- Fix(halcyon): resolve issue #306 - Improve support for dropped brand logos with disconnected or text-heavy silhouettes
+- Fix(halcyon): resolve issue #291 - Phone navigation: fluid overview cursor and continuous shelf swipes
+- Fix(halcyon): resolve issue #308 - Reconstruct checkout millwork and equipment bays from reference geometry
+- Support the receipt printer beside the left register and refine counter finishes
+- Support cabinet installations with coherent counter equipment mounts
+- Keep arcade trim above the brick footer
+- Integrate grounded contact for optional checkout housing (Closes [#188](https://github.com/halcyon-video/halcyon-video/issues/188))
+- Add optional later checkout till housing (Closes [#188](https://github.com/halcyon-video/halcyon-video/issues/188))
+- Add optional late-era handheld scanner at the counter (Closes [#187](https://github.com/halcyon-video/halcyon-video/issues/187))
+- Correct candy rack depth, stock and optional local hardware (Closes [#193](https://github.com/halcyon-video/halcyon-video/issues/193))
+- Fix(halcyon): resolve issue #286 - Blender: model the recessed round downlight housing
+- Fix(halcyon): resolve issue #287 - Blender: model the wall-mounted changeable-strip information board family
+- Fix(halcyon): resolve issue #288 - Reference study: resolve ambiguous entrance and counter hardware
+- Fix(halcyon): resolve issue #290 - Public phone rendering: sustain fluid aisle browsing and checkout
+- Fix(halcyon): resolve issue #294 - Release goal: a frictionless phone visit from store overview to streaming checkout
+- Fix(halcyon): resolve issue #295 - Seasonal decor: original molded pumpkins and Halloween window clings
+- Fix(halcyon): resolve issue #297 - Finish hosted catalog requirements left incomplete after v0.17.0
+- Fix(halcyon): resolve issue #298 - [bug] Plex: abandoned HLS transcode sessions are never stopped in video player
+- Fix(halcyon): resolve issue #299 - [bug] Plex server display name is overwritten with raw host label on first-run login
+- Fix(halcyon): resolve issue #302 - [bug] Mobile shelf drag is clamped to single shelving unit and fails to snap camera on release
+- Fix(halcyon): resolve issue #301 - [bug] Stale dragged state permanently suppresses case and credit taps in inspect mode
+- Fix(halcyon): resolve issue #300 - [bug] subtitleTrackUrl delegates to Jellyfin WebVTT endpoint for Plex media items
+- Fix(halcyon): resolve issue #305 - [bug] walkTakeSlot in walk and VR mode allows picking up streaming titles into physical rental carry stack
+- Fix(halcyon): resolve issue #304 - [bug] Counter terminal SAVE AND RESTOCK fails to build streaming aisles on bare installs due to premature guard in rebuildStoreScene
+- Fix(halcyon): resolve issue #303 - [bug] Non-rental checkout completion for streaming titles leaves viewport stuck on permanent whiteout overlay
+- Model the existing queue candy rack in Blender (Closes [#193](https://github.com/halcyon-video/halcyon-video/issues/193))
+- Model and place rolling new-release stock cart (#169)
+- Restore Halloween gel cling colors (Closes [#295](https://github.com/halcyon-video/halcyon-video/issues/295))
+- Refine Halloween counter and window decor (Closes [#295](https://github.com/halcyon-video/halcyon-video/issues/295))
+- Add original October pumpkin and window cling kit (Closes [#295](https://github.com/halcyon-video/halcyon-video/issues/295))
+
 ## [v0.18.0] — 2026-09-09
 
 ### CHANGELOG
