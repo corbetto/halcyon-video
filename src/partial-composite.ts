@@ -161,14 +161,16 @@ export class BeautyPass extends Pass {
   private readonly copy = makeCopyQuad();
 
   constructor(private scene: THREE.Scene, private camera: THREE.Camera,
-              template: THREE.WebGLRenderTarget) {
+              template: THREE.WebGLRenderTarget,
+              private borrowedTarget?: THREE.WebGLRenderTarget) {
     super();
     this.needsSwap = false; // writes into readBuffer, exactly like RenderPass
     // Cloned from the composer's own buffer: same format/type/size, and its
     // depth buffer comes along. EffectComposer.setSize() drives setSize()
     // below with the effective (pixel-ratio'd) size from then on.
-    this.beautyRT = template.clone();
-    this.beautyRT.texture.name = 'BeautyPass.beauty';
+    this.beautyRT = borrowedTarget ?? template.clone();
+    this.beautyRT.depthBuffer = true;
+    if (!borrowedTarget) this.beautyRT.texture.name = 'BeautyPass.beauty';
   }
 
   setSize(width: number, height: number): void {
@@ -194,7 +196,7 @@ export class BeautyPass extends Pass {
   }
 
   dispose(): void {
-    this.beautyRT.dispose();
+    if (!this.borrowedTarget) this.beautyRT.dispose();
     this.copy.mat.dispose();
     this.copy.quad.dispose();
   }

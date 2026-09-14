@@ -34,7 +34,7 @@ import { keyboardOwnedByControl } from './text-entry-focus';
 // @ts-ignore
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { omitBloomDepth, omitPostprocessDepth } from './postprocess-memory';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
@@ -2046,6 +2046,9 @@ export class StoreScene {
     // single-sample target, so the composer buffers only ever see full-screen
     // quads. Anti-aliasing here is SSAA (pixel-budget above) + FXAA.
     this.composer = new EffectComposer(this.renderer);
+    // Scene depth lives with the beauty source. Postprocessing only needs HDR colour.
+    omitPostprocessDepth(this.composer.renderTarget1);
+    omitPostprocessDepth(this.composer.renderTarget2);
 
     // AO: disabled on medium/low quality, or via explicit bb_ssao=0 override.
     const ssaoEnabled = localStorage.getItem('bb_ssao') !== '0' && effectiveQuality === 'high';
@@ -2089,7 +2092,12 @@ export class StoreScene {
       // the plain RenderPass takes over (EffectComposer skips disabled
       // passes), so NONE of the AO chain runs — same contract as the GTAO
       // enabled toggle.
-      const walkRenderPass = new RenderPass(this.scene, this.camera);
+      // Reuse N8AO's depth-owning beauty target while AO is gated off.
+      const walkRenderPass = new BeautyPass(this.scene, this.camera,
+        this.composer.renderTarget1, (n8aoPass as any).beautyRenderTarget);
+      // N8AO sets depthBuffer on the MRT textures; the attachment belongs to
+      // the render target. This fullscreen depth downsample needs no depth test.
+      omitPostprocessDepth((n8aoPass as any).depthDownsampleTarget);
       walkRenderPass.enabled = false;
       this.composer.addPass(n8aoPass);
       this.composer.addPass(walkRenderPass);
@@ -2341,6 +2349,7 @@ export class StoreScene {
         // troffers smeared a milky veil across the whole ceiling.
         2.0
       );
+      omitBloomDepth(bloomPass);
       this.composer.addPass(bloomPass);
       this.bloomPass = bloomPass;
     }
@@ -5932,6 +5941,7 @@ export class StoreScene {
     disposeFacadeEntry(this.scene);
     disposeRooftopHVAC(this.scene);
     this.scene.getObjectByName('serviceDoor')?.userData.dispose?.();
+    mirrors.disposeMirrorTargets(this);
     disposeSceneMeshes(this.scene);
 
     if (this.selectionArrowLabel) {

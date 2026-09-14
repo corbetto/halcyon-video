@@ -2586,22 +2586,13 @@ async function initializeStoreScene(preservePosterCache = false) {
     // batched and offscreen shelves culled without paging away departments.
     const plannedTitles = storeLibraries.reduce((sum, lib) => sum + lib.movies.length, 0) + storeGameMovies.length;
     logToConsole(`[System] Planning the store floor for ${plannedTitles} title(s)...`, 'system');
+    contextLossGaveUp = false;
     const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon.slice(0, 100), storeDiscovery.slice(0, 100), storeGameMovies, staffPicks, { libraries: storeLibraries, games: storeGameMovies });
+    // ready includes asynchronous stock construction. A context can die during
+    // that heavy startup work, so recovery must already be listening.
+    installContextLossRecovery(scene.renderer.domElement);
     try { await scene.ready; } catch (error) { scene.destroy(); throw error; }
     armQualityBackstop();
-    // A fresh attempt is underway — any earlier give-up no longer applies (it
-    // could only be reached again via a brand-new page load, which is a fresh
-    // JS environment anyway, or a rebuild the user triggered by hand).
-    contextLossGaveUp = false;
-    // Wire context-loss recovery the moment the canvas exists — long before
-    // the texture load below even starts, let alone finishes. See
-    // installContextLossRecovery for why this can't wait for
-    // texturesReadyPromise. The scene constructor above always builds a
-    // fresh canvas (three-scene.ts appends it in its own constructor), so
-    // this fires on every boot AND every rebuild.
-    const glCanvas = canvasContainer.querySelector('canvas');
-    if (glCanvas) installContextLossRecovery(glCanvas);
-
     let lastLoggedPct = -1;
     scene.onTextureLoadProgress = (loaded, total) => {
       if (total === 0) return;
@@ -2794,13 +2785,14 @@ async function initializeStoreScene(preservePosterCache = false) {
     (isPublicDemo ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
       document.getElementById('boot-overlay')?.classList.add('preparing-models');
       await waitForStartupModel(scene.entrance?.whenCounterModelReady());
-      if (contextLossGaveUp) {
+      if (contextLossGaveUp || scene.renderer.getContext().isContextLost()) {
         document.getElementById('boot-overlay')?.classList.remove('preparing-models');
-        // A boot-time context loss already exhausted its retries and put the
+        // A lost context cannot be a successful boot or clear the retry count.
+        // A boot-time context loss may already have exhausted its retries and put the
         // give-up message on screen (see installContextLossRecovery) — decode
         // finishing later doesn't change that the GPU context is still dead,
         // so don't swap that message for a "ready" reveal nothing can render.
-        logToConsole('[System] Textures finished decoding after the context-loss give-up — staying on the error message rather than revealing an unrenderable store.', 'system');
+        logToConsole('[System] Graphics context unavailable at startup completion — keeping recovery visible.', 'system');
         return;
       }
       storeScene = scene;

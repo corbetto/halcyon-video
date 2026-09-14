@@ -23,6 +23,7 @@
 // were captured for, and an env-mapped cube with no box projection at all is
 // just the chrome fallback below, which already exists.
 import * as THREE from 'three';
+import { MirrorRenderTarget } from './mirror-render-target';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { perfTrace } from './perf-trace';
 import { SP_MIRROR, CT_MIRROR, MIRROR_REFRESH_HZ } from './scene-shared';
@@ -32,6 +33,12 @@ import type { StoreScene } from './three-scene';
 // faces the room, so an unguarded reflector renders inside another reflector's
 // render, cascading into hundreds of nested scene draws.
 let reflectorRendering = false;
+const mirrorTargets = new WeakMap<StoreScene, MirrorRenderTarget>();
+
+export function disposeMirrorTargets(scene: StoreScene): void {
+  mirrorTargets.get(scene)?.dispose();
+  mirrorTargets.delete(scene);
+}
 
 // Reflections redrawn per admitted frame. A second one does not amortise — it
 // costs ~5ms of its own and drops p50 below 60fps.
@@ -245,7 +252,7 @@ export function renderMirrorsAhead(scene: StoreScene) {
       }
       perfTrace.count(CT_MIRROR);
       perfTrace.begin(SP_MIRROR);
-      try { m.original(scene.renderer, scene.scene, scene.camera); }
+      try { mirrorTargets.get(scene)!.render(scene.renderer, m.r.getRenderTarget(), m.original, scene.scene, scene.camera); }
       finally {
         perfTrace.end(SP_MIRROR);
         for (const s of savedMats) s.o.material = s.m;
@@ -291,12 +298,18 @@ export function renderMirrorsAhead(scene: StoreScene) {
  * the refresh budget gets spent redrawing them.
  */
 export function installMirrorThrottle(scene: StoreScene) {
+  disposeMirrorTargets(scene);
+  const targets = new MirrorRenderTarget();
+  mirrorTargets.set(scene, targets);
   scene.mirrors.length = 0;
   scene.mirrorCursor = 0;
   scene.scene.traverse((obj) => {
     if (obj instanceof Reflector) {
+      const original = obj.onBeforeRender.bind(obj);
+      const target = obj.getRenderTarget();
+      targets.prepare(target);
       scene.mirrors.push({
-        r: obj, dirty: true, rendered: false, original: obj.onBeforeRender.bind(obj),
+        r: obj, dirty: true, rendered: false, original,
       });
       obj.onBeforeRender = () => {};  // see renderMirrorsAhead()
     }
