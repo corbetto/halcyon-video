@@ -2,7 +2,7 @@
 // uses direct camera manipulation; other touch installs retain arrow swipes.
 import type { InputCallbacks } from './input';
 import type { StoreScene } from './three-scene';
-import { beginMobileDrag, mobileStoreActive } from './mobile-store';
+import { beginMobileDrag, mobileStoreActive, markMobileDragged } from './mobile-store';
 
 /**
  * A finger with no hover is the only signal this acts on. Unlike the
@@ -48,8 +48,12 @@ export function touchMovieHUDText(
   collectionGap: boolean,
   comingSoon: boolean,
   isRequestedDiscovery: boolean,
+  streaming?: boolean,
+  streamingChoice?: boolean,
 ): string | null {
   if (!isInspecting) return mobileStoreActive() ? 'DRAG TO BROWSE  •  TAP A MOVIE' : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
+  if (streamingChoice) return 'TAP A SERVICE  •  TAP OK TO CONFIRM';
+  if (streaming) return 'SWIPE TO FLIP  •  TAP OK TO CHECK OUT';
   if (game) return 'SWIPE TO FLIP  •  TAP OK TO RENT & PLAY';
   if (discovery) return isRequestedDiscovery ? 'ALREADY REQUESTED' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (collectionGap) return isRequestedDiscovery ? 'ON ORDER — COMING SOON' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
@@ -67,7 +71,7 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
     case 'library-select':
       return 'TAP TO BROWSE THIS SECTION';
     case 'overview':
-      return mobileStoreActive() ? 'DRAG TO LOOK  •  TAP A SHELF' : 'SWIPE TO BROWSE  •  TAP OK TO GO';
+      return mobileStoreActive() ? 'SWIPE TO MOVE  •  TAP CURSOR TO ENTER' : 'SWIPE TO BROWSE  •  TAP OK TO GO';
     case 'genre-select':
       return '';
     case 'browse':
@@ -221,7 +225,14 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
     let drag: ReturnType<typeof beginMobileDrag> = null;
     let moved = false;
     stage.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) { tracking = false; drag?.end(); drag = null; return; }
+      if (e.touches.length !== 1) {
+        tracking = false;
+        const s = getScene?.();
+        if (s) markMobileDragged(s);
+        drag?.end();
+        drag = null;
+        return;
+      }
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true; moved = false;
@@ -229,7 +240,18 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
       drag = scene ? beginMobileDrag(scene, startX, startY) : null;
     }, { passive: true });
     stage.addEventListener('touchmove', (e) => {
-      if (!tracking || !drag || e.touches.length !== 1) return;
+      if (!tracking || !drag || e.touches.length !== 1) {
+        if (e.touches.length > 1) {
+          const s = getScene?.();
+          if (s) markMobileDragged(s);
+          if (drag) {
+            drag.end();
+            drag = null;
+          }
+          tracking = false;
+        }
+        return;
+      }
       const t = e.touches[0];
       if (Math.hypot(t.clientX - startX, t.clientY - startY) > 8) moved = true;
       if (moved) { poke(); drag.move(t.clientX, t.clientY); }
@@ -253,6 +275,12 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
         if (dy < 0) callbacks.onUp(); else callbacks.onDown();
       }
     }, { passive: true });
-    stage.addEventListener('touchcancel', () => { tracking = false; drag?.end(); drag = null; }, { passive: true });
+    stage.addEventListener('touchcancel', () => {
+      tracking = false;
+      const s = getScene?.();
+      if (s) markMobileDragged(s);
+      drag?.end();
+      drag = null;
+    }, { passive: true });
   }
 }

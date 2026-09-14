@@ -31,6 +31,7 @@ import {
   subNavRefresh, closeSubNav, debugSubNav, forgetSubNav,
 } from './store-subnav';
 import { talkToClerkAtCounter } from './store-checkout';
+import { stepStreamingServiceChoice } from './streaming-checkout';
 import type { StoreScene } from './three-scene';
 
 /**
@@ -147,8 +148,8 @@ function exitGenreEndcapToShelf(scene: StoreScene, fixture: SceneFixture, exitTo
     } else {
       // A row's mouth cap: Left continues to the previous ROW's back face,
       // whose reading end is that row's first unit.
-      scene.selectedUnitIdx = rowStartUnit(libUnits, prevUnit.rowGroupId).unitIdxInLibrary;
-      scene.selectedSide = 'back';
+      scene.selectedUnitIdx = (prevUnit.singleSided ? prevUnit : rowStartUnit(libUnits, prevUnit.rowGroupId)).unitIdxInLibrary;
+      scene.selectedSide = prevUnit.singleSided ? 'front' : 'back';
     }
     scene.updateColsCount();
     scene.selectedCol = scene.colsCount - 1;
@@ -306,6 +307,21 @@ export function moveLeftInternal(scene: StoreScene) {
             exitGenreEndcapToShelf(scene, fixture!, 'prevBack');
             return;
           }
+          // A corner club has only two adjacent public faces; its outer ends
+          // stop at the room walls instead of browsing invisible rear stock.
+          if (fixture?.placement.kind === 'clubhouse') {
+            if (scene.selectedSide === 'front') return;
+            scene.selectedSide = 'front'; scene.selectedCol = scene.colsCount - 1;
+            scene.updateCameraTarget(); return;
+          }
+          if (fixture?.placement.kind === 'pv-drape-table') {
+            const toSide = scene.selectedSide === 'front' ? 'back' : 'front';
+            if (fixture.getSlots().some(slot => slot.side === toSide)) {
+              scene.selectedSide = toSide; scene.selectedCol = scene.colsCount - 1;
+              scene.updateCameraTarget();
+            }
+            return;
+          }
           // Step around the corner to the face on the viewer's left; you
           // arrive at that face's screen-RIGHT end, which is its LAST col.
           if (scene.selectedSide === 'front') scene.selectedSide = 'left';
@@ -370,10 +386,10 @@ export function moveLeftInternal(scene: StoreScene) {
           // reading end is the line's FIRST unit, at its last (screen-right)
           // column.
           if (prevUnit) {
-            const prevLineFirstUnit = rowStartUnit(libUnits, prevUnit.rowGroupId);
+            const prevLineFirstUnit = prevUnit.singleSided ? prevUnit : rowStartUnit(libUnits, prevUnit.rowGroupId);
 
             scene.selectedUnitIdx = prevLineFirstUnit.unitIdxInLibrary;
-            scene.selectedSide = 'back';
+            scene.selectedSide = prevLineFirstUnit.singleSided ? 'front' : 'back';
             scene.updateColsCount();
             scene.selectedCol = scene.colsCount - 1;
             scene.cameraWindowMinCol = Math.max(0, scene.colsCount - BROWSE_WINDOW_SIZE);
@@ -462,6 +478,19 @@ export function moveRightInternal(scene: StoreScene) {
           const fixture = scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId);
           if (isEndcapKind(fixture?.placement.kind)) {
             exitGenreEndcapToShelf(scene, fixture!, 'lineFront');
+            return;
+          }
+          if (fixture?.placement.kind === 'clubhouse') {
+            if (scene.selectedSide === 'right') return;
+            scene.selectedSide = 'right'; scene.selectedCol = 0;
+            scene.updateCameraTarget(); return;
+          }
+          if (fixture?.placement.kind === 'pv-drape-table') {
+            const toSide = scene.selectedSide === 'front' ? 'back' : 'front';
+            if (fixture.getSlots().some(slot => slot.side === toSide)) {
+              scene.selectedSide = toSide; scene.selectedCol = 0;
+              scene.updateCameraTarget();
+            }
             return;
           }
           // Step around the corner to the face on the viewer's right; you
@@ -661,6 +690,7 @@ export function moveUp(scene: StoreScene) {
   } else if (scene.mode === 'inspect') {
     if (scene.moveSeriesSeasonSelection(-1)) return;
     if (scene.moveSeriesEpisodeSelection(-1)) return;
+    if (stepStreamingServiceChoice(scene, -1)) return;
     if (scene.isFlipped) {
       const movie = scene.getSelectedMovie();
       const regions = movie ? (backCoverRegions.get(movie.id) || []) : [];
@@ -875,6 +905,7 @@ export function moveDown(scene: StoreScene) {
   } else if (scene.mode === 'inspect') {
     if (scene.moveSeriesSeasonSelection(1)) return;
     if (scene.moveSeriesEpisodeSelection(1)) return;
+    if (stepStreamingServiceChoice(scene, 1)) return;
     if (scene.isFlipped) {
       const movie = scene.getSelectedMovie();
       const regions = movie ? (backCoverRegions.get(movie.id) || []) : [];

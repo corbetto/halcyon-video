@@ -40,6 +40,7 @@ export interface CounterFrame {
 }
 
 export interface CounterBuildResult {
+  modelReady: Promise<THREE.Group | null>;
   // The counter's store-facing point Z (frames the checkout camera move).
   // Kept for the front-facing shapes, whose "apex" really is a Z; a side-wall
   // desk faces across the room, so anything positional should read `frame`
@@ -189,17 +190,17 @@ export function buildCheckoutCounter(
   counterLamRough.repeat.set(4, 4);
   const counterWhite = new THREE.MeshStandardMaterial({
     color: new THREE.Color(theme.palette.counterBody), map: counterLamTex,
-    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.25, 0.25),
-    // The map averages 0.65: 0.69 keeps the former 0.45 satin finish while
+    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
+    // The map averages 0.65: 0.62 gives a satin finish near 0.40 while
     // allowing subtle wipe/grain variation in reflected highlights.
-    roughnessMap: counterLamRough, roughness: 0.69, metalness: 0.02,
+    roughnessMap: counterLamRough, roughness: 0.62, metalness: 0,
   });
   const counterTopBlue = new THREE.MeshStandardMaterial({
     color: new THREE.Color(theme.palette.counterTop), map: counterLamTex,
-    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.25, 0.25),
-    roughness: 0.28, metalness: 0.03,
+    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
+    roughnessMap: counterLamRough, roughness: 0.55, metalness: 0,
   });
-  const counterStripe = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.palette.secondary), roughness: 0.32, metalness: 0.05 });
+  const counterStripe = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.palette.secondary), map: counterLamTex, normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.2, 0.2), roughnessMap: counterLamRough, roughness: 0.6, metalness: 0 });
   const innerTopMat = counterTopMaterial(spec.counterTop, counterWhite);
 
   const bandH = 3.4;
@@ -405,7 +406,6 @@ export function buildCheckoutCounter(
     extrudeSegment(A_out, B_out, B_in, A_in, (bandH + 0.14) - (STRIPE_Y + GROOVE_HALF), STRIPE_Y + GROOVE_HALF, counterTopBlue);
   };
 
-  const GAP_TRIM = 2.2;
   // Band segment list as [edge index, trimA, trimB] — the edge index rides
   // along because one edge may contribute several built pieces (the usquare
   // left side below) and the safety stripe needs each piece's true normal.
@@ -437,11 +437,9 @@ export function buildCheckoutCounter(
         [2, 0, 0.01],                // right side
       ]
     : [
-        [0, 0, GAP_TRIM],
-        [1, GAP_TRIM, 0],
-        [2, 0, 0],
-        [3, 0, 0],
-        [4, 0, 0],
+        [0, 0, P_out[0].distanceTo(P_out[1]) - 1.0],
+        [0, 4.6, 0],
+        [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
       ];
   const bandSegs = bandSegDefs.map(([edge, trimA, trimB]) =>
     ({ edge, trimA, trimB, e: segEnds(edge, trimA, trimB) }));
@@ -538,7 +536,9 @@ export function buildCheckoutCounter(
   const pFront1 = deskFront
     ? deskFront.clone()
     : straightFront ? new THREE.Vector2(cx, innerFrontZ) : P_in[2].clone();
-  const pFront0X = cx - islandHalf;
+  // Extend the left worktop toward the staff entry for the receipt printer.
+  // The same endpoints drive visible fallback geometry and clerk obstacles.
+  const pFront0X = cx - islandHalf - (desk ? 0 : usquare ? 0.25 : 0.6);
   const pFront0Y = straightFront
     ? innerFrontZ
     : P_in[1].y + (pFront0X - P_in[1].x) * (P_in[2].y - P_in[1].y) / (P_in[2].x - P_in[1].x);
@@ -672,14 +672,14 @@ export function buildCheckoutCounter(
     facingYaw: deskPlan ? deskPlan.facingYaw : Math.PI,
   };
 
-  installCounterModel(ctx, parent, group, spec.counterShape, rounded,
+  const modelReady = installCounterModel(ctx, parent, group, spec.counterShape, rounded,
     deskFront
       ? { x: deskFront.x, z: deskFront.y, yaw: Math.atan2(-windU.y, windU.x) }
       : { x: cx, z: backZ, yaw: 0 },
     { body: counterWhite, top: counterTopBlue, inlay: counterStripe, worktop: innerTopMat });
 
   return {
-    deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,
+    modelReady, deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,
     frame, spineAt, standingAt,
     navFootprints, registerStanding, getTerminalStanding,
   };

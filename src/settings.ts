@@ -54,8 +54,9 @@ import { ALL_DEFAULT_STREAMING_SERVICES_CSV } from './streaming-catalog';
 import { getSeerrValidationStatus } from './seerr-service-status';
 import type { StoreScene } from './three-scene';
 import type { JellyfinLibrary } from './jellyfin';
+import { getAmbientTvStatus, formatAmbientTvStatus } from './ambient-tv-status';
 
-export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret';
+export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret' | 'readout';
 export type ApplyMode = 'live' | 'rebuild-scene' | 'reload';
 export type SettingGroup = 'Connection' | 'Store Look' | 'Store Brand' | 'Playback' | 'Performance' | 'Video Games';
 
@@ -228,6 +229,10 @@ export function currentValueLabel(key: string): string {
   if (def.kind === 'cycle') {
     const cur = String(getSetting(key));
     return decorate(def.values?.find((v) => v.id === cur)?.label ?? cur);
+  }
+  if (def.kind === 'readout') {
+    const val = getSetting<string>(key);
+    return decorate(val || '');
   }
   const val = getSetting<string>(key);
   if (def.kind === 'secret') return decorate(val ? '••••••••' : '(not set)');
@@ -443,6 +448,14 @@ export function registerCoreSettings(): void {
     },
   });
 
+  registerSetting({
+    key: 'bb_above_r_room', label: 'NC-17 / X back room', kind: 'toggle',
+    group: 'Store Look', default: false, applyMode: 'rebuild-scene',
+    visibleWhen: () => localStorage.getItem(STORE_FORMAT_KEY) === 'mom-and-pop'
+      || localStorage.getItem('bb_theme') === 'mom-and-pop',
+    hint: 'Separate explicitly rated NC-17 or X movies. Empty rooms stay hidden.',
+  });
+
   // Store Brand -------------------------------------------------------------
   // Brand pack selection lives with the logo editor and its preview.
   registerSetting({
@@ -469,6 +482,13 @@ export function registerCoreSettings(): void {
   // represented studios instead (topStudiosInLibrary); blank keeps the old
   // curated-list behavior, which is still the right default for a library
   // with no saved preference.
+  registerSetting({
+    key: 'bb_browse_camera', label: 'Shelf Camera', kind: 'cycle', group: 'Store Look',
+    values: [{ id: 'steady', label: 'Steady' }, { id: 'floaty', label: 'Walking Glide' }],
+    default: 'steady', applyMode: 'rebuild-scene',
+    hint: 'Gently angle along the aisle in your direction of travel. Shelf height stays the same.',
+  });
+
   registerSetting({
     key: 'bb_studio_picks',
     label: 'Featured Studios',
@@ -578,6 +598,13 @@ export function registerCoreSettings(): void {
   });
 
   registerSetting({
+    key: 'bb_ceiling_structure', label: 'Ceiling Structure', kind: 'cycle', group: 'Store Look',
+    values: [{id:'tile',label:'Acoustic tile'}, {id:'exposed',label:'Exposed joists & pendants'}],
+    default: 'tile', applyMode: 'rebuild-scene', subpage: 'Building & Storefront',
+    hint: 'Industrial pendants in corporate stores at standard or high ceiling height.',
+  });
+
+  registerSetting({
     key: 'bb_ceiling',
     label: 'Ceiling Height',
     kind: 'cycle',
@@ -589,23 +616,6 @@ export function registerCoreSettings(): void {
     default: 'standard',
     applyMode: 'rebuild-scene',
     hint: 'Standard drop ceiling or a raised high-ceiling shell.',
-    subpage: 'Building & Storefront',
-  });
-
-  registerSetting({
-    key: 'bb_corner',
-    label: 'Corner Step',
-    kind: 'cycle',
-    group: 'Store Look',
-    values: [
-      { id: 'standard', label: 'Standard' },
-      { id: 'wide', label: 'Wide' },
-      { id: 'shallow', label: 'Shallow' },
-      { id: 'none', label: 'None' },
-    ],
-    default: 'standard',
-    applyMode: 'rebuild-scene',
-    hint: 'Stepped back-right corner for New Releases. None = flat.',
     subpage: 'Building & Storefront',
   });
 
@@ -706,10 +716,26 @@ export function registerCoreSettings(): void {
       { id: 'gabled-brick', label: 'Gabled Brick' },
       { id: 'flat-parapet', label: 'Flat Parapet' },
       { id: 'arcaded-brick', label: 'Arcaded Brick' },
+      { id: 'cone-canopy', label: 'Slate Cone Canopy' },
     ],
     default: 'gabled-brick',
     applyMode: 'rebuild-scene',
     hint: 'The large store’s exterior architecture, independent of its era and brand.',
+  });
+
+  registerSetting({
+    key: 'bb_cone_canopy_finish',
+    label: 'Cone canopy finish',
+    kind: 'cycle',
+    group: 'Store Look',
+    subpage: 'Building & Storefront',
+    values: [
+      { id: 'brand-accent', label: 'Brand Accent' },
+      { id: 'full-slate', label: 'Full Slate' },
+    ],
+    default: 'brand-accent',
+    applyMode: 'rebuild-scene',
+    hint: 'Center canopy and pillars finish for the Slate Cone Canopy facade: brand accent or full slate.',
   });
 
   registerSetting({
@@ -831,6 +857,51 @@ export function registerCoreSettings(): void {
     default: false,
     applyMode: 'live',
     hint: 'Start every movie with subtitles showing.',
+  });
+
+  // Overhead TVs (issue #307) ---------------------------------------------------
+  // Live CRT stream status & diagnostics, plus fallback configuration.
+  registerSetting({
+    key: 'bb_tv_status',
+    label: 'Stream Status',
+    kind: 'readout',
+    group: 'Playback',
+    subpage: 'Overhead TVs',
+    default: '',
+    applyMode: 'live',
+    valueLabel: () => formatAmbientTvStatus(),
+    hint: () => {
+      const status = getAmbientTvStatus();
+      if (status.source === 'stream') {
+        return status.title
+          ? `Active stream: "${status.title}" from media server library.`
+          : 'Active stream from media server library.';
+      }
+      if (status.source === 'loop') {
+        return status.lastFailureReason
+          ? `Fallback active: server stream failed (${status.lastFailureReason}).`
+          : 'Playing bundled promo loop (Big Buck Bunny).';
+      }
+      return status.lastFailureReason
+        ? `Overhead TVs off: ${status.lastFailureReason}.`
+        : 'Overhead TVs are off.';
+    },
+  });
+
+  registerSetting({
+    key: 'bb_tv_fallback',
+    label: 'Fallback Mode',
+    kind: 'cycle',
+    group: 'Playback',
+    subpage: 'Overhead TVs',
+    values: [
+      { id: 'loop', label: 'Demo Loop (Big Buck Bunny)' },
+      { id: 'dark', label: 'Dark Tubes (Turn Off)' },
+      { id: 'testcard', label: 'Test Card (SMPTE)' },
+    ],
+    default: 'loop',
+    applyMode: 'rebuild-scene',
+    hint: 'When server stream fails: play demo, keep tubes dark, or show test card.',
   });
 
   // Tone mapping (research-driven, see three-scene initThree): AgX is the
@@ -1545,11 +1616,11 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     if (restore.builtin !== previous.builtin) hooks.onNeedsReload?.();
   });
 
-  kit.color('body', 'Background colour', 'Left or Right chooses a named ink. Click the swatch for a custom colour.',
+  kit.color('body', 'Background colour', 'OK or click opens the 100-shade palette grid.',
     () => working.bodyColor, (v) => { working.bodyColor = v; });
-  kit.color('text', 'Lettering colour', 'Left or Right chooses a named ink.',
+  kit.color('text', 'Lettering colour', 'OK or click opens the 100-shade palette grid.',
     () => working.textColor, (v) => { working.textColor = v; });
-  kit.color('border', 'Outline colour', 'Left or Right chooses a named ink for the outline and sign sides.',
+  kit.color('border', 'Outline colour', 'OK or click opens the 100-shade palette grid for outline and sign sides.',
     () => working.borderColor, (v) => { working.borderColor = v; });
   kit.toggle('outline', 'Inset outline', 'A fine border inside the emblem background.',
     () => working.innerBorder, (v) => { working.innerBorder = v; });

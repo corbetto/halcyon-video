@@ -16,11 +16,9 @@ import { selfLit } from '../material-lighting';
 // period detail people remember, and the fittings are what this is.
 //
 // ── The curtain ─────────────────────────────────────────────────────────────
-// One InstancedMesh. A beaded curtain genuinely IS a few thousand beads, so
-// spheres are the honest primitive here rather than a lazy one — but a few
-// thousand separate meshes would be a few thousand draw calls, and this store
-// idles for days. Every bead in the doorway is one instance of a single
-// low-poly sphere: one geometry, one material, one draw call, no per-frame work.
+// Blender-authored drilled bead variants, cords and eyelets use five instance
+// batches plus one support rail. The original spheres remain the loading/error
+// fallback. Neither version adds per-frame work or blocks the passage.
 //
 // The curtain carries NO collider. You walk through beads; that is what they are
 // for. The partitions do collide, so the only way in is the doorway.
@@ -31,6 +29,7 @@ import { Footprint } from '../layout-validator';
 import { createSignTextTexture, createHandLetteredSignTexture } from '../canvas-textures';
 import { formatShelfWood } from '../format-surfaces';
 import { themeTrimDarkHex } from '../themes';
+import { installAlcoveCurtain } from './alcove-curtain-model';
 
 
 /** Default room size, feet. Deep enough to stand in, small enough to be a corner. */
@@ -58,7 +57,8 @@ export class CurtainedAlcove implements StoreFixture {
   private ctx: FixtureContext;
   private group: THREE.Group | null = null;
   private disposables: Array<{ dispose(): void }> = [];
-  private footprint: Footprint | null = null;
+  private wallFootprints: Footprint[] = [];
+  private removeCurtainModel: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -119,6 +119,10 @@ export class CurtainedAlcove implements StoreFixture {
       mesh.receiveShadow = true;
       group.add(mesh);
       this.ctx.addCollider(mesh);
+      if (y - h / 2 < .1) this.wallFootprints.push({
+        label: `structure:curtained-alcove-wall-${this.wallFootprints.length}`,
+        kind: 'structure', cx: x, cz: z, w, d, yaw: 0,
+      });
       return mesh;
     };
 
@@ -132,8 +136,8 @@ export class CurtainedAlcove implements StoreFixture {
     const doorCenterZ = frontZ - 0.35 - DOOR_W / 2; // opening biased toward the sales floor
     const pierFrontD = Math.max(0.01, frontZ - (doorCenterZ + DOOR_W / 2));
     const pierBackD = Math.max(0.01, (doorCenterZ - DOOR_W / 2) - backZ);
-    if (pierFrontD > 0.02) {
-      slab(WALL_T, ceilingY, pierFrontD, innerX, ceilingY / 2, frontZ - pierFrontD / 2);
+    if (pierFrontD > WALL_T / 2 + 0.02) {
+      slab(WALL_T, ceilingY, pierFrontD - WALL_T / 2, innerX, ceilingY / 2, frontZ - (pierFrontD + WALL_T / 2) / 2);
     }
     if (pierBackD > 0.02) {
       slab(WALL_T, ceilingY, pierBackD, innerX, ceilingY / 2, backZ + pierBackD / 2);
@@ -144,7 +148,7 @@ export class CurtainedAlcove implements StoreFixture {
       slab(WALL_T, overH, DOOR_W, innerX, DOOR_H + overH / 2, doorCenterZ);
     }
 
-    // 3. The BEADED CURTAIN in the opening — one InstancedMesh (see header).
+    // 3. The BEADED CURTAIN in the opening, with an instanced fallback.
     this.buildBeadCurtain(group, innerX, side, doorCenterZ);
 
     // 4. Header board over the doorway, facing the sales floor, and the age
@@ -172,16 +176,8 @@ export class CurtainedAlcove implements StoreFixture {
     this.ctx.scene.add(group);
     this.ctx.requestShadowRefresh();
 
-    // The footprint is the WHOLE room, so the floor planner and the clerk's nav
-    // grid both treat it as solid building rather than as walkable floor. The
-    // doorway is deliberately not carved out of it: nothing but the player goes
-    // in there, and a 3 ft slot in a 5 ft rect rasterizes shut on the nav grid's
-    // half-foot cells anyway (the same trap the counter's walk-through gap hit).
-    this.footprint = {
-      label: 'structure:curtained-alcove',
-      kind: 'structure',
-      cx, cz, w: roomW, d: roomD, yaw: 0,
-    };
+    // Only the partitions are solid; the stocked interior and doorway are walkable.
+
   }
 
   /**
@@ -236,6 +232,8 @@ export class CurtainedAlcove implements StoreFixture {
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     group.add(mesh);
+    this.disposables.push(mesh);
+    this.removeCurtainModel = installAlcoveCurtain(this.ctx, group, mesh, planeX, doorCenterZ);
   }
 
   /** Header board over the doorway plus the age placard beside it. */
@@ -309,10 +307,14 @@ export class CurtainedAlcove implements StoreFixture {
   update(_timeMs: number): void {}
 
   getFootprint(): Footprint | null {
-    return this.footprint;
+    return null;
   }
 
+  getFootprints(): Footprint[] { return this.wallFootprints; }
+
   dispose(): void {
+    this.removeCurtainModel?.();
+    this.removeCurtainModel = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;

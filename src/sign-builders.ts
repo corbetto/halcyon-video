@@ -335,10 +335,10 @@ export function splitTrapezoidGroups(geo: THREE.BufferGeometry) {
 // flat "back" panel that faces into the shelving run, plus the thin perimeter
 // return edges). Built once and shared — a canvas re-draw per end cap would be
 // wasteful since the pattern never varies. The height axis of the end-cap's
-// UVs is unnormalized (raw feet), so `repeat` maps grooves to a real 4"
+// UVs is unnormalized (raw feet), so `repeat` maps grooves to a real 3"
 // spacing rather than the texture's fixed pixel size.
 let cachedSlatwallEndCapTexture: THREE.CanvasTexture | null = null;
-const SLATWALL_GROOVE_SPACING_FT = 4 / 12; // 4 inches
+const SLATWALL_GROOVE_SPACING_FT = 3 / 12; // matches the authored slat section
 function getSlatwallEndCapTexture(): THREE.CanvasTexture {
   if (!cachedSlatwallEndCapTexture) {
     const canvas = document.createElement('canvas');

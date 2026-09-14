@@ -1,3 +1,8 @@
+import { buildWalkOffMats } from './walk-off-mats';
+import { installCounterOfficeKit } from '../fixtures/counter-office-kit';
+import { installPriceLabelGun } from '../fixtures/price-label-gun';
+import { counterOfficeKitAnchor, priceLabelGunAnchor } from '../store-fixtures-config';
+import { finishEquipmentSurfaces } from '../fixtures/equipment-surfaces';
 import { disposeDetachedModel } from '../model-resources';
 import { selfLit } from '../material-lighting';
 // Front entrance vestibule + walk-in checkout desk, modelled on the classic
@@ -40,17 +45,18 @@ import { selfLit } from '../material-lighting';
 //    counter (white body, blue top, yellow pinstripe) that faces the store.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { createGlassSurfaceNormalMap, createWalkOffMatTexture, createHvacVentTexture, useCheapMaterials } from '../canvas-textures';
+import { createGlassSurfaceNormalMap, createHvacVentTexture, useCheapMaterials } from '../canvas-textures';
 import { getTubeMaskCanvas } from '../crt-tube';
 import { makeCrtGlassMaterial, addGlassReflectionPane } from '../glass-reflection';
 import { assetUrl } from '../asset-url';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { getActiveTheme, themeKneeGoldHex } from '../themes';
-import { CEILING_Y, mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
+import { mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
 import { facadeEntryGlazing, facadeStyle } from '../storefront-architecture';
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
+import { counterMount, placeOnCounterMount } from './counter-mounts';
 import { buildCheckoutCounter, ClerkStanding, CounterFrame } from './counter';
 import { buildCounterTv } from './counter-tv';
 import { Footprint } from '../layout-validator';
@@ -58,10 +64,10 @@ import { CheckoutBag } from '../checkout-bag';
 import { ReturnSlot } from './return-slot';
 import { activeStoreFormat } from '../store-format';
 import type { Movie } from '../jellyfin';
-import { CRT_BLACK, CRT_GOLD, CRT_INK, CRT_TEXT } from '../crt-theme';
+import { counterCrtPalette } from '../crt-theme';
 import { brandString } from '../brand-pack';
 import { textureArrayManager } from '../poster-textures';
-import { fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
+import { counterMonitorAsset, fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
 
 export class EntranceCheckout implements StoreFixture {
   // The counter's store-facing point Z (used by StoreScene to frame the checkout camera move).
@@ -79,6 +85,27 @@ export class EntranceCheckout implements StoreFixture {
   // 'counter-top' MountSurface (src/mount-surfaces.ts) off actual build()
   // output rather than a second hardcoded copy of these numbers. Populated by
   // build(); null until then.
+  private counterModelReady: Promise<THREE.Group | null> = Promise.resolve(null);
+  whenCounterModelReady() { return this.counterModelReady; }
+
+  /** Re-seat complete terminal groups, including their live screen and dock. */
+  seatCounterTerminals(model: THREE.Group): void {
+    for (let i = 0; i < this.terminalStations.length; i++) {
+      const mount = counterMount(model, `mount_terminal_${i}`);
+      const station = this.ctx.scene.getObjectByName(`counter-terminal-station-${i}`);
+      if (!mount || !station) continue;
+      const housing = this.ctx.scene.getObjectByName(`counter-cash-housing-${i}`);
+      placeOnCounterMount(station, mount, Number(housing?.userData.supportHeight ?? 0));
+      station.getWorldPosition(this.terminalStations[i]);
+      if (i === 0) {
+        this.searchStationOrigin.copy(this.terminalStations[i]);
+        this.searchStationRotY = mount.rotY;
+      }
+    }
+    this.ctx.requestShadowRefresh();
+    this.ctx.requestRender();
+  }
+
   private counterTopInfo: {
     cx: number;
     topY: number;
@@ -268,7 +295,7 @@ export class EntranceCheckout implements StoreFixture {
     // is closed by a solid, wall-colored capping soffit instead — see
     // "Solid soffit cap" below.
     const soffitCapY = vestibuleCeilingY(this.ctx.ceilingY);
-    const wallH = Math.min(soffitCapY, vestibuleCeilingY(CEILING_Y));
+    const wallH = Math.min(hasChamber ? soffitCapY - 1.5 : soffitCapY, WINDOW_HEAD_Y);
     const wallT = 0.12;          // glazing thickness
 
     // ----- Materials -----
@@ -312,7 +339,7 @@ export class EntranceCheckout implements StoreFixture {
     // delineate the narrow sidelights beside the door pair.
     const buildGlazedWall = (
       orient: 'X' | 'Z', fixed: number, s0: number, s1: number, gaps: number[],
-      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number },
+      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number },
     ) => {
       // place a box whose long axis lies along the wall's run direction
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
@@ -346,7 +373,7 @@ export class EntranceCheckout implements StoreFixture {
         // Only door jambs reach the floor. Fixed sidelight posts sit on the
         // masonry sill instead of cutting a dark stripe through its face.
         const isDoorJamb = intervals.some(([a, b]) => Math.abs(v - a) < 0.01 || Math.abs(v - b) < 0.01);
-        const bottom = isDoorJamb ? 0 : sillY;
+        const bottom = isDoorJamb ? 0 : (orient === 'Z' && Math.abs(v - frontZ) < .01 ? opts?.frontSillY ?? sillY : sillY);
         const top = fullHeight ? wallH : doorH;
         along(v, frameT, (top + bottom) / 2, top - bottom, frameD, frameMat);
       });
@@ -374,6 +401,28 @@ export class EntranceCheckout implements StoreFixture {
     const sideDoorZ = backZ + doorW / 2 + 0.4; // side doors sit on the store-side (inner) half
     this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ, hasChamber };
     const doorMats = { frameMat, glassMat, chrome };
+    if (hasChamber && this.ctx.wallSurface) {
+      const surface = this.ctx.wallSurface;
+      const liner = (lo: number, hi: number, bottom: number, top: number) => {
+        if (hi <= lo || top <= bottom) return;
+        const geo = new THREE.BoxGeometry(hi - lo, top - bottom, .16);
+        mapWallSegmentUV(geo, hi - lo, top - bottom, bottom, surface.storeWidth, surface.roomHeight);
+        const mesh = new THREE.Mesh(geo, surface.material);
+        mesh.name = 'vestibule-interior-masonry'; mesh.position.set((lo + hi) / 2, (bottom + top) / 2, frontZ - .24);
+        mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+      };
+      const glazing = facadeEntryGlazing(doorW, facadeStyle());
+      liner(xL - .2, xR + .2, WINDOW_HEAD_Y, soffitCapY);
+      liner(xL - .2, cx - glazing.openingHalfWidth, 0, WINDOW_HEAD_Y);
+      liner(cx + glazing.openingHalfWidth, xR + .2, 0, WINDOW_HEAD_Y);
+      if (glazing.dividerWidth) {
+        liner(cx - glazing.dividerWidth / 2, cx + glazing.dividerWidth / 2, 0, WINDOW_HEAD_Y);
+        const doorOuter = glazing.doorCenterOffset + doorW / 2;
+        liner(cx - glazing.openingHalfWidth, cx - doorOuter, 0, 1.82);
+        liner(cx + doorOuter, cx + glazing.openingHalfWidth, 0, 1.82);
+      }
+    }
+
 
     if (hasChamber) {
       // Gabled stores have separate entry/exit doors and transoms around a
@@ -414,8 +463,8 @@ export class EntranceCheckout implements StoreFixture {
       buildGlazedWall('X', backZ, xL, xR, []);
 
       // ----- Side walls (glass), each with one door on the inner (store-side) half -----
-      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ]); // right wall -> into store
-      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ]); // left wall  -> exiters enter
+      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // right wall -> into store
+      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // left wall  -> exiters enter
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xR, sideDoorZ, doorH, false, true, 1.4));
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xL, sideDoorZ, doorH, false, true, 1.4));
 
@@ -445,6 +494,7 @@ export class EntranceCheckout implements StoreFixture {
         const capGeo = new THREE.BoxGeometry(boxW, capH, boxDepth);
         if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
         const cap = new THREE.Mesh(capGeo, capMat);
+        cap.name = 'vestibule-solid-cap';
         cap.position.set(cx, wallH + capH / 2, (frontZ + backZ) / 2);
         cap.castShadow = true;
         cap.receiveShadow = true;
@@ -495,21 +545,10 @@ export class EntranceCheckout implements StoreFixture {
       // +X, exit -X) — every real retail vestibule has them, and they break up
       // what was pristine carpet running straight to the door line.
       {
-        const { map: matTex, normalMap: matNorm } = createWalkOffMatTexture();
         const matW = (boxW / 2) - doorW * 0.55;
         const matD = boxDepth - 1.1;
-        matTex.repeat.set(matW / 1.5, matD / 1.5);
-        matNorm.repeat.copy(matTex.repeat);
-        const matMat = new THREE.MeshStandardMaterial({
-          map: matTex, normalMap: matNorm, normalScale: new THREE.Vector2(0.5, 0.5),
-          roughness: 0.95, metalness: 0.0,
-        });
-        [cx + boxW / 4, cx - boxW / 4].forEach((mx) => {
-          const mat = new THREE.Mesh(new THREE.BoxGeometry(matW, 0.025, matD), matMat);
-          mat.position.set(mx, 0.0125, (frontZ + backZ) / 2);
-          mat.receiveShadow = true;
-          group.add(mat);
-        });
+        buildWalkOffMats(this.ctx, group, matW, matD,
+          [cx + boxW / 4, cx - boxW / 4], (frontZ + backZ) / 2);
       }
     } else {
       // ----- Storefront door (GH #110): ONE door leaf set directly into the
@@ -547,19 +586,9 @@ export class EntranceCheckout implements StoreFixture {
 
       // A single walk-off mat at the door.
       {
-        const { map: matTex, normalMap: matNorm } = createWalkOffMatTexture();
-        const matW = doorW + 1.0;
         const matD = 2.2;
-        matTex.repeat.set(matW / 1.5, matD / 1.5);
-        matNorm.repeat.copy(matTex.repeat);
-        const matMat = new THREE.MeshStandardMaterial({
-          map: matTex, normalMap: matNorm, normalScale: new THREE.Vector2(0.5, 0.5),
-          roughness: 0.95, metalness: 0.0,
-        });
-        const mat = new THREE.Mesh(new THREE.BoxGeometry(matW, 0.025, matD), matMat);
-        mat.position.set(cx, 0.0125, frontZ - 0.1 - matD / 2);
-        mat.receiveShadow = true;
-        group.add(mat);
+        buildWalkOffMats(this.ctx, group, doorW + 1.0, matD,
+          [cx], frontZ - 0.1 - matD / 2);
       }
     }
 
@@ -575,6 +604,25 @@ export class EntranceCheckout implements StoreFixture {
     // the counterStyle/counterTop variants — the footprint below is identical
     // across styles so every anchor below is unaffected by which style is active.
     const counterResult = buildCheckoutCounter(this.ctx, group, cx, backZ, spec, this.ctx.storeWidth);
+    this.counterModelReady = counterResult.modelReady;
+    const officeAnchor = counterOfficeKitAnchor(spec.counterShape, cx, backZ);
+    if (officeAnchor && this.ctx.activeTheme.id !== 'bb-2010' && activeStoreFormat().counterDressing) {
+      installCounterOfficeKit(this.ctx, group, officeAnchor);
+    }
+    const labelGunAnchor = priceLabelGunAnchor(spec.counterShape, cx, backZ, this.ctx.activeTheme.id);
+    if (labelGunAnchor && activeStoreFormat().counterDressing) {
+      installPriceLabelGun(this.ctx, group, labelGunAnchor);
+    }
+    void this.counterModelReady.then(model => {
+      if (!model) return;
+      this.seatCounterTerminals(model);
+      const bag = counterMount(model, 'mount_bag');
+      if (bag && this.bag) {
+        this.bag.setRestPose(bag.x, bag.y, bag.z, bag.rotY);
+        this.bagBaseWorld?.set(bag.x, bag.y, bag.z);
+        this.bagRestYaw = bag.rotY;
+      }
+    });
     this.deskApexZ = counterResult.deskApexZ;
     const { getInnerCounterSpine, spineAt, standingAt, innerH, innerDepth } = counterResult;
     this.counterTopInfo = {
@@ -597,7 +645,7 @@ export class EntranceCheckout implements StoreFixture {
       // Same anchors the terminal props are built at, below.
       terminals: spec.counterShape === 'desk'
         ? [standingAt(1.3)]
-        : [standingAt(-4.0), standingAt(4.0)],
+        : [standingAt(spec.counterShape === 'usquare' ? -3.5 : -4), standingAt(spec.counterShape === 'usquare' ? 3.5 : 4)],
     };
 
     // Anchor offsets ALONG the inner island, in feet from its centre. The
@@ -843,7 +891,7 @@ export class EntranceCheckout implements StoreFixture {
   }
 
   // ===========================================================================
-  // Front-desk rental terminals: the authored CRT-monitor + keyboard models
+  // Front-desk rental terminals: CRT/LCD variants + the shared keyboard models
   // (tools/models/counter-terminal.py — molded parts with baked occlusion and
   // ABS grain, see docs/counter-terminal-model.md), finished beige per
   // material role like a late-80s register, each with a gold-on-black
@@ -897,7 +945,7 @@ export class EntranceCheckout implements StoreFixture {
       obj.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return;
         const m = child.material;
-        if (!Array.isArray(m) && m.name === 'CableRubber') return;
+        if (!Array.isArray(m) && m.name.endsWith('CableRubber')) return;
         out.expandByObject(child);
       });
       return out;
@@ -926,15 +974,15 @@ export class EntranceCheckout implements StoreFixture {
     // instead and keep the maps.
     type RoleTint = { color: number; roughness: number; emissive?: number };
     const MONITOR_TINTS: Record<string, RoleTint> = {
-      CabinetABS: { color: 0xd9cdb2, roughness: 0.62 },
-      BezelABS: { color: 0xcfc3a8, roughness: 0.58 },
+      CabinetABS: { color: 0xd9cdb2, roughness: 0.42 },
+      BezelABS: { color: 0xcfc3a8, roughness: 0.4 },
       TrimDark: { color: 0x2b2a2a, roughness: 0.6 },
       CableRubber: { color: 0x232323, roughness: 0.72 },
       PowerLed: { color: 0x2c6a3a, roughness: 0.4, emissive: 0x2dff5a },
     };
     const KEYBOARD_TINTS: Record<string, RoleTint> = {
-      KeyboardShell: { color: 0xc4b89e, roughness: 0.68 },
-      KeyCaps: { color: 0xd6cbb1, roughness: 0.55 },
+      KeyboardShell: { color: 0xc4b89e, roughness: 0.46 },
+      KeyCaps: { color: 0xd6cbb1, roughness: 0.42 },
       KeyCapsDark: { color: 0x9a917c, roughness: 0.62 },
       TrimDark: { color: 0x2b2a2a, roughness: 0.6 },
       CableRubber: { color: 0x232323, roughness: 0.72 },
@@ -952,13 +1000,15 @@ export class EntranceCheckout implements StoreFixture {
       const finish = (m: THREE.Material): THREE.Material => {
         const done = cache.get(m);
         if (done) return done;
+        if (m.name === 'LCDScreen') return crtFaceMat;
         const tint = tints[m.name];
-        let out = fallback;
+        // LCD finishes and their baked maps stay authored; CRT tints retain their contract.
+        let out = m.name.startsWith('LCD') ? m.clone() : fallback;
         if (tint && m instanceof THREE.MeshStandardMaterial) {
           const c = m.clone();
           c.color.setHex(tint.color);
           c.roughness = tint.roughness;
-          c.metalness = 0.03;
+          c.metalness = 0;
           if (tint.emissive !== undefined) {
             c.emissive.setHex(tint.emissive);
             c.emissiveIntensity = 1.4;
@@ -978,8 +1028,12 @@ export class EntranceCheckout implements StoreFixture {
       });
     };
 
-    const stationGroups = stations.map((st) => {
+    const terminalRoot = new THREE.Group();
+    terminalRoot.name = 'counter-terminal-hardware';
+    parent.add(terminalRoot);
+    const stationGroups = stations.map((st, index) => {
       const g = new THREE.Group();
+      g.name = `counter-terminal-station-${index}`;
       g.position.set(st.x, st.y, st.z);
       g.rotation.y = st.rotY;
       // Keep the whole terminal out of the GTAO G-buffer (feedback/004): the
@@ -991,7 +1045,7 @@ export class EntranceCheckout implements StoreFixture {
       // the counter/shelves BEHIND the hidden terminal is multiplied straight
       // across the bezel and the lit screen (see the GTAO wrapper).
       g.userData.aoBlendMask = true;
-      parent.add(g);
+      terminalRoot.add(g);
       return g;
     });
     // Station 0's world origin is known immediately (no GLTF round-trip
@@ -1003,165 +1057,190 @@ export class EntranceCheckout implements StoreFixture {
     }
 
     let retired = false;
-    tex.addEventListener('dispose', () => { retired = true; });
+    let screenTextureDisposed = false;
+    tex.addEventListener('dispose', () => { retired = true; screenTextureDisposed = true; });
     // Entrance.dispose removes its entire group before the store's scene-wide
     // disposal (same boundary counter-model.ts releases at). The loaded
     // terminals own their geometry, retinted materials and the baked maps
     // those materials carry; release them there too, once, for every station.
     const disposeTerminals = () => {
       parent.removeEventListener('removed', disposeTerminals);
-      for (const g of stationGroups) {
-        disposeDetachedModel(g);
-        g.removeFromParent();
+      retired = true;
+      // Dispose shared resources once, including templates with no loaded consumer.
+      const usedMaterials = new Set<THREE.Material>();
+      terminalRoot.traverse(o => {
+        if (o instanceof THREE.Mesh) {
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => usedMaterials.add(m));
+        }
+      });
+      disposeDetachedModel(terminalRoot);
+      for (const m of [screenMat, beige, beigeDark, crtFaceMat]) {
+        if (!usedMaterials.has(m)) m.dispose();
       }
+      if (!screenTextureDisposed) tex.dispose();
+      if (this.terminalTex === tex) this.terminalTex = null;
+      terminalRoot.removeFromParent();
     };
     parent.addEventListener('removed', disposeTerminals);
     const MON_H = 1.55;
-    loader.load(assetUrl('models/rental-terminal.glb'), (gltf) => {
-      if (retired) { disposeDetachedModel(gltf.scene); return; }
-      const monitorFinish = new Map<THREE.Material, THREE.Material>();
-      stationGroups.forEach((g, idx) => {
-        const monitor = gltf.scene.clone(true);
-        monitor.name = 'rental-terminal-model';
-        // Identify the model's screen primitives by their authored material
-        // roles BEFORE the finish pass: 'CrtGlass' is the pillow glass pane
-        // (frontmost — the real bezel opening), 'CrtTube' the recessed tube
-        // face behind it. 'mat16' / 'mat17' were the same two surfaces on the
-        // downloaded model this one replaced, kept so a swap back still works.
-        let glassMesh: THREE.Mesh | null = null;
-        const tubeMeshes: THREE.Mesh[] = [];
-        monitor.traverse((child) => {
-          if (child instanceof THREE.Mesh && !Array.isArray(child.material)) {
-            const matName = (child.material as THREE.Material).name;
-            if (matName === 'CrtGlass' || matName === 'mat16') glassMesh = child;
-            else if (matName === 'CrtTube' || matName === 'mat17') tubeMeshes.push(child);
+    const monitorAssets = stationGroups.map((_, i) => counterMonitorAsset(getActiveTheme().id, i, stations.length));
+    for (const modelPath of new Set(monitorAssets)) {
+      loader.load(assetUrl(modelPath), (gltf) => {
+        if (retired) { disposeDetachedModel(gltf.scene); return; }
+        const monitorFinish = new Map<THREE.Material, THREE.Material>();
+        stationGroups.forEach((g, idx) => {
+          if (monitorAssets[idx] !== modelPath) return;
+          const monitor = gltf.scene.clone(true);
+          monitor.name = 'rental-terminal-model';
+          monitor.userData.hardwareVariant = modelPath.includes('flat-panel') ? 'lcd' : 'crt';
+          // Identify the model's screen primitives by their authored material
+          // roles BEFORE the finish pass: 'CrtGlass' is the pillow glass pane
+          // (frontmost — the real bezel opening), 'CrtTube' the recessed tube
+          // face behind it. 'mat16' / 'mat17' were the same two surfaces on the
+          // downloaded model this one replaced, kept so a swap back still works.
+          let glassMesh: THREE.Mesh | null = null;
+          const tubeMeshes: THREE.Mesh[] = [];
+          monitor.traverse((child) => {
+            if (child instanceof THREE.Mesh && !Array.isArray(child.material)) {
+              const matName = (child.material as THREE.Material).name;
+              if (matName === 'CrtGlass' || matName === 'mat16') glassMesh = child;
+              else if (matName === 'CrtTube' || matName === 'mat17' || matName === 'LCDScreen') tubeMeshes.push(child);
+            }
+          });
+          finishModel(monitor, MONITOR_TINTS, beige, monitorFinish);
+          finishEquipmentSurfaces(monitor, true);
+          tubeMeshes.forEach((m) => { m.material = crtFaceMat; });
+          // The model's own curved glass pane becomes REAL glass — an ADDITIVE
+          // reflection of the store off the baked environment (glass-reflection.ts),
+          // which slides across the dome as you move along the counter — instead
+          // of opaque tube-black. This is what embeds the screen in the bezel.
+          // One material PER STATION: the monitors face different ways, and
+          // teardown disposes materials. Same rule as the vestibule glazing:
+          // transparent glass must not shadow as an opaque slab (the finish pass
+          // set castShadow on every mesh).
+          if (glassMesh) {
+            // Dimmer than the ceiling sets: the authored pane is a proper pillow
+            // dome, and at the tube default it mirrors the whole bright store
+            // over the rental menu the clerk has to read (the old flat pane only
+            // ever caught the ceiling lights).
+            (glassMesh as THREE.Mesh).material = makeCrtGlassMaterial({ intensity: 0.5, roughness: 0.14 });
+            (glassMesh as THREE.Mesh).castShadow = false;
+            (glassMesh as THREE.Mesh).renderOrder = 1;
+          }
+          // The model's bezel faces its -Z; spin it so the face matches the
+          // screen plane we add on the station's +Z side.
+          monitor.rotation.y = Math.PI;
+          const bb = fitModel(monitor, MON_H);
+          // This station group's local +Z is the island's front->back offset
+          // axis (matches getInnerCounterSpine's rotY: local Z = -islandDepth/2
+          // is the island's FRONT face, i.e. the customer side — and it sits
+          // FLUSH, zero clearance, against the solid outer counter band, for
+          // both counter shapes (counter.ts builds pFront directly on the
+          // band's own inner face line). Local Z = +islandDepth/2 is the BACK
+          // face, the clerk side, opening onto the open counter well she works
+          // in. This model is nearly as deep as the whole island even centered
+          // (measured: ~1.55 ft of body on a 1.6 ft island, ~0.3 in of slack
+          // total), so it has to overhang SOMEWHERE. The old
+          // `monitor.position.z -= 0.3` overhung it toward the flush FRONT,
+          // driving the tube ~0.27 ft into the solid band — the owner's "the
+          // computer monitors are clipping with the front counter". Overhang
+          // into the open well instead (the safe side), and size the shift off
+          // the model's own measured bounding box rather than a fixed number:
+          // keep a real clearance off the flush front plane, capped so the
+          // back overhang stays well short of the clerk's stand point (~1.15 ft
+          // beyond this edge — see counter.ts getTerminalStanding's standOff).
+          const halfIslandD = islandDepth / 2;
+          const FRONT_CLEARANCE = 0.12;
+          const BACK_OVERHANG_CAP = 0.35;
+          const shiftZ = THREE.MathUtils.clamp(
+            (-halfIslandD + FRONT_CLEARANCE) - bb.min.z,
+            0,
+            (halfIslandD + BACK_OVERHANG_CAP) - bb.max.z,
+          );
+          monitor.position.z += shiftZ;
+          bodyBox(monitor, bb);
+          // Bezel-opening bounds must be measured while the monitor is still
+          // detached (setFromObject uses world space; g already carries the
+          // station transform).
+          const glassBox = glassMesh ? new THREE.Box3().setFromObject(glassMesh) : null;
+          // The actual picture area is the recessed tube face (mat17) — the
+          // glass pane (mat16) spans the whole shell opening, bezel included,
+          // and sizing the UI to it made the screen read as a sticker slapped
+          // over the monitor's face.
+          const tubeBox = tubeMeshes.length
+            ? tubeMeshes.reduce((acc, m) => acc.union(new THREE.Box3().setFromObject(m)), new THREE.Box3())
+            : null;
+          g.add(monitor);
+          // Gold-on-black screen plane fitted to the tube face and recessed
+          // BEHIND the (now transparent, glossy) glass pane, with the old
+          // whole-model heuristic as fallback if the glb's material names ever
+          // change. The authored tube face IS the bezel opening (its box stops
+          // where the funnel starts), so the plane matches it exactly; the
+          // canvas keeps only a slim margin (drawTerminal's safe area).
+          let screenW = (bb.max.x - bb.min.x) * 0.62;
+          let screenH = MON_H * 0.48;
+          let sx = 0, sy = MON_H * 0.55, sz = bb.max.z + 0.012;
+          const fitBox = tubeBox ?? glassBox;
+          if (fitBox) {
+            screenW = fitBox.max.x - fitBox.min.x;
+            screenH = fitBox.max.y - fitBox.min.y;
+            sx = (fitBox.min.x + fitBox.max.x) / 2;
+            sy = (fitBox.min.y + fitBox.max.y) / 2;
+            // Between the tube face and the back of the glass dome — never
+            // inside the tube geometry itself.
+            sz = glassBox
+              ? Math.max(glassBox.min.z - 0.004, tubeBox ? tubeBox.max.z + 0.003 : -Infinity)
+              : fitBox.max.z + 0.008;
+          }
+          const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), screenMat);
+          screen.position.set(sx, sy, sz);
+          screen.name = 'counter-terminal-live-screen';
+          g.add(screen);
+          if (idx === 0) this.searchScreenMesh = screen; // this one doubles as the search terminal
+        });
+        const sourceMaterials = new Set<THREE.Material>();
+        gltf.scene.traverse(o => {
+          if (o instanceof THREE.Mesh) {
+            (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => sourceMaterials.add(m));
           }
         });
-        finishModel(monitor, MONITOR_TINTS, beige, monitorFinish);
-        tubeMeshes.forEach((m) => { m.material = crtFaceMat; });
-        // The model's own curved glass pane becomes REAL glass — an ADDITIVE
-        // reflection of the store off the baked environment (glass-reflection.ts),
-        // which slides across the dome as you move along the counter — instead
-        // of opaque tube-black. This is what embeds the screen in the bezel.
-        // One material PER STATION: the monitors face different ways, and
-        // teardown disposes materials. Same rule as the vestibule glazing:
-        // transparent glass must not shadow as an opaque slab (the finish pass
-        // set castShadow on every mesh).
-        if (glassMesh) {
-          // Dimmer than the ceiling sets: the authored pane is a proper pillow
-          // dome, and at the tube default it mirrors the whole bright store
-          // over the rental menu the clerk has to read (the old flat pane only
-          // ever caught the ceiling lights).
-          (glassMesh as THREE.Mesh).material = makeCrtGlassMaterial({ intensity: 0.5, roughness: 0.14 });
-          (glassMesh as THREE.Mesh).castShadow = false;
-          (glassMesh as THREE.Mesh).renderOrder = 1;
-        }
-        // The model's bezel faces its -Z; spin it so the face matches the
-        // screen plane we add on the station's +Z side.
-        monitor.rotation.y = Math.PI;
-        const bb = fitModel(monitor, MON_H);
-        // This station group's local +Z is the island's front->back offset
-        // axis (matches getInnerCounterSpine's rotY: local Z = -islandDepth/2
-        // is the island's FRONT face, i.e. the customer side — and it sits
-        // FLUSH, zero clearance, against the solid outer counter band, for
-        // both counter shapes (counter.ts builds pFront directly on the
-        // band's own inner face line). Local Z = +islandDepth/2 is the BACK
-        // face, the clerk side, opening onto the open counter well she works
-        // in. This model is nearly as deep as the whole island even centered
-        // (measured: ~1.55 ft of body on a 1.6 ft island, ~0.3 in of slack
-        // total), so it has to overhang SOMEWHERE. The old
-        // `monitor.position.z -= 0.3` overhung it toward the flush FRONT,
-        // driving the tube ~0.27 ft into the solid band — the owner's "the
-        // computer monitors are clipping with the front counter". Overhang
-        // into the open well instead (the safe side), and size the shift off
-        // the model's own measured bounding box rather than a fixed number:
-        // keep a real clearance off the flush front plane, capped so the
-        // back overhang stays well short of the clerk's stand point (~1.15 ft
-        // beyond this edge — see counter.ts getTerminalStanding's standOff).
-        const halfIslandD = islandDepth / 2;
-        const FRONT_CLEARANCE = 0.12;
-        const BACK_OVERHANG_CAP = 0.35;
-        const shiftZ = THREE.MathUtils.clamp(
-          (-halfIslandD + FRONT_CLEARANCE) - bb.min.z,
-          0,
-          (halfIslandD + BACK_OVERHANG_CAP) - bb.max.z,
-        );
-        monitor.position.z += shiftZ;
-        bodyBox(monitor, bb);
-        // Bezel-opening bounds must be measured while the monitor is still
-        // detached (setFromObject uses world space; g already carries the
-        // station transform).
-        const glassBox = glassMesh ? new THREE.Box3().setFromObject(glassMesh) : null;
-        // The actual picture area is the recessed tube face (mat17) — the
-        // glass pane (mat16) spans the whole shell opening, bezel included,
-        // and sizing the UI to it made the screen read as a sticker slapped
-        // over the monitor's face.
-        const tubeBox = tubeMeshes.length
-          ? tubeMeshes.reduce((acc, m) => acc.union(new THREE.Box3().setFromObject(m)), new THREE.Box3())
-          : null;
-        g.add(monitor);
-        // Gold-on-black screen plane fitted to the tube face and recessed
-        // BEHIND the (now transparent, glossy) glass pane, with the old
-        // whole-model heuristic as fallback if the glb's material names ever
-        // change. The authored tube face IS the bezel opening (its box stops
-        // where the funnel starts), so the plane matches it exactly; the
-        // canvas keeps only a slim margin (drawTerminal's safe area).
-        let screenW = (bb.max.x - bb.min.x) * 0.62;
-        let screenH = MON_H * 0.48;
-        let sx = 0, sy = MON_H * 0.55, sz = bb.max.z + 0.012;
-        const fitBox = tubeBox ?? glassBox;
-        if (fitBox) {
-          screenW = fitBox.max.x - fitBox.min.x;
-          screenH = fitBox.max.y - fitBox.min.y;
-          sx = (fitBox.min.x + fitBox.max.x) / 2;
-          sy = (fitBox.min.y + fitBox.max.y) / 2;
-          // Between the tube face and the back of the glass dome — never
-          // inside the tube geometry itself.
-          sz = glassBox
-            ? Math.max(glassBox.min.z - 0.004, tubeBox ? tubeBox.max.z + 0.003 : -Infinity)
-            : fitBox.max.z + 0.008;
-        }
-        const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), screenMat);
-        screen.position.set(sx, sy, sz);
-        g.add(screen);
-        if (idx === 0) this.searchScreenMesh = screen; // this one doubles as the search terminal
+        sourceMaterials.forEach(m => m.dispose());
+        this.ctx.requestShadowRefresh();
+      }, undefined, () => {
+        if (retired) return;
+        // Model unavailable (offline) — box-monitor fallback so the desk still works.
+        stationGroups.forEach((g, idx) => {
+          if (monitorAssets[idx] !== modelPath) return;
+          const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 1.2), beige);
+          body.name = 'counter-terminal-fallback';
+          body.position.y = 0.7;
+          body.castShadow = true;
+          g.add(body);
+          const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), screenMat);
+          screen.name = 'counter-terminal-live-screen';
+          screen.position.set(0, 0.72, 0.615);
+          g.add(screen);
+          const gloss = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), makeCrtGlassMaterial());
+          gloss.position.set(0, 0.72, 0.619);
+          gloss.renderOrder = 1;
+          g.add(gloss);
+          if (idx === 0) this.searchScreenMesh = screen;
+        });
+        this.ctx.requestShadowRefresh();
       });
-      const sourceMaterials = new Set<THREE.Material>();
-      gltf.scene.traverse(o => {
-        if (o instanceof THREE.Mesh) {
-          (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => sourceMaterials.add(m));
-        }
-      });
-      sourceMaterials.forEach(m => m.dispose());
-      this.ctx.requestShadowRefresh();
-    }, undefined, () => {
-      if (retired) return;
-      // Model unavailable (offline) — box-monitor fallback so the desk still works.
-      stationGroups.forEach((g, idx) => {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 1.2), beige);
-        body.position.y = 0.7;
-        body.castShadow = true;
-        g.add(body);
-        const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), screenMat);
-        screen.position.set(0, 0.72, 0.615);
-        g.add(screen);
-        const gloss = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), makeCrtGlassMaterial());
-        gloss.position.set(0, 0.72, 0.619);
-        gloss.renderOrder = 1;
-        g.add(gloss);
-        if (idx === 0) this.searchScreenMesh = screen;
-      });
-    });
+    }
 
     loader.load(assetUrl('models/rental-keyboard.glb'), (gltf) => {
       if (retired) { disposeDetachedModel(gltf.scene); return; }
       const keyboardFinish = new Map<THREE.Material, THREE.Material>();
       stationGroups.forEach((g) => {
         const kb = gltf.scene.clone(true);
+        kb.name = 'rental-keyboard-model';
         // Shell, key caps and the dark modifier/nav caps are separate roles
         // (KEYBOARD_TINTS) — a flat one-colour pass turned the old model into
         // a featureless wedge (feedback/046).
         finishModel(kb, KEYBOARD_TINTS, beigeDark, keyboardFinish);
+        finishEquipmentSurfaces(kb, true);
         // The model's low front edge faces its -Z; spin it to face the clerk
         // like the monitor screen does (feedback/046 "looks backwards").
         kb.rotation.y = Math.PI;
@@ -1198,7 +1277,8 @@ export class EntranceCheckout implements StoreFixture {
     if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
     const W = canvas.width, H = canvas.height;
-    ctx.fillStyle = CRT_BLACK;
+    const palette = counterCrtPalette(getActiveTheme().id);
+    ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, W, H);
 
     // Safe area. The screen plane matches the authored CRT's tube opening
@@ -1219,10 +1299,10 @@ export class EntranceCheckout implements StoreFixture {
 
     // ── Title bar: solid gold, dark text (the DOS-era POS sandwich, top) ──
     ctx.textBaseline = 'top';
-    ctx.fillStyle = CRT_GOLD;
+    ctx.fillStyle = palette.bar;
     ctx.fillRect(PAD_X - CH * 0.5, PAD_Y, SAFE_W + CH, BAR_H);
     ctx.font = `bold ${FONT_PX}px "Courier New", monospace`;
-    ctx.fillStyle = CRT_INK;
+    ctx.fillStyle = palette.ink;
     ctx.fillText(brandString('pos-system-title', 'HALCYON RENTAL SYSTEM'), PAD_X, PAD_Y + (BAR_H - FONT_PX) / 2);
 
     // The idle screen is also the manager terminal's only in-world signpost
@@ -1250,7 +1330,7 @@ export class EntranceCheckout implements StoreFixture {
       '>',
     ];
     ctx.font = `${FONT_PX}px "Courier New", monospace`;
-    ctx.fillStyle = CRT_TEXT;
+    ctx.fillStyle = palette.text;
     // Body starts one blank row below the title bar; the footer bar (drawn
     // below) reserves its own strip so text never collides with it. The tube's
     // curve eats more of the canvas at the BOTTOM than the side padding does
@@ -1290,10 +1370,10 @@ export class EntranceCheckout implements StoreFixture {
     });
 
     // ── Footer bar: solid gold status strip (the sandwich, bottom) ──
-    ctx.fillStyle = CRT_GOLD;
+    ctx.fillStyle = palette.bar;
     ctx.fillRect(PAD_X - CH * 0.5, footTop, SAFE_W + CH, BAR_H);
     ctx.font = `bold ${FONT_PX}px "Courier New", monospace`;
-    ctx.fillStyle = CRT_INK;
+    ctx.fillStyle = palette.ink;
     const footY = footTop + (BAR_H - FONT_PX) / 2;
     // feedback/037 (owner: reword all "be kind rewind" to "please rewind") —
     // was 'BE KIND' paired with the left-aligned 'REMEMBER TO REWIND'.

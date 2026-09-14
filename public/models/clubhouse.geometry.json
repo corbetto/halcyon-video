@@ -1,0 +1,21 @@
+{
+  "bytes": 485740,
+  "triangles": 6868,
+  "draws": 8,
+  "roles": [
+    "FramePaint",
+    "HeaderPaint",
+    "PanelLaminate",
+    "ShelfLaminate",
+    "ShelfEdge",
+    "Baseboard",
+    "EdgePaint",
+    "CabinetLaminate"
+  ],
+  "height": 10.6,
+  "envelope": [
+    15.2,
+    15.2
+  ],
+  "uv": true
+}

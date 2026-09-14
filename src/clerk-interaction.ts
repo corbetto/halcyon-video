@@ -1,5 +1,5 @@
 import type { Movie } from './jellyfin';
-import { recommend } from './clerk-recommend';
+import { recommend, isShelfRecommendation } from './clerk-recommend';
 import { keyboardOwnedByControl } from './text-entry-focus';
 import { brandString } from './brand-pack';
 
@@ -43,29 +43,26 @@ export interface ClerkInteractionHooks {
   onRequest?: (movie: Movie) => Promise<boolean>;
   /** Open the existing diegetic search flow. */
   onSearch: () => void;
+  /** Inspect this exact title; false means it no longer has a reachable case. */
+  onShowMovie?: (movie: Movie) => boolean;
   /** Surface a chosen line (e.g. to the on-screen console log). */
   onLog?: (msg: string) => void;
   /** Optional short blip when the dialog opens/advances. */
   onBlip?: () => void;
 }
 
-const SMALL_TALK = [
-  '"Please rewind" — but honestly these are all digital now.',
-  'Friday nights get busy, so grab your picks early.',
-  "We just restocked the new releases wall by the register.",
-  "Membership's free — ask me and I'll set you up.",
-  "If you liked that one, the sequel's on the back wall.",
-];
-
 const STYLE_ID = 'clerk-interaction-styles';
 
 export class ClerkInteraction {
   private hooks: ClerkInteractionHooks;
-  private prompt: HTMLDivElement;
+  private prompt: HTMLButtonElement;
   private dialog: HTMLDivElement;
   private near = false;
   private open = false;
-  private smallTalkIdx = 0;
+  private conversation = 0;
+  private returnFocus: HTMLElement | null = null;
+  private pendingOrders = new Set<string>();
+  private requestedIds = new Set<string>();
   // When the dialog was opened from a recommendation clasp, recommendations
   // come from that clasp's shelf rather than the whole library, and the wording
   // names the section. Cleared on close so the proximity chat is unaffected.
@@ -77,7 +74,7 @@ export class ClerkInteraction {
   // exhausted. All reset when the dialog opens or closes.
   private shownIds = new Set<string>();
   private recRoll = 0;
-  private sugIdx = 0;
+
   // Number-key → action for the options currently on screen. Rebuilt each
   // render (optionList clears it); dispatched from onKeyDown.
   private optionActions = new Map<string, () => void>();
@@ -91,13 +88,18 @@ export class ClerkInteraction {
     this.hooks = hooks;
     this.injectStyles();
 
-    this.prompt = document.createElement('div');
+    this.prompt = document.createElement('button');
+    this.prompt.type = 'button';
     this.prompt.className = 'clerk-prompt';
     this.prompt.innerHTML = `<span class="clerk-key">E</span> Talk to the clerk`;
+    this.prompt.onclick = () => { if (this.near && !this.open) this.openMenu(); };
     document.body.appendChild(this.prompt);
 
     this.dialog = document.createElement('div');
     this.dialog.className = 'clerk-dialog';
+    this.dialog.setAttribute('role', 'dialog');
+    this.dialog.setAttribute('aria-modal', 'true');
+    this.dialog.setAttribute('aria-label', 'Talk to the clerk');
     document.body.appendChild(this.dialog);
 
     window.addEventListener('keydown', this.onKeyDown, true);
@@ -126,11 +128,11 @@ export class ClerkInteraction {
     this.claspLabel = label;
     this.claspSugs = suggestions;
     this.resetRotation();
-    this.open = true;
+    this.beginConversation();
     this.prompt.classList.remove('visible');
     this.hooks.onBlip?.();
     this.renderRecommendation();
-    this.dialog.classList.add('visible');
+    this.showDialog();
   }
 
   /**
@@ -162,27 +164,41 @@ export class ClerkInteraction {
    * Jellyseerr-suggestion side of the rotation.
    */
   debugOpenRecommend(rolls = 0): void {
-    this.open = true;
+    this.beginConversation();
     this.resetRotation();
     this.prompt.classList.remove('visible');
     this.renderRecommendation();
     for (let i = 0; i < rolls; i++) this.renderRecommendation();
-    this.dialog.classList.add('visible');
+    this.showDialog();
   }
 
   dispose() {
     window.removeEventListener('keydown', this.onKeyDown, true);
+    this.close();
     this.prompt.remove();
     this.dialog.remove();
-    document.getElementById(STYLE_ID)?.remove();
   }
 
   // ── Internals ──────────────────────────────────────────────────────────────
 
   private onKeyDown = (e: KeyboardEvent) => {
-    if (keyboardOwnedByControl()) return;
+    if (!this.open && keyboardOwnedByControl()) return;
 
     if (this.open) {
+      // A modal owns store shortcuts as well as its own arrows. Do not let
+      // movement, checkout or search handlers see a conversation keypress.
+      if (e.key === 'F8') return;
+      e.stopImmediatePropagation();
+      if (['Tab', ' ', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        if (e.key === 'Tab') this.moveSelection(e.shiftKey ? -1 : 1);
+        else if (e.key === ' ' && !e.repeat) this.currentOptions[this.selectedIndex]?.action();
+        return;
+      }
+      if (e.repeat && (e.key === 'Enter' || this.optionActions.has(e.key))) {
+        e.preventDefault();
+        return;
+      }
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -223,29 +239,43 @@ export class ClerkInteraction {
   };
 
   private openMenu() {
-    this.open = true;
+    this.beginConversation();
     this.resetRotation();
     this.prompt.classList.remove('visible');
     this.hooks.onBlip?.();
     this.renderMenu();
+    this.showDialog();
+  }
+
+  private beginConversation() {
+    this.conversation++;
+    if (!this.open) this.returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.open = true;
+  }
+
+  private showDialog() {
     this.dialog.classList.add('visible');
+    this.currentOptions[this.selectedIndex]?.el.focus({ preventScroll: true });
   }
 
   private close() {
+    this.conversation++;
     this.open = false;
     this.claspPool = null;
     this.claspLabel = null;
     this.claspSugs = null;
     this.resetRotation();
     this.optionActions.clear();
+    this.currentOptions = [];
     this.dialog.classList.remove('visible');
+    if (this.dialog.contains(document.activeElement)) this.returnFocus?.focus({ preventScroll: true });
+    this.returnFocus = null;
     if (this.near) this.prompt.classList.add('visible');
   }
 
   private resetRotation() {
     this.shownIds.clear();
     this.recRoll = 0;
-    this.sugIdx = 0;
   }
 
   private renderMenu() {
@@ -258,8 +288,9 @@ export class ClerkInteraction {
       this.hooks.onSearch();
     });
     this.addOption(opts, '2', 'What do you recommend?', () => this.renderRecommendation());
-    this.addOption(opts, '3', 'Just browsing', () => this.renderSmallTalk());
-    this.addOption(opts, 'Esc', 'Never mind', () => this.close());
+    this.addOption(opts, '3', 'Help me choose a genre', () => this.renderGenres());
+    this.addOption(opts, '4', 'How does this work?', () => this.renderHelp());
+    this.addOption(opts, 'Esc', 'Just browsing, thanks', () => this.close());
     this.finishOptions(opts);
   }
 
@@ -270,18 +301,21 @@ export class ClerkInteraction {
     // on where you're standing: the aisle's own pool when you're in one, the
     // whole store only when you're nowhere in particular.
     const local = fromClasp ? null : this.hooks.getLocalContext?.() ?? null;
-    const pool = fromClasp ? this.claspPool! : local ? local.movies : this.hooks.getMovies();
+    const pool = (fromClasp ? this.claspPool! : local ? local.movies : this.hooks.getMovies()).filter(isShelfRecommendation);
     const label = fromClasp ? this.claspLabel : local?.label ?? null;
     const scoped = fromClasp || local !== null;
-    const sugs = (fromClasp ? this.claspSugs : local?.suggestions) ?? [];
+    const sugs = ((fromClasp ? this.claspSugs : local?.suggestions) ?? [])
+      .filter((sug) => !this.shownIds.has(sug.movie.id));
+    const fresh = pool.filter((movie) => !this.shownIds.has(movie.id));
 
     // Alternate her answers between the shelf and the order book: even rolls
     // pitch something she can hand you, odd rolls something Jellyseerr can
     // get for you — so "Something else?" walks through both.
-    const wantSuggestion = sugs.length > 0 && (this.recRoll % 2 === 1 || pool.length === 0);
+    const wantSuggestion = sugs.length > 0 && (this.recRoll % 2 === 1 || fresh.length === 0);
     this.recRoll++;
     if (wantSuggestion) {
-      this.renderSuggestion(sugs[this.sugIdx++ % sugs.length]);
+      this.shownIds.add(sugs[0].movie.id);
+      this.renderSuggestion(sugs[0]);
       return;
     }
 
@@ -289,40 +323,43 @@ export class ClerkInteraction {
     this.dialog.innerHTML = '';
     if (!rec) {
       this.dialog.appendChild(this.speech(
-        scoped
-          ? "This section's picked pretty clean right now — try me somewhere else."
-          : "Hmm, the shelves are looking bare — check back in a bit!"
+        pool.length
+          ? "We've been through this selection. Want to try a different genre, or look for a title?"
+          : scoped
+            ? "I don't have an available pick in this section. Let's try another genre or search the store."
+            : "I don't have an available pick yet. Choose your streaming apps at the counter to stock the store, or search what's here."
       ));
     } else {
       const { movie, reason } = rec;
       const yr = movie.year ? ` (${movie.year})` : '';
       const lead = label
         ? `If you're after ${label.toLowerCase()}, `
-        : 'Oh, ';
-      this.dialog.appendChild(this.speech(`${lead}you have to see "${movie.title}"${yr}. ${reason}`));
+        : '';
+      this.dialog.appendChild(this.speech(`${lead}I'd suggest "${movie.title}"${yr}. ${reason}`));
       this.hooks.onLog?.(`[Clerk] Recommends "${movie.title}"${yr} — ${reason}`);
     }
     const opts = this.optionList();
-    this.addOption(opts, '1', scoped ? 'Something else?' : 'Anything else?',
-      () => (scoped ? this.renderRecommendation() : this.renderMenu()));
-    if (scoped) {
-      this.addOption(opts, '2', 'Actually, let me search', () => {
-        this.close();
-        this.hooks.onSearch();
+    let key = 1;
+    if (rec && this.hooks.onShowMovie) {
+      const movie = rec.movie;
+      this.addOption(opts, String(key++), 'Show me that one', () => {
+        if (this.hooks.onShowMovie!(movie)) this.close();
+        else this.renderUnavailable();
       });
     }
-    this.addOption(opts, 'Esc', 'Thanks!', () => this.close());
+    if (rec) this.addOption(opts, String(key++), 'Something else?', () => this.renderRecommendation());
+    this.addOption(opts, String(key++), 'Try a different genre', () => this.renderGenres());
+    this.addOption(opts, String(key++), 'Let me search', () => this.search());
+    this.addOption(opts, 'Esc', 'Thanks, I will keep browsing', () => this.close());
     this.finishOptions(opts);
   }
 
   /**
-   * "Something else?" has to actually show something else: demote what she's
-   * already pitched this conversation, resetting once the pool runs dry.
+   * Keep already shown picks out of this conversation, including at exhaustion.
    */
   private pickOwned(pool: Movie[]) {
     const fresh = pool.filter((m) => !this.shownIds.has(m.id));
-    if (fresh.length === 0) this.shownIds.clear();
-    const rec = recommend(fresh.length > 0 ? fresh : pool);
+    const rec = recommend(fresh);
     if (rec) this.shownIds.add(rec.movie.id);
     return rec;
   }
@@ -331,11 +368,12 @@ export class ClerkInteraction {
   private renderSuggestion(sug: ClerkSuggestion) {
     const { movie } = sug;
     const yr = movie.year ? ` (${movie.year})` : '';
-    const requested = sug.requested || !!movie.discoveryRequested;
-    const tail = requested
-      ? "It's already on order — keep an eye on the Coming Soon rack."
+    const requested = sug.requested || !!movie.discoveryRequested || this.requestedIds.has(movie.id);
+    const pending = this.pendingOrders.has(movie.id);
+    const tail = pending ? "I am still sending this request. You can keep browsing." : requested
+      ? "The request is already in. It may still need approval or time to become available."
       : this.hooks.onRequest
-        ? 'Want me to put in an order for it?'
+        ? 'Want me to request it for you?'
         : 'Worth keeping an eye out for.';
     this.dialog.innerHTML = '';
     this.dialog.appendChild(this.speech(
@@ -343,8 +381,8 @@ export class ClerkInteraction {
     this.hooks.onLog?.(`[Clerk] Suggests "${movie.title}"${yr} (Jellyseerr) — ${sug.reason}`);
     const opts = this.optionList();
     let key = 1;
-    if (!requested && this.hooks.onRequest) {
-      this.addOption(opts, String(key++), 'Order it for me', () => this.requestSuggestion(sug));
+    if (!requested && !pending && this.hooks.onRequest) {
+      this.addOption(opts, String(key++), 'Request this title', () => this.requestSuggestion(sug));
     }
     this.addOption(opts, String(key++), 'Something else?', () => this.renderRecommendation());
     this.addOption(opts, String(key++), 'Actually, let me search', () => {
@@ -356,44 +394,99 @@ export class ClerkInteraction {
   }
 
   private async requestSuggestion(sug: ClerkSuggestion) {
+    const id = sug.movie.id;
+    if (!this.hooks.onRequest || this.pendingOrders.has(id)) return;
+    if (this.requestedIds.has(id)) { this.renderSuggestion(sug); return; }
+    const conversation = this.conversation;
+    this.pendingOrders.add(id);
     this.hooks.onBlip?.();
     this.dialog.innerHTML = '';
-    this.dialog.appendChild(this.speech('One sec, let me punch that in...'));
-    this.optionActions.clear(); // no live options while the order is in flight
-    const ok = await this.hooks.onRequest!(sug.movie).catch(() => false);
-    if (!this.open) return; // player walked off while the order was in flight
-    const yr = sug.movie.year ? ` (${sug.movie.year})` : '';
-    this.dialog.innerHTML = '';
+    this.dialog.appendChild(this.speech('Let me send that request. You can keep browsing while I check.'));
+    const pending = this.optionList(); // retire both number AND Enter actions
+    this.addOption(pending, 'Esc', 'Keep browsing', () => this.close());
+    this.finishOptions(pending);
+    let ok = false;
+    try { ok = await this.hooks.onRequest(sug.movie); } catch { /* show a retry */ }
+    finally { this.pendingOrders.delete(id); }
     if (ok) {
       sug.requested = true;
-      this.dialog.appendChild(this.speech(
-        `You got it — "${sug.movie.title}"${yr} is on order. It'll show up on the Coming Soon rack once it lands.`));
-    } else {
-      this.dialog.appendChild(this.speech(
-        "Hm, the system's not taking orders right now. Come back and ask me again in a bit."));
+      this.requestedIds.add(id);
     }
+    // A completed request belongs to its original conversation, never a
+    // newly opened chat. Keep its success recorded even if the user left.
+    if (!this.open || conversation !== this.conversation) return;
+    this.dialog.innerHTML = '';
+    this.dialog.appendChild(this.speech(ok
+      ? `The request for "${sug.movie.title}" is in. It may still need approval or time to become available.`
+      : `I couldn't confirm the request for "${sug.movie.title}". You can try again or choose something else.`));
     const opts = this.optionList();
-    this.addOption(opts, '1', 'Something else?', () => this.renderRecommendation());
+    let key = 1;
+    if (!ok) this.addOption(opts, String(key++), 'Try the request again', () => this.requestSuggestion(sug));
+    this.addOption(opts, String(key++), 'Something else?', () => this.renderRecommendation());
     this.addOption(opts, 'Esc', 'Thanks!', () => this.close());
     this.finishOptions(opts);
   }
 
-  private renderSmallTalk() {
-    this.hooks.onBlip?.();
-    const line = SMALL_TALK[this.smallTalkIdx % SMALL_TALK.length];
-    this.smallTalkIdx++;
+  private search() {
+    this.close();
+    this.hooks.onSearch();
+  }
+
+  private renderGenres(page = 0) {
+    const movies = this.hooks.getMovies().filter(isShelfRecommendation);
+    const genres = [...new Set(movies.flatMap((movie) => movie.genres))].sort((a, b) => a.localeCompare(b));
     this.dialog.innerHTML = '';
-    this.dialog.appendChild(this.speech(line));
+    this.dialog.appendChild(this.speech(genres.length
+      ? 'What are you in the mood for? These are the genres we have available.'
+      : "There aren't enough titles to choose by genre yet. I can still help you search."));
     const opts = this.optionList();
-    this.addOption(opts, '1', 'Tell me more', () => this.renderSmallTalk());
-    this.addOption(opts, '2', 'Back', () => this.renderMenu());
-    this.addOption(opts, 'Esc', 'See ya', () => this.close());
+    genres.slice(page * 5, page * 5 + 5).forEach((genre, i) => {
+      this.addOption(opts, String(i + 1), genre, () => {
+        this.claspPool = movies.filter((movie) => movie.genres.includes(genre));
+        this.claspLabel = genre;
+        this.claspSugs = [];
+        this.resetRotation();
+        this.renderRecommendation();
+      });
+    });
+    if (genres.length > 5) this.addOption(opts, '6', 'More genres', () => this.renderGenres((page + 1) % Math.ceil(genres.length / 5)));
+    this.addOption(opts, '7', 'Surprise me from the whole store', () => {
+      this.claspPool = movies;
+      this.claspLabel = null;
+      this.claspSugs = [];
+      this.resetRotation();
+      this.renderRecommendation();
+    });
+    this.addOption(opts, '8', 'Let me search', () => this.search());
+    this.addOption(opts, 'Esc', 'Keep browsing', () => this.close());
+    this.finishOptions(opts);
+  }
+
+  private renderHelp() {
+    this.dialog.innerHTML = '';
+    this.dialog.appendChild(this.speech(
+      'Open a case to read about a title. When you find something you want, choose checkout on the case. For streaming titles, you choose a service there, then head through the counter. I can help you find a title or suggest one.'));
+    const opts = this.optionList();
+    this.addOption(opts, '1', 'Help me find a title', () => this.search());
+    this.addOption(opts, '2', 'Suggest something', () => this.renderRecommendation());
+    this.addOption(opts, 'Esc', 'Got it, thanks', () => this.close());
+    this.finishOptions(opts);
+  }
+
+  private renderUnavailable() {
+    this.dialog.innerHTML = '';
+    this.dialog.appendChild(this.speech("That case isn't available here anymore. Let's find you another."));
+    const opts = this.optionList();
+    this.addOption(opts, '1', 'Show me another pick', () => this.renderRecommendation());
+    this.addOption(opts, '2', 'Let me search', () => this.search());
+    this.addOption(opts, 'Esc', 'Keep browsing', () => this.close());
     this.finishOptions(opts);
   }
 
   private speech(text: string): HTMLElement {
     const el = document.createElement('div');
     el.className = 'clerk-speech';
+    el.setAttribute('role', 'status');
     const name = document.createElement('span');
     name.className = 'clerk-name';
     name.textContent = 'CLERK';
@@ -418,6 +511,7 @@ export class ClerkInteraction {
   private addOption(list: HTMLElement, key: string, label: string, action: () => void) {
     const btn = document.createElement('button');
     btn.className = 'clerk-option';
+    btn.type = 'button';
     const keyEl = document.createElement('span');
     keyEl.className = 'clerk-key';
     keyEl.textContent = key;
@@ -427,6 +521,8 @@ export class ClerkInteraction {
     // handler (see the map lookup there) rather than a per-option window
     // listener, so nothing accumulates as the dialog re-renders.
     if (/^\d$/.test(key)) this.optionActions.set(key, action);
+    const index = this.currentOptions.length;
+    btn.onfocus = () => { this.selectedIndex = index; this.applySelection(); };
     this.currentOptions.push({ el: btn, action });
     list.appendChild(btn);
   }
@@ -437,11 +533,14 @@ export class ClerkInteraction {
     if (n === 0) return;
     this.selectedIndex = (this.selectedIndex + delta + n) % n;
     this.applySelection();
+    this.currentOptions[this.selectedIndex]?.el.focus({ preventScroll: true });
+    this.currentOptions[this.selectedIndex]?.el.scrollIntoView({ block: 'nearest' });
   }
 
   private applySelection() {
     this.currentOptions.forEach((opt, i) => {
       opt.el.classList.toggle('selected', i === this.selectedIndex);
+      opt.el.tabIndex = i === this.selectedIndex ? 0 : -1;
     });
   }
 
@@ -450,6 +549,8 @@ export class ClerkInteraction {
     this.selectedIndex = 0;
     this.applySelection();
     this.dialog.appendChild(list);
+    this.dialog.scrollTop = 0;
+    if (this.dialog.classList.contains('visible')) this.currentOptions[0]?.el.focus({ preventScroll: true });
   }
 
   private injectStyles() {
@@ -459,14 +560,14 @@ export class ClerkInteraction {
     style.textContent = `
     .clerk-prompt {
       position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(8px);
-      z-index: 60; pointer-events: none; opacity: 0; transition: opacity .18s, transform .18s;
-      font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: .04em;
+      z-index: 60; pointer-events: none; visibility: hidden; opacity: 0; transition: opacity .18s, transform .18s;
+      font-family: 'Courier New', monospace; font-size: 15px; min-height: 44px; font-weight: 700; letter-spacing: .04em;
       color: var(--bb-knockout, #eef3ff); background: rgba(10,18,40,.82);
       border: 1px solid var(--bb-secondary, #f2e8c9);
       padding: 8px 16px; border-radius: 6px; text-shadow: 0 1px 2px #000;
       box-shadow: 0 4px 18px rgba(0,0,0,.5);
     }
-    .clerk-prompt.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .clerk-prompt.visible { pointer-events: auto; visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
     .clerk-key {
       display: inline-block; min-width: 1.4em; text-align: center; margin-right: 8px;
       padding: 1px 6px; border-radius: 4px; background: #ffd54a; color: #10203f;
@@ -474,7 +575,8 @@ export class ClerkInteraction {
     }
     .clerk-dialog {
       position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%) translateY(12px) scale(.98);
-      z-index: 61; width: min(560px, 90vw); pointer-events: auto;
+      z-index: 61; box-sizing: border-box; width: min(560px, calc(100vw - 24px)); pointer-events: auto;
+      max-height: calc(100dvh - 100px); overflow-y: auto; overscroll-behavior: contain;
       opacity: 0; visibility: hidden; transition: opacity .2s, transform .2s;
       font-family: 'Courier New', monospace; color: #eef3ff;
       background: linear-gradient(180deg, rgba(17,30,64,.97), rgba(9,16,38,.97));
@@ -482,15 +584,15 @@ export class ClerkInteraction {
       box-shadow: 0 10px 40px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.05);
     }
     .clerk-dialog.visible { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0) scale(1); }
-    .clerk-speech { font-size: 15px; line-height: 1.5; margin-bottom: 14px; }
+    .clerk-speech { overflow-wrap: anywhere; font-size: 15px; line-height: 1.5; margin-bottom: 14px; }
     .clerk-name {
-      display: block; font-size: 11px; letter-spacing: .18em; color: #ffd54a;
+      display: block; font-size: 15px; letter-spacing: .18em; color: #ffd54a;
       margin-bottom: 4px; font-weight: 800;
     }
     .clerk-options { display: flex; flex-direction: column; gap: 6px; }
     .clerk-option {
       display: flex; align-items: center; text-align: left; width: 100%;
-      font-family: inherit; font-size: 14px; color: #eef3ff; cursor: pointer;
+      font-family: inherit; font-size: 15px; min-height: 44px; color: #eef3ff; cursor: pointer;
       background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12);
       border-radius: 6px; padding: 8px 12px; transition: background .12s, border-color .12s;
     }
@@ -502,6 +604,11 @@ export class ClerkInteraction {
     .clerk-option.selected {
       background: var(--crt-gold, #ffcc00); border-color: var(--crt-gold, #ffcc00);
       color: var(--crt-ink, #000a1c);
+    }
+    @media (max-width: 600px) {
+      .clerk-dialog { bottom: max(12px, env(safe-area-inset-bottom)); padding: 16px; max-height: calc(100dvh - 32px); }
+      .clerk-key { display: none; }
+      .clerk-option { padding: 10px 12px; }
     }
     .clerk-option.selected .clerk-key {
       background: var(--crt-ink, #000a1c); color: var(--crt-gold, #ffcc00);

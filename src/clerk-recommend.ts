@@ -18,7 +18,13 @@ type Affinity = Record<string, number>;
 function readJSON<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    const parsed = raw ? JSON.parse(raw) : fallback;
+    if (Array.isArray(fallback)) {
+      return (Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : fallback) as T;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
+    return Object.fromEntries(Object.entries(parsed).filter(([, v]) =>
+      typeof v === 'number' && Number.isFinite(v) && v >= 0)) as T;
   } catch {
     return fallback;
   }
@@ -51,12 +57,18 @@ export interface Recommendation {
   reason: string;
 }
 
+/** Only offer stock the visitor can actually inspect and choose today. */
+export function isShelfRecommendation(movie: Movie): boolean {
+  return !movie.comingSoon && !movie.collectionGap && !movie.discovery;
+}
+
 /**
  * Pick a single sensible title. Score = rating + recency + genre affinity.
  * Recently-inspected titles are demoted so she suggests something fresh.
  */
 export function recommend(movies: Movie[]): Recommendation | null {
-  if (!movies || movies.length === 0) return null;
+  movies = movies.filter(isShelfRecommendation);
+  if (movies.length === 0) return null;
 
   const affinity = readJSON<Affinity>(AFFINITY_KEY, {});
   const recent = new Set(readJSON<string[]>(RECENT_KEY, []));
@@ -93,13 +105,13 @@ export function recommend(movies: Movie[]): Recommendation | null {
   let reason: string;
   const topGenre = (best.genres ?? []).find((g) => (affinity[g] ?? 0) > 0);
   if (bestAffinity > 0.3 && topGenre) {
-    reason = `You've been eyeing a lot of ${topGenre.toLowerCase()} — this one's a keeper.`;
+    reason = `You've been browsing ${topGenre.toLowerCase()} — this has that in common.`;
   } else if ((best.communityRating ?? 0) >= 7.5) {
-    reason = `It's one of our highest-rated rentals right now.`;
+    reason = `Viewers rate it ${best.communityRating!.toFixed(1)} out of 10.`;
   } else if (best.year && best.year >= maxYear - 1) {
-    reason = `Just came in — it's flying off the shelf.`;
+    reason = `It's one of the more recent titles in this selection.`;
   } else {
-    reason = `A staff favorite. You won't be disappointed.`;
+    reason = `Take a look at the case and see if it sounds like your kind of thing.`;
   }
 
   return { movie: best, reason };

@@ -37,12 +37,14 @@ import { defaultJellyfinUrl, operatorDefault, type OperatorServiceId } from './o
 import { isDemoMode, useSyntheticDemoStock } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
 import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
+import { syncConfiguredCatalog } from './boot-catalog';
 import {
   addMediaSource,
   clearMediaSources,
   labelForUrl,
   listMediaSources,
   primaryMediaSource,
+  sameServer,
 } from './media-sources';
 import { verifySeerrCredentialsLive } from './seerr-service-status';
 import {
@@ -284,16 +286,7 @@ function stallMessage(displayName: string, stallMs: number, lastStage: string): 
   );
 }
 
-/**
- * Sync every connected server (GH #84) and say what happened.
- *
- * The one place all three boot paths get their catalog, so the multi-server
- * reporting reads the same whether you arrived by setup terminal, login form
- * or saved session. A source that failed is NAMED rather than folded into a
- * total: "3 of 5 libraries" with no explanation is how a friend's sleeping
- * server turns into a bug report about missing shelves.
- */
-async function syncAllSources(onProgress?: (stage: string) => void): Promise<JellyfinLibrary[]> {
+async function restoreStoreSettings(onProgress?: (stage: string) => void): Promise<void> {
   // BEFORE the catalog, not after (GH #123): the carried-library choices are
   // part of the configuration being fetched, and they decide which libraries
   // are worth syncing at all. Hydrating afterwards would have this machine pay
@@ -312,7 +305,27 @@ async function syncAllSources(onProgress?: (stage: string) => void): Promise<Jel
   } else if (config.status === 'failed') {
     deps?.log(`[System] Could not read your saved store settings: ${config.error}`, 'system');
   }
-  const result = await fetchCatalogFromAllSources({ onProgress });
+}
+
+/**
+ * Sync every connected server (GH #84) and say what happened.
+ *
+ * The one place all three boot paths get their catalog, so the multi-server
+ * reporting reads the same whether you arrived by setup terminal, login form
+ * or saved session. A source that failed is NAMED rather than folded into a
+ * total: "3 of 5 libraries" with no explanation is how a friend's sleeping
+ * server turns into a bug report about missing shelves.
+ */
+async function syncAllSources(
+  onProgress?: (stage: string) => void, stall?: Promise<never>,
+): Promise<JellyfinLibrary[]> {
+  const d = deps!;
+  const result = await syncConfiguredCatalog(
+    () => restoreStoreSettings(onProgress),
+    () => fetchCatalogFromAllSources({ onProgress }),
+    [d.loadComingSoon, d.loadDiscovery, d.loadGames, d.loadStreaming],
+    stall,
+  );
   for (const failure of result.failures) {
     deps?.log(`[System] ${failure.source.name} did not answer: ${failure.error}`, 'system');
   }
@@ -364,16 +377,10 @@ async function syncForSetup(
   };
   let libs: JellyfinLibrary[];
   try {
-    [libs] = await Promise.all([
-      // `url`/`session` are already persisted as a connected source by
-      // afterAuth — the sync fans out over ALL of them, not just the one the
-      // terminal happened to finish on (GH #84).
-      Promise.race([syncAllSources(onProgress), stallPromise]),
-      d.loadComingSoon(),
-      d.loadDiscovery(),
-      d.loadGames(),
-      d.loadStreaming(),
-    ]);
+    // `url`/`session` are already persisted as a connected source by
+    // afterAuth — the sync fans out over ALL of them, not just the one the
+    // terminal happened to finish on (GH #84).
+    libs = await syncAllSources(onProgress, stallPromise);
   } finally {
     if (stallTimer) clearTimeout(stallTimer);
   }
@@ -555,7 +562,11 @@ export function showBootOverlay() {
  * classic login form and the membership card picker (T17). Never stores a
  * password -- only the resulting session token/userid.
  */
-async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSession) {
+async function finishLoginAndLaunch(
+  urlInput: string,
+  session: MembershipLoginSession,
+  opts?: { displayName?: string }
+) {
   if (!deps) return;
   deps.log(`[System] Authenticated successfully as ${session.userName}.`, 'system');
   // Connect (or refresh) this server as a source rather than overwriting the
@@ -563,13 +574,16 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   // them, so everything that still reads jellyfin_url/token/userid is fed.
   // Matching on (kind, url) means re-authenticating a server the store already
   // knows keeps its id, and therefore its carried-library choices.
+  const existingSource = listMediaSources().find(
+    (s) => s.kind === provider().id && sameServer(s.url, urlInput)
+  );
   addMediaSource({
     kind: provider().id,
     url: urlInput,
     token: session.accessToken,
     userId: session.userId,
     userName: session.userName,
-    name: labelForUrl(urlInput),
+    name: opts?.displayName || existingSource?.name || primaryMediaSource()?.name || labelForUrl(urlInput),
   });
   localStorage.setItem('jellyfin_last_userid', session.userId); // remembered for next boot's card highlight
 
@@ -591,13 +605,7 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   });
   let libs: JellyfinLibrary[];
   try {
-    [libs] = await Promise.all([
-      Promise.race([syncAllSources(armLoginStall), loginTimeout]),
-      deps.loadComingSoon(),
-      deps.loadDiscovery(),
-      deps.loadGames(),
-      deps.loadStreaming()
-    ]);
+    libs = await syncAllSources(armLoginStall, loginTimeout);
   } finally {
     if (loginStallTimer) clearTimeout(loginStallTimer);
   }
@@ -1007,13 +1015,7 @@ export async function checkCredentialsAndLoad() {
 
       try {
         let libs: JellyfinLibrary[];
-        [libs] = await Promise.all([
-          Promise.race([syncAllSources(armStall), stallPromise]),
-          d.loadComingSoon(),
-          d.loadDiscovery(),
-          d.loadGames(),
-          d.loadStreaming()
-        ]);
+        libs = await syncAllSources(armStall, stallPromise);
         if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
 
         if (escaped) return;
@@ -1309,14 +1311,16 @@ export function setupLoginHandlers() {
         // it is the one the person actually typed or picked first, and the
         // singleton consumers (Jellyseerr, remote play, the Settings rows)
         // resolve to it.
+        const primaryDisplayName =
+          (backendKind === 'plex' ? (plexServerNameFor(urlInput) || plexServerNameFor(connectedUrl)) : '')
+          || labelForUrl(connectedUrl);
         addMediaSource({
           kind: backendKind,
           url: connectedUrl,
           token: session.accessToken,
           userId: session.userId,
           userName: session.userName,
-          name: (backendKind === 'plex' ? (plexServerNameFor(urlInput) || plexServerNameFor(connectedUrl)) : '')
-            || labelForUrl(connectedUrl),
+          name: primaryDisplayName,
         });
         if (backendKind === 'plex') {
           const extras = selectedPlexServerUrls()
@@ -1343,7 +1347,7 @@ export function setupLoginHandlers() {
           }
         }
 
-        await finishLoginAndLaunch(connectedUrl, session);
+        await finishLoginAndLaunch(connectedUrl, session, { displayName: primaryDisplayName });
       } catch (err: any) {
         deps?.log(`[System] Connection error: ${err.message}`, 'system');
         if (errorMsg) {

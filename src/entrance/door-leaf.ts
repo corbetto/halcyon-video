@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 
 /** A continuous aluminum leaf with a recessed glass pocket and a deep bottom rail. */
-export function createDoorLeafFrame(width: number, height: number): THREE.ExtrudeGeometry {
-  const left = -width / 2 + .10, right = width / 2 - .10;
-  const bottom = .055, top = height - .02;
+export function createDoorLeafFrame(width: number, height: number, single = false): THREE.ExtrudeGeometry {
+  const margin = single ? .05 : .10;
+  const left = -width / 2 + margin, right = width / 2 - margin;
+  const bottom = single ? .04 : .055, top = height - .02;
+  const stile = single ? .15 : .12, kick = single ? .28 : .24;
   const shape = new THREE.Shape();
   shape.moveTo(left, bottom); shape.lineTo(right, bottom);
   shape.lineTo(right, top); shape.lineTo(left, top); shape.closePath();
   const glass = new THREE.Path();
-  glass.moveTo(left + .12, bottom + .24); glass.lineTo(left + .12, top - .16);
-  glass.lineTo(right - .12, top - .16); glass.lineTo(right - .12, bottom + .24); glass.closePath();
+  glass.moveTo(left + stile, bottom + kick); glass.lineTo(left + stile, top - .16);
+  glass.lineTo(right - stile, top - .16); glass.lineTo(right - stile, bottom + kick); glass.closePath();
   shape.holes.push(glass);
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: .115, bevelEnabled: true, bevelThickness: .006, bevelSize: .006,

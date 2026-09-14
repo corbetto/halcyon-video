@@ -1,5 +1,9 @@
+import { buildWallCourtesyTelephone } from './fixtures/wall-courtesy-telephone';
+import { installDisplayModel } from './fixtures/display-model';
+import { buildRooftopHVAC } from './rooftop-hvac';
 import { selfLit } from './material-lighting';
-// Exterior envelope shared by three architectural styles. Window openings,
+import { BB_ARCHIVO_BLACK } from './bundled-fonts';
+// Exterior envelope shared by the architectural styles. Window openings,
 // service-door placement and masonry tiling follow the store's live plan.
 // Fitted entrance portals and canopies are authored in Blender; none of this
 // exterior dressing changes the walkable entrance or its door animations.
@@ -11,6 +15,7 @@ import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
 import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
 import { createBrickTexture } from './canvas-textures';
+import { createFacadeSlateMaterial } from './facade-slate-material';
 import { WINDOW_BAY_TARGET_WIDTH, FRONT_WINDOW_CORNER_MARGIN, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
 export interface FacadeBuildParams {
@@ -55,6 +60,8 @@ export interface FacadeLogoAnchor {
   // that outgrow the gable lay out along this band instead — the
   // "letters across the whole front" placement.
   fascia: { width: number; bottomY: number; topY: number };
+  /** Optional wall-mounted channel-letter fields on either side of the canopy. */
+  wallBands?: { x: number; z: number; width: number; bottomY: number; topY: number }[];
 }
 
 export interface StorefrontFacade {
@@ -126,7 +133,7 @@ export function rightSideDoorZone(sideRibbon: { frontZ: number; backZ: number } 
   if (!sideRibbon) return null;
   const doorZ = sideRibbon.backZ - 0.5 - RIGHT_SIDE_DOOR_W / 2;
   const halfZ = (RIGHT_SIDE_DOOR_W + 0.4) / 2; // matches the interior frame's DOOR_W+0.4 span below
-  const signTopY = RIGHT_SIDE_DOOR_H + 0.75 + (0.73 + 0.06) / 2; // housing center + half its height
+  const signTopY = RIGHT_SIDE_DOOR_H + 0.75 + (0.73 + 0.08) / 2; // housing center + half its height (pin 107 dimensional housing)
   return { z0: doorZ - halfZ, z1: doorZ + halfZ, yTop: Math.max(RIGHT_SIDE_DOOR_H + 0.16, signTopY) };
 }
 
@@ -169,7 +176,14 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     group.add(m);
     return m;
   };
-  const masonry = brickMaterial(1, 1);
+  const slateHelper = style === 'cone-canopy' ? createFacadeSlateMaterial() : null;
+  const slateVeneer = slateHelper?.material ?? null;
+  const masonry = slateVeneer ?? brickMaterial(1, 1);
+  if (slateHelper) {
+    group.addEventListener('removed', () => {
+      slateHelper.dispose();
+    });
+  }
   const brickBox = (w: number, h: number, d: number, x: number, y: number, z: number) => {
     const mesh = addBox(w, h, d, x, y, z, masonry);
     mapFacadeUV(mesh.geometry, mesh.position);
@@ -306,6 +320,14 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     const hardwareMat = new THREE.MeshStandardMaterial({ color: 0xb9bec5, roughness: 0.25, metalness: 0.9 });
     const stoopMat = new THREE.MeshStandardMaterial({ color: 0x9a938a, roughness: 0.95, metalness: 0.0 });
 
+    const door = new THREE.Group();
+    door.name = 'serviceDoor';
+    door.position.set(rightEdgeX, 0, doorZ);
+    group.add(door);
+    const fallback = new THREE.Group();
+    door.add(fallback);
+    const firstDoorChild = group.children.length;
+
     // Exterior, proud of the brick veneer (veneer outer face ≈ wall + 0.625).
     const exFrameX = rightEdgeX + 0.66;
     [-1, 1].forEach((s) => {
@@ -328,15 +350,30 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     addBox(0.08, DOOR_H, DOOR_W, rightEdgeX - 0.06, DOOR_H / 2, doorZ, leafMat);          // leaf
     addBox(0.1, 0.14, DOOR_W - 0.7, rightEdgeX - 0.16, 3.3, doorZ, hardwareMat);          // crash bar
 
+    // Preserve the existing stoop and drip cap; replace only door construction.
+    for (const child of group.children.slice(firstDoorChild)) {
+      if (!(child instanceof THREE.Mesh) || child.material === stoopMat || child.material === coping) continue;
+      child.position.sub(door.position);
+      fallback.add(child);
+    }
+    const releaseDoor = installDisplayModel(params.context, door, fallback, 'models/service-door.glb', {
+      ServiceLeaf: leafMat, ServiceFrame: frameMat, ServiceHardware: hardwareMat,
+    });
+    door.userData.dispose = releaseDoor;
+    group.addEventListener('removed', releaseDoor);
+    // Independent static wall prop; door/frame and exit/navigation stay unchanged.
+    buildWallCourtesyTelephone(params.context, group, rightEdgeX, rightSideDoorZone(sideRibbon)!.z0);
+
     // EXIT sign above the door, built to real US exit-sign proportions: a
     // 15.5in x 8.75in face (aspect ~1.78) carrying RED "EXIT" at the NFPA 101 /
     // IBC minimum 6in cap height — i.e. letters filling ~69% of the face height
     // and nearly its full width, which is what makes one read as an exit sign
-    // at a glance. It used to be a 2.36:1 letterbox with ~3.9in green letters
-    // floating in the middle, which read as a printed placard.
-    // Self-luminous like the real thing: the emissiveMap carries only the
-    // glyphs, so they glow well above the surrounding face without blooming it.
+    // at a glance.
+    //
+    // Original molded housing fitted to the existing face and wall anchor.
+    // Its open bezel and recessed face make the construction readable in profile.
     const SIGN_W = 1.3, SIGN_H = 0.73;
+    const HOUSING_D = 0.292; // 3.5 in fitted housing depth
     const drawExitFace = (bg: string, fg: string): THREE.CanvasTexture => {
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 144; // matches SIGN_W/SIGN_H, no stretch
@@ -344,15 +381,12 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
       c.fillStyle = bg;
       c.fillRect(0, 0, canvas.width, canvas.height);
       c.fillStyle = fg;
-      // 99px caps on a 144px face = 6in on an 8.75in sign (code minimum).
-      c.font = '900 99px Arial, sans-serif';
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      // Wide letter-spacing, drawn per-glyph (canvas letterSpacing support varies).
-      const word = 'EXIT';
-      const step = 60;
-      const x0 = canvas.width / 2 - ((word.length - 1) * step) / 2;
-      for (let i = 0; i < word.length; i++) c.fillText(word[i], x0 + i * step, canvas.height / 2 + 4);
+      // Measure actual ink height; CSS font size is not capital-letter height.
+      c.font = `100px ${BB_ARCHIVO_BLACK}`;
+      const caps = c.measureText('EXIT').actualBoundingBoxAscent || 72;
+      c.font = `${100 * 99 / caps}px ${BB_ARCHIVO_BLACK}`;
+      c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+      c.fillText('EXIT',canvas.width/2,(canvas.height+99)/2,canvas.width-20);
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
@@ -362,15 +396,32 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
       map: drawExitFace('#f2f4f1', '#cf142b'),          // white acrylic face, safety-red lettering
       emissive: 0xffffff,
       emissiveMap: drawExitFace('#000000', '#ff3b30'),  // only the letters glow (backlit red)
-      emissiveIntensity: 2.0,                            // reads as self-luminous, not printed
+      emissiveIntensity: 1.2,                            // internally lit lettering below the bloom threshold
       roughness: 0.55,
       metalness: 0.0,
     }), 'light-source');
-    addBox(0.12, SIGN_H + 0.06, SIGN_W + 0.08, rightEdgeX - 0.16, DOOR_H + 0.75, doorZ, frameMat, false); // housing
+
+    // The Blender shell has an open bezel and a recessed seat, not a solid
+    // block covering the illuminated face. Its back attaches to the wall.
+    const housing = new THREE.Group(); housing.name = 'exit-sign-housing';
+    housing.position.set(rightEdgeX - .01, DOOR_H + .75, doorZ);
+    housing.rotation.y = -Math.PI / 2; group.add(housing);
+    const housingMat = new THREE.MeshStandardMaterial({ color: 0xe9ece6, roughness: .6, metalness: 0 });
+    const housingFallback = new THREE.Group(); housing.add(housingFallback);
+    const part = (w: number, h: number, d: number, x: number, y: number, z: number) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),housingMat);
+      mesh.position.set(x,y,z); housingFallback.add(mesh);
+    };
+    part(SIGN_W+.08,SIGN_H+.08,.04,0,0,.02);
+    for (const side of [-1,1]) {
+      part(.04,SIGN_H+.08,HOUSING_D-.04,side*(SIGN_W/2+.02),0,(HOUSING_D+.04)/2);
+      part(SIGN_W,.04,HOUSING_D-.04,0,side*(SIGN_H/2+.02),(HOUSING_D+.04)/2);
+    }
+    const removeHousing = installDisplayModel(params.context,housing,housingFallback,'models/exit-sign.glb',{ExitHousing:housingMat});
+    group.addEventListener('removed',removeHousing);
     const exitFace = new THREE.Mesh(new THREE.PlaneGeometry(SIGN_W, SIGN_H), exitFaceMat);
-    exitFace.position.set(rightEdgeX - 0.225, DOOR_H + 0.75, doorZ);
-    exitFace.rotation.y = -Math.PI / 2; // face -X, into the store
-    group.add(exitFace);
+    exitFace.name = 'exit-sign-illuminated-face'; exitFace.position.z = .274;
+    housing.add(exitFace);
   }
 
   group.add(buildFacadeEntryModel(params.context, {
@@ -378,20 +429,30 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     frontCornerMargin, brickMaterial, primary: stripeColor,
   }));
 
+  const rooftop = buildRooftopHVAC(params.context, storeWidth, backWallZ, ceilingY);
+  group.add(rooftop);
+  group.addEventListener('removed', () => rooftop.userData.dispose?.());
+
   // The brand cabinet sits over the entry, below the peak. Separate gable
   // and fascia bounds also keep optional freestanding letters inside the wall.
-  const logoWidth = Math.min(9.0, entryHalfWidth * 1.05);
+  const logoWidth = style === 'cone-canopy' ? Math.min(13, entryHalfWidth*1.65) : Math.min(9.0, entryHalfWidth * 1.05);
   const logoHeight = logoWidth * 0.6;
+  const wallInner = dimensions.massHalf + dimensions.pierWidth + .3;
+  const wallOuter = storeWidth/2 - frontCornerMargin;
   const logoAnchor: FacadeLogoAnchor = {
     x: CX,
     y: dimensions.logoY,
     z: towerFrontZ + 0.05,
-    width: logoWidth,
-    height: logoHeight,
+    width: logoWidth * 2,
+    height: logoHeight * 2,
     gable: style === 'gabled-brick'
       ? { baseY: gableBase, halfWidth: massHalf-1, height: gableH }
       : { baseY: 13.4, halfWidth: massHalf, height: dimensions.pierTop-13.4 },
     fascia: { width: storeWidth, bottomY: WINDOW_HEAD_Y, topY: parapetTop },
+    ...(style === 'cone-canopy' ? { wallBands: [-1,1].map(sign => ({
+      x: CX+sign*(wallInner+wallOuter)/2, z: FRONT_Z+.8,
+      width: Math.max(1,wallOuter-wallInner), bottomY: 13.4, topY: parapetTop-.4,
+    })) } : {}),
   };
 
   return { group, logoAnchor };

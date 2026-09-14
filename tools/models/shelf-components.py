@@ -4,8 +4,10 @@ The runtime stretches only the straight central runs, preserving edge profiles.
 """
 from pathlib import Path
 import math
+import json
 import bpy
 import bmesh
+from mathutils import Euler, Vector
 ROOT = Path(__file__).resolve().parents[2]
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
@@ -49,6 +51,27 @@ sweep('Rail', [(-.022,-.040),(.012,-.040),(.022,-.030),(.022,-.019),
                (.008,-.019),(.006,-.025),(-.010,-.025),(-.010,.025),
                (.006,.025),(.008,.019),(.022,.019),(.022,.030),
                (.012,.040),(-.022,.040)])
+# Snap-on closed rear spring: a C section gripping the recessed deck edge.
+# Channel back remains x=-.022; mouth faces +X. Runs retain their section.
+sweep('RailClip', [(-.022,.034),(-.064,.034),(-.070,.028),(-.070,-.036),
+    (-.064,-.042),(-.022,-.042),(-.022,-.034),(-.060,-.034),
+    (-.062,-.030),(-.062,.022),(-.060,.026),(-.022,.026)], .075)
+# Finished end plugs cover the cut extrusion; inset sockets avoid coplanar seams.
+sweep('RailEndStop', [(-.023,-.041),(.013,-.041),(.024,-.030),
+    (.024,.030),(.013,.041),(-.023,.041)], .012)
+# Separate blue carrier and two sprung jaws behind the independently printed card.
+carrier=sweep('ClaspCarrier', [(-.020,-.099),(-.004,-.103),(.004,-.095),
+    (.004,.095),(-.004,.103),(-.020,.099)], .974)
+carrier.data.materials.clear()
+blue=bpy.data.materials.new('ClaspBluePolymer');blue.diffuse_color=(.004,.063,.35,1)
+carrier.data.materials.append(blue)
+jaw=sweep('ClaspJaw', [(-.016,.038),(-.085,.038),(-.092,.029),
+    (-.092,-.054),(-.084,-.064),(-.052,-.064),(-.043,-.054),
+    (-.043,-.045),(-.055,-.045),(-.060,-.052),(-.080,-.052),
+    (-.082,-.046),(-.082,.021),(-.076,.026),(-.016,.026)], .075)
+steel=bpy.data.materials.new('SpringSteel');steel.diffuse_color=(.15,.17,.19,1)
+jaw.data.materials.clear();jaw.data.materials.append(steel)
+
 # Narrow folded support bracket, below the stock surface.
 sweep('Bracket', [(-.5,-.018),(.5,-.018),(.47,-.052),(-.44,-.15),(-.5,-.15)], .028)
 # Round wire with a closed end, eight sides enough at browsing distance.
@@ -60,8 +83,7 @@ sweep('Slat', [(-.25,-.125),(.25,-.125),(.25,.072),(.213,.072),
                (-.25,.105),(-.213,.105),(-.213,.072),(-.25,.072)])
 # Structural carcass components: finished laminate panel with a recessed toe,
 # eased edges and a fitted central spine. Nominal height five feet.
-panel=sweep('Upright', [(-.94,0),(.94,0),(.94,.20),(1.08,.20),
-    (.70,4.994),(.694,5),(-.694,5),(-.70,4.994),(-1.08,.20),(-.94,.20)], .04)
+panel=sweep('Upright', [(-1.08,0),(1.08,0),(.70,4.994),(.694,5),(-.694,5),(-.70,4.994)], .04)
 # Bevel every sheet edge, including the cut underside of the toe notch.
 bpy.context.view_layer.objects.active=panel
 bevel=panel.modifiers.new('Finished panel edges','BEVEL');bevel.width=.006;bevel.segments=2
@@ -84,8 +106,30 @@ for i,obj in enumerate(bpy.context.scene.objects):
     obj.select_set(True)
 bpy.context.scene.unit_settings.system='IMPERIAL'
 bpy.context.scene.unit_settings.scale_length=.3048
+bpy.context.scene['provenance']='Original generic shelf hardware; scripted for Halcyon #237. Assumed dimensions, not a replica.'
+for obj in bpy.context.scene.objects:
+    obj['runtime_contract']='Local geometry only: +X outward, Y up, Z along shelf after glTF export; feet.'
+for screen in bpy.data.screens:
+    for area in screen.areas:
+        if area.type == 'VIEW_3D':
+            view=area.spaces.active.region_3d
+            view.view_location=Vector((9.5,0,2))
+            view.view_distance=24
+            view.view_rotation=Euler((math.radians(65),0,math.radians(15)),'XYZ').to_quaternion()
+            view.view_perspective='ORTHO'
 bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/shelf-components.blend'))
 bpy.ops.export_scene.gltf(filepath=str(ROOT/'public/models/shelf-components.glb'),
     export_format='GLB',use_selection=True,export_yup=True,export_apply=True)
+metrics={}
+for obj in bpy.context.scene.objects:
+    mesh=obj.data;mesh.calc_loop_triangles()
+    bm=bmesh.new();bm.from_mesh(mesh)
+    assert all(e.is_manifold for e in bm.edges),obj.name
+    bm.free()
+    coords=[v.co for v in mesh.vertices]
+    metrics[obj.name]={'triangles':len(mesh.loop_triangles),'vertices':len(mesh.vertices),
+        'bounds_blender_ft':[[min(v[i] for v in coords),max(v[i] for v in coords)] for i in range(3)],
+        'materials':[m.name for m in mesh.materials],'uv':bool(mesh.uv_layers)}
+(ROOT/'tools/models/shelf-components-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 print('Shelf kit: closed manifold parts, UVs,',sum(len(o.data.polygons) for o in bpy.context.scene.objects),'polygons')

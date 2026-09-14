@@ -23,6 +23,7 @@ import {
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
 import { facadeEntryGlazing, facadeStyle } from './storefront-architecture';
+import { getStreamingCheckoutMovie, clearStreamingCheckoutMovie } from './streaming-checkout';
 
 export function ensureCarried(scene: StoreScene): CarriedTapes {
   if (!scene.carried) {
@@ -106,12 +107,19 @@ export function rehydrateCarried(scene: StoreScene): void {
     // Source-aware (GH #84): the stored id may be qualified, and a bare one
     // from an older build still resolves. findSlotKeyForMovie takes the BARE
     // id — the shelf slot is the server's own item.
-    const movie = findTitleByCarryId(scene.libraries, id)
-      ?? scene.gameMovies.find((g) => g.id === id);
-    if (movie) carried.take(movie, scene.findSlotKeyForMovie(movie.id), null, now);
+    const movie = findTitleByCarryId(scene.catalogLibraries, id)
+      ?? scene.catalogGames.find((g) => g.id === id);
+    if (movie) {
+      if (movie.streaming) continue;
+      carried.take(movie, scene.findSlotKeyForMovie(movie.id), null, now);
+    }
   }
   if (carried.count > 0) {
     scene.onConsoleLog(`[System] Still carrying ${carried.count} tape(s) from last visit.`, 'system');
+  } else {
+    try {
+      localStorage.removeItem(CARRY_STORAGE_KEY);
+    } catch { /* storage restricted */ }
   }
 }
 
@@ -330,6 +338,28 @@ export function checkoutCounterSpots(scene: StoreScene): CarryPose[] {
 
 export function confirmCheckout(scene: StoreScene): boolean {
   if (scene.checkoutRunning) return false;
+  const streamingMovie = getStreamingCheckoutMovie(scene) ?? (scene.carried?.topMovie()?.streaming ? scene.carried.topMovie() : null);
+  if (streamingMovie) {
+    retailAudio.playCheckoutChime();
+    showClerkToast(`Enjoy "${streamingMovie.title}" on ${streamingMovie.streamingServiceName || 'streaming'}!`);
+    if (streamingMovie.streamingUrl) {
+      try {
+        window.open(streamingMovie.streamingUrl, '_blank', 'noopener');
+      } catch {
+        scene.onConsoleLog(`[System] Couldn't open the link for "${streamingMovie.title}" (popup blocked?).`, 'system');
+      }
+    }
+    scene.carried?.clearAll(true);
+    clearStreamingCheckoutMovie(scene);
+    scene.clerk?.releaseFromRegister();
+    if (scene.overviewStart) {
+      scene.enterOverview();
+    } else {
+      scene.returnToEntrance();
+    }
+    scene.requestRender();
+    return true;
+  }
   const carried = scene.carried;
   if (!carried || carried.count === 0) {
     retailAudio.playDenyBuzz();
@@ -400,6 +430,7 @@ export function confirmCheckout(scene: StoreScene): boolean {
 // session, so a deny (empty-handed, over the rental cap) never tears down
 // the headset view for nothing.
 export function canConfirmCheckout(scene: StoreScene): boolean {
+  if (getStreamingCheckoutMovie(scene)) return true;
   const carried = scene.carried;
   if (!carried || carried.count === 0) return false;
   if (scene.rentalMode && carried.count > rentalCapacityAt(new Date())) return false;

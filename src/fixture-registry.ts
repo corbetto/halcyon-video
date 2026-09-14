@@ -1,3 +1,12 @@
+import { Clubhouse } from './fixtures/clubhouse';
+import { ChildrenChair } from './fixtures/children-chair';
+import { DepartmentArch } from './fixtures/department-arch';
+import { QueueVitrine } from './fixtures/queue-vitrine';
+import { CatalogPodium } from './fixtures/catalog-podium';
+import { CounterApparel } from './fixtures/counter-apparel';
+import { RopeStanchions } from './fixtures/rope-stanchions';
+import { ReleaseCart } from './fixtures/release-cart';
+import { CustomerInformationTerminal } from './fixtures/customer-information-terminal';
 import { FixturePlacement } from './store-layout';
 import { FixtureContext, StoreFixture } from './fixtures';
 import { FourSidedDisplay } from './fixtures/four-sided-display';
@@ -18,6 +27,7 @@ import { TipJar } from './fixtures/tip-jar';
 import { MirrorColumn } from './fixtures/mirror-column';
 import { CurtainedAlcove } from './fixtures/curtained-alcove';
 import { PottedPlant } from './fixtures/potted-plant';
+import { WallTrackBoard } from './fixtures/wall-track-board';
 
 export interface PlacedFixture extends StoreFixture {
   placement: FixturePlacement;
@@ -51,6 +61,7 @@ export function createFixture(placement: FixturePlacement, ctx: FixtureContext):
 
 // Statically register standard/default fixture kinds
 registerFixtureKind('four-sided-display', (placement, ctx) => new FourSidedDisplay(placement, ctx));
+// CandyDisplay owns the optional 1993 cardboard wing and shared stock/selection.
 registerFixtureKind('candy-display', (placement, ctx) => new CandyDisplay(placement, ctx));
 registerFixtureKind('previously-viewed-bin', (placement, ctx) => new PreviouslyViewedBin(placement, ctx));
 registerFixtureKind('tape-rewinder', (placement, ctx) => new TapeRewinder(placement, ctx));
@@ -66,3 +77,21 @@ registerFixtureKind('tip-jar', (placement, ctx) => new TipJar(placement, ctx));
 registerFixtureKind('mirror-column', (placement, ctx) => new MirrorColumn(placement, ctx));
 registerFixtureKind('curtained-alcove', (placement, ctx) => new CurtainedAlcove(placement, ctx));
 registerFixtureKind('potted-plant', (placement, ctx) => new PottedPlant(placement, ctx));
+registerFixtureKind('wall-track-board', (placement, ctx) => new WallTrackBoard(placement, ctx));
+
+registerFixtureKind('release-cart', (placement, ctx) => new ReleaseCart(placement, ctx));
+registerFixtureKind('customer-information-terminal', (placement, ctx) => new CustomerInformationTerminal(placement, ctx));
+
+registerFixtureKind('rope-stanchions', (placement, ctx) => new RopeStanchions(placement, ctx));
+
+registerFixtureKind('counter-apparel', (placement, ctx) => new CounterApparel(placement, ctx));
+
+registerFixtureKind('catalog-podium', (placement, ctx) => new CatalogPodium(placement, ctx));
+
+registerFixtureKind('queue-vitrine', (placement, ctx) => new QueueVitrine(placement, ctx));
+
+registerFixtureKind('department-arch', (placement, ctx) => new DepartmentArch(placement, ctx));
+
+registerFixtureKind('children-chair', (placement, ctx) => new ChildrenChair(placement, ctx));
+
+registerFixtureKind('clubhouse', (placement, ctx) => new Clubhouse(placement, ctx));

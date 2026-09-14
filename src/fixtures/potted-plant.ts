@@ -247,6 +247,16 @@ export class PottedPlant implements StoreFixture {
       potDiameter *= scale;
     }
 
+    if (this.opt('endcapShelf', false)) {
+      const boardGeo = new THREE.BoxGeometry(1.9, 0.08, 0.9);
+      const boardMat = new THREE.MeshStandardMaterial({ color: 0x6f4322, roughness: 0.8 });
+      this.disposables.push({ geo: boardGeo, mat: boardMat });
+      const board = new THREE.Mesh(boardGeo, boardMat);
+      board.position.y = -0.04;
+      board.castShadow = board.receiveShadow = true;
+      group.add(board);
+    }
+
     this.ctx.scene.add(group);
     this.ctx.requestShadowRefresh();
 

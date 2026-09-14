@@ -7,6 +7,8 @@
 // movie boxes bake their resting transforms from the plan, not from these
 // meshes, so any structure that respects the plan's dimensions works.
 import * as THREE from 'three';
+import { buildWallLibraryUnit } from './wall-library-shelving';
+import { activeStoreFormat } from './store-format';
 import { ShelfModelBatch, type ShelfPart } from './shelf-model';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { JellyfinLibrary } from './jellyfin';
@@ -18,7 +20,7 @@ import {
 import { StorePlan } from './store-plan';
 import { createFlushTopperLabelTexture, paintFlushTopperLabel, createArchedTopperLabelTexture, BB2000_PLAQUE_RED } from './canvas-textures';
 import {
-  createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T,
+  createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T, MOM_POP_CLASP_ASPECT,
 } from './fixtures/ticket-board-sign';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from './sign-builders';
 import { createFasciaBladeFactory, FASCIA_BLADE_H } from './fixtures/genre-fascia';
@@ -113,9 +115,9 @@ function getSpineSlatwallMaterial(panelHeightFt: number): THREE.MeshStandardMate
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    // One V tile per 4-inch slat course (same spacing as the end caps'
+    // One V tile per 3-inch slat course (same spacing as the end caps'
     // slatwall); a handful of U tiles across the run for the grain.
-    tex.repeat.set(6, panelHeightFt / (4 / 12));
+    tex.repeat.set(6, panelHeightFt / (3 / 12));
     tex.generateMipmaps = true;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
@@ -160,19 +162,9 @@ export interface AisleShelvingDeps {
   suppressFrontCapLineIds?: Set<number>;
 }
 
-/**
- * Which shelf lip carries the clasps: the band just ABOVE the top row — at the
- * walk-mode eye height (5.5ft) the one you read without moving your head, and
- * the one the browse cursor reaches by pressing Up off the top shelf.
- *
- * This was written against the OLD 4-row heights ([1.0, 2.1, 3.2, 4.3], where
- * 4.3 was the top row itself); the measured pitch (2e4eadf) moved the top row
- * to AISLE_SHELF_HEIGHTS's last entry and left this literal floating. The
- * clearance below keeps the current position exactly where it is today while
- * making sure a future pitch change can never sink the clasp BELOW the top row
- * and bury it in that row's stock.
- */
-const CLASP_SHELF_Y = Math.max(4.3, AISLE_SHELF_HEIGHTS[AISLE_SHELF_HEIGHTS.length - 1] + 0.45);
+/** The actual top deck carries the jaws. The former invisible section marker
+ * floated above this row; visible clip hardware must follow its physical lip. */
+const CLASP_SHELF_Y = AISLE_SHELF_HEIGHTS[AISLE_SHELF_HEIGHTS.length - 1];
 
 // Populate shelves dynamically for each library's freestanding shelving units.
 // Each island is parented to its own pivot group, positioned at the island's
@@ -216,7 +208,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       // toppers wear, cut and finished in fixtures/ticket-board-sign.ts. The
       // brand torn-ticket emblem it replaced still serves the library
       // ENTRANCE labels via createLibraryLabelTexture.
-      mat = createTicketBoardLabelMaterial(label);
+      mat = createTicketBoardLabelMaterial(label, activeStoreFormat().overheadSignage ? undefined : MOM_POP_CLASP_ASPECT);
       sectionLabelMats.set(label, mat);
     }
     return mat;
@@ -329,7 +321,11 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const wireBlackFrame = theme.shelving.frame === 'wire-black';
   const wireFrame = wireBlackFrame && !!materials.wireShelf;
   const modeledSpineMat = wireFrame ? deps.shelfModels.own(materials.shelf.clone()) : materials.shelf;
-  if (wireFrame) modeledSpineMat.color.set(0xeadcbc);
+  if (wireFrame) {
+    modeledSpineMat.color.set(0xeadcbc);
+    modeledSpineMat.roughness = .8;
+    modeledSpineMat.normalScale?.set(.18, .18);
+  }
   const wireMats = new Map<string, THREE.MeshStandardMaterial>();
   const getWireMat = (rx: number, ry: number): THREE.MeshStandardMaterial => {
     const key = `${rx.toFixed(2)}_${ry.toFixed(2)}`;
@@ -377,6 +373,10 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     const aisleParent = makeAisleGroup(unit.yaw, unit.xCenter, unitZCenter);
     aisleParent.name = `gondola-unit:${unit.libraryIdx}:${unit.unitIdxInLibrary}`;
     aisleParent.userData.gondolaLine = unit.lineId;
+    if (unit.singleSided) {
+      buildWallLibraryUnit(deps, unit, aisleParent, getSectionLabelMat);
+      return;
+    }
     const cols = unit.cols;
     const shelfLength = (cols - 1) * BOX_SPACING + 1.0; // 0.5 ft margin on each end
 
@@ -444,6 +444,18 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
 
     });
 
+    // Finished laminate closes the base below the lowest deck on each face.
+    if (!wireFrame) {
+      const baseH = AISLE_SHELF_HEIGHTS[0] - .0425;
+      const faceX = unitDepthAtHeight(AISLE_SHELF_HEIGHTS[0]) / 2 - .05;
+      for (const side of [-1, 1]) {
+        stamp(structureParts, getBoxTemplate(.0625, baseH, shelfLength - .04),
+          xCenter + side * faceX, baseH / 2, zCenter);
+        structureModels.push({ kind: 'spine', depth: .0625, height: baseH,
+          length: shelfLength - .04, x: xCenter + side * faceX, z: zCenter });
+      }
+    }
+
     // Vertical dividers between sets of 7 columns - ONE CONTINUOUS PIECE FROM BOTTOM TO TOP
     const addDivider = (zDiv: number) => {
       if (wireFrame) {
@@ -468,11 +480,18 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
 
     // Divider where conjoined/contiguous shelf units meet (at the back of the unit if not the end of the line)
     if (!unit.isLineBack) {
-      addDivider(FIELD_Z_FRONT + unit.zPos - shelfLength);
+      const seamZ = FIELD_Z_FRONT + unit.zPos - shelfLength;
+      addDivider(seamZ);
+      if (wireFrame) {
+        // Close the seam between the two trimmed spines, behind the one joint post.
+        const joint = new THREE.Mesh(getBoxTemplate(.5, UNIT_FRAME_HEIGHT, .04), getSpineSlatwallMaterial(UNIT_FRAME_HEIGHT));
+        joint.position.set(xCenter, frameCenterY, seamZ); joint.castShadow=joint.receiveShadow=true;
+        aisleParent.add(joint);
+      }
     }
 
     if (wireFrame) {
-      for (const z of [FIELD_Z_FRONT + unit.zPos - .06, FIELD_Z_FRONT + unit.zPos - shelfLength + .06]) {
+      for (const z of [unit.isLineFront ? FIELD_Z_FRONT + unit.zPos - .06 : null, unit.isLineBack ? FIELD_Z_FRONT + unit.zPos - shelfLength + .06 : null].filter((z): z is number => z !== null)) {
         const support = new THREE.Mesh(getBoxTemplate(.14, UNIT_FRAME_HEIGHT, .09), materials.strip);
         support.position.set(xCenter, frameCenterY, z);
         support.castShadow = support.receiveShadow = true;
@@ -589,6 +608,21 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         };
         place(plusXLabel, 1);
         place(minusXLabel, -1);
+      }
+
+      if (!activeStoreFormat().overheadSignage) {
+        // Small independent-store labels clip onto the eye-level shelf lip.
+        for (const [sign, label] of [[1, plusXLabel], [-1, minusXLabel]] as const) {
+          const card = new THREE.Mesh(getBoxTemplate(0.04, 0.20, 1.45), [
+            getSectionLabelMat(label), getSectionLabelMat(label),
+            materials.signSide, materials.signSide, materials.signSide, materials.signSide,
+          ]);
+          card.position.set(xCenter + sign * (unitDepthAtHeight(4.795) / 2 + 0.04), 4.795, zSecCenter);
+          card.name = 'eye-level library clasp';
+          markSignMesh(card, { casts: true });
+          aisleParent.add(card);
+        }
+        continue;
       }
 
       if (archedTopper) {
@@ -780,7 +814,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
 
       // Front End Cap (built to UNIT_FRAME_HEIGHT, flush with the run top)
       const isBlue = isFrontCapFacingStore;
-      const capMats = createLibraryEndCapMaterial(wireBlackFrame ? !isBlue : false);
+      const capMats = createLibraryEndCapMaterial(wireBlackFrame);
       const leftCap = new THREE.Mesh(capTrapezoidGeo, capMats);
       leftCap.position.set(xCenter, frameCenterY, FIELD_Z_FRONT + unit.zPos + 0.05);
       leftCap.rotation.y = 0; // Face pointing towards +Z
@@ -796,13 +830,13 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       deps.addCollider(leftCap);
       deps.registerEndCap(leftCap);
       deps.shelfModels.add(leftCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
-        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY, physicalUV: wireBlackFrame }], capMats, true);
     }
 
     if (unit.isLineBack) {
       // Back End Cap (built to UNIT_FRAME_HEIGHT, flush with the run top)
       const isBlue = !isFrontCapFacingStore;
-      const capMats = createLibraryEndCapMaterial(wireBlackFrame ? !isBlue : false);
+      const capMats = createLibraryEndCapMaterial(wireBlackFrame);
       const rightCap = new THREE.Mesh(capTrapezoidGeo, capMats);
       rightCap.position.set(xCenter, frameCenterY, FIELD_Z_FRONT + unit.zPos - shelfLength - 0.05);
       rightCap.rotation.y = Math.PI; // Face pointing towards -Z
@@ -818,7 +852,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       deps.addCollider(rightCap);
       deps.registerEndCap(rightCap);
       deps.shelfModels.add(rightCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
-        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY, physicalUV: wireBlackFrame }], capMats, true);
     }
   });
 }

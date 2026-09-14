@@ -27,9 +27,11 @@ const store = new Map<string, string>();
 const {
   directStreamUrl,
   currentTranscodeSessionId,
+  stopTranscodeSession,
   transcodeStreamUrl,
   transcodeStreamUrlSync,
   playbackIsDirectSafe,
+  subtitleTrackUrl,
 } = await import('../src/playback-routing.ts');
 
 const SERVER = 'http://media.local:32400';
@@ -50,6 +52,7 @@ test('Jellyfin routes to Jellyfin endpoints', async () => {
   assert.match(directStreamUrl(SERVER, 'tok', '42'), /\/Videos\/42\//);
   assert.match(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
   assert.match(transcodeStreamUrlSync(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
+  assert.match(subtitleTrackUrl(SERVER, 'tok', '42', 2)!, /\/Videos\/42\/42\/Subtitles\/2\/0\/Stream\.vtt/);
   assert.equal(playbackIsDirectSafe(MP4), true, 'a plain mp4/h264/aac is direct-playable');
 });
 
@@ -67,6 +70,9 @@ test('Plex routes to Plex endpoints, and never to a Jellyfin route', async () =>
   // Even the direct builder — unreachable today, see playbackIsDirectSafe —
   // must not fabricate a Jellyfin URL if a future direct path calls it.
   assert.doesNotMatch(directStreamUrl(SERVER, 'tok', '42'), /\/Videos\//);
+
+  // Plex does not serve Jellyfin /Videos/.../Subtitles endpoints (GH #300).
+  assert.equal(subtitleTrackUrl(SERVER, 'tok', '42', 2), undefined);
 });
 
 test('Plex declines synchronous direct play regardless of codecs', () => {
@@ -131,11 +137,13 @@ test('an explicit kind overrides the install-wide one, both directions', async (
     /\/video\/:\/transcode\/universal\/start\.m3u8/);
   assert.doesNotMatch(directStreamUrl(SERVER, 'tok', '42', undefined, 'plex'), /\/Videos\//);
   assert.equal(playbackIsDirectSafe(MP4, 'plex'), false, 'Plex is never direct-play');
+  assert.equal(subtitleTrackUrl(SERVER, 'tok', '42', 2, undefined, 'plex'), undefined);
 
   useBackend('plex'); // and the mirror image: primary Plex, this title Jellyfin
   assert.match(await transcodeStreamUrl(SERVER, 'tok', '42', {}, 'jellyfin'), /\/Videos\/42\//);
   assert.match(transcodeStreamUrlSync(SERVER, 'tok', '42', {}, 'jellyfin'), /\/Videos\/42\//);
   assert.match(directStreamUrl(SERVER, 'tok', '42', undefined, 'jellyfin'), /\/Videos\/42\//);
+  assert.match(subtitleTrackUrl(SERVER, 'tok', '42', 2, undefined, 'jellyfin')!, /\/Videos\/42\//);
   assert.equal(playbackIsDirectSafe(MP4, 'jellyfin'), true);
 });
 
@@ -143,23 +151,29 @@ test('omitting the kind still falls back to the install-wide backend', async () 
   // Single-backend stores pass nothing and must behave exactly as before.
   useBackend('plex');
   assert.doesNotMatch(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\//);
+  assert.equal(subtitleTrackUrl(SERVER, 'tok', '42', 2), undefined);
   useBackend('jellyfin');
   assert.match(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
+  assert.match(subtitleTrackUrl(SERVER, 'tok', '42', 2)!, /\/Videos\/42\//);
 });
 
 
 test('Emby playback follows the title source even when the primary server differs', async () => {
   useBackend('plex');
   const direct = new URL(directStreamUrl('http://emby.local/base', 'emby-token', 'film', 'source', 'emby'));
-  assert.equal(direct.pathname, '/base/emby/Videos/film/stream');
+  assert.equal(direct.pathname, '/base/Videos/film/stream');
   assert.equal(direct.searchParams.get('api_key'), 'emby-token');
   assert.equal(direct.searchParams.get('MediaSourceId'), 'source');
   const hls = new URL(transcodeStreamUrlSync('http://emby.local/base/emby', 'emby-token', 'film', { mediaSourceId: 'source', startPositionTicks: 600000000 }, 'emby'));
   assert.equal(hls.pathname, '/base/emby/Videos/film/master.m3u8');
   assert.equal(hls.searchParams.get('MediaSourceId'), 'source');
   assert.equal(hls.searchParams.get('StartTimeTicks'), '600000000');
+  const sub = new URL(subtitleTrackUrl('http://emby.local/base/emby', 'emby-token', 'film', 2, 'source', 'emby')!);
+  assert.equal(sub.pathname, '/base/emby/Videos/film/source/Subtitles/2/0/Stream.vtt');
+  assert.equal(sub.searchParams.get('api_key'), 'emby-token');
   useBackend('emby');
   assert.equal(new URL(directStreamUrl('http://jellyfin.local', 'jf-token', 'film', undefined, 'jellyfin')).pathname, '/Videos/film/stream');
+  assert.match(subtitleTrackUrl('http://jellyfin.local', 'jf-token', 'film', 2, undefined, 'jellyfin')!, /\/Videos\/film\/film\/Subtitles\/2\/0\/Stream\.vtt/);
 });
 
 
@@ -170,3 +184,68 @@ test('transcode teardown retains the playing stream when another source builds a
   assert.equal(currentTranscodeSessionId('emby', playing), new URL(playing).searchParams.get('PlaySessionId'));
   assert.equal(currentTranscodeSessionId('emby', 'http://emby.local/emby/Videos/1/stream'), undefined);
 });
+
+test('Plex transcode session ID is extracted from the session parameter', async () => {
+  const hls = await transcodeStreamUrl(SERVER, 'tok', '42', {}, 'plex');
+  const sessionId = currentTranscodeSessionId('plex', hls);
+  assert.ok(sessionId);
+  assert.match(sessionId, /^halcyon-/);
+  assert.equal(sessionId, new URL(hls).searchParams.get('session'));
+  assert.equal(currentTranscodeSessionId('plex', 'http://plex.local:32400/library/parts/1/file.mkv'), undefined);
+  assert.equal(currentTranscodeSessionId('plex', ''), undefined);
+  assert.equal(currentTranscodeSessionId('plex', undefined), undefined);
+
+  // Falls back to install-wide backend if kind is omitted
+  useBackend('plex');
+  assert.equal(currentTranscodeSessionId(undefined, hls), sessionId);
+});
+
+test('stopTranscodeSession invokes stop endpoint on Plex server', async (t) => {
+  const calls: Array<[string, any]> = [];
+  t.mock.method(globalThis, 'fetch', async (url: string, opts: any) => {
+    calls.push([url, opts]);
+    return new Response('ok', { status: 200 });
+  });
+
+  const logs: string[] = [];
+  await stopTranscodeSession('halcyon-session-123', (m) => logs.push(m), {
+    url: 'http://plex.local:32400',
+    token: 'plex-token',
+    kind: 'plex',
+  });
+
+  assert.equal(calls.length, 1);
+  const [calledUrl, calledOpts] = calls[0];
+  const urlObj = new URL(calledUrl);
+  assert.equal(urlObj.pathname, '/video/:/transcode/universal/stop');
+  assert.equal(urlObj.searchParams.get('session'), 'halcyon-session-123');
+  assert.equal(urlObj.searchParams.get('X-Plex-Token'), 'plex-token');
+  assert.equal(calledOpts.headers['X-Plex-Token'], 'plex-token');
+  assert.equal(logs.length, 0);
+});
+
+test('stopTranscodeSession is a no-op when server is null', async (t) => {
+  let called = false;
+  t.mock.method(globalThis, 'fetch', async () => {
+    called = true;
+    return new Response('ok', { status: 200 });
+  });
+  await stopTranscodeSession('halcyon-session-123', () => {}, null);
+  assert.equal(called, false);
+});
+
+test('stopTranscodeSession reports error via log callback on Plex failure', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('Plex unreachable');
+  });
+
+  const logs: string[] = [];
+  await stopTranscodeSession('halcyon-session-123', (m) => logs.push(m), {
+    url: 'http://plex.local:32400',
+    token: 'plex-token',
+    kind: 'plex',
+  });
+
+  assert.ok(logs.some((msg) => msg.includes('[Player] stopPlexTranscode failed: Plex unreachable')));
+});
+

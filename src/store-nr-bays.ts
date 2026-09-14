@@ -3,11 +3,11 @@
 //
 // The ribbon is one column index across up to four wall runs (the left-wall
 // unit, then back-wall Runs 1-3), but every run is cut into bays on its OWN
-// axis: a divider every SECTION_COLS from the run's first column, with the
+// axis: a divider every NR_SECTION_COLS from the run's first column, with the
 // leftover forming a narrower trailing bay against the run's end panel
 // (store-shell.ts buildShelfRun, the ticket toppers and nrDividerNudge all use
 // that per-run math). Run column counts come from floor((length - 1) /
-// BOX_SPACING) and are almost never multiples of six, so title sections dealt
+// BOX_SPACING) and are almost never multiples of eight, so title sections dealt
 // across the global ribbon from col 0 drifted off the bays: past the first
 // short run one title showed two copies at the end of a bay and four at the
 // start of the next, and a section could straddle the corner between runs.
@@ -15,7 +15,7 @@
 // two whole neighbouring bays as a double feature.
 //
 // Pure math, no three.js — node-testable (tests/nr-bays.test.ts).
-import { SECTION_COLS } from './store-layout.ts';
+import { NR_SECTION_COLS } from './store-layout.ts';
 
 export interface NrBay {
   /** Index of the wall run this bay sits on, in ribbon order. */
@@ -24,9 +24,9 @@ export interface NrBay {
   startCol: number;
   /** Last GLOBAL ribbon column of the bay (inclusive). */
   endCol: number;
-  /** Column count: SECTION_COLS for a full bay, fewer for a trailing partial. */
+  /** Column count: NR_SECTION_COLS for a full bay, fewer for a trailing partial. */
   cols: number;
-  /** True when the bay is a full SECTION_COLS wide — features go there only. */
+  /** True when the bay is a full NR_SECTION_COLS wide — features go there only. */
   full: boolean;
 }
 
@@ -35,14 +35,14 @@ export function nrBaysForRuns(runCols: number[]): NrBay[] {
   const bays: NrBay[] = [];
   let startCol = 0;
   runCols.forEach((cols, runIdx) => {
-    for (let local = 0; local < cols; local += SECTION_COLS) {
-      const width = Math.min(SECTION_COLS, cols - local);
+    for (let local = 0; local < cols; local += NR_SECTION_COLS) {
+      const width = Math.min(NR_SECTION_COLS, cols - local);
       bays.push({
         runIdx,
         startCol: startCol + local,
         endCol: startCol + local + width - 1,
         cols: width,
-        full: width === SECTION_COLS,
+        full: width === NR_SECTION_COLS,
       });
     }
     startCol += Math.max(0, cols);

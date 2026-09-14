@@ -1,3 +1,6 @@
+import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/department-arch-layout';
+// Service-wall dressing follows the live facade/door datum, not a fixed floor placement.
+export { WALL_COURTESY_PHONE } from './fixtures/wall-courtesy-telephone';
 import { FixturePlacement, BOX_SPACING, STORE_CENTER_X } from './store-layout';
 import { activeStoreFormat, type CounterShape } from './store-format';
 import { registerFixtureKind } from './fixture-registry';
@@ -12,7 +15,29 @@ import { deskGroundPlan } from './entrance/desk-plan';
 // lives with the config that declares its rectangles.
 registerFixtureKind('structure-footprint', (placement) => new StructureFootprint(placement));
 
+// #280 has no confirmed hinge/base or floor/counter anchor. Tooling may inspect
+// this crop-relative asset, but it MUST NOT enter DEFAULT_FIXTURE_PLACEMENTS.
+export const CUSTOMER_INFORMATION_TERMINAL_PREVIEW: FixturePlacement = {
+  id: 'customer-information-terminal-preview', kind: 'customer-information-terminal',
+  position: { x: 0, z: 0 }, yaw: 0, options: { assetViewer: true },
+};
+
 export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
+  // Original glass retail case beside the left checkout queue. Kept forward
+  // of the shelf field and clear of the early catalog podium and service cart.
+  // Dormant at the owner's request (2026-09-12). Keep its registered fixture
+  // and model available for later reactivation.
+  // Original early paper lookup table, right of checkout (entrance side).
+  // Directory book is dormant at the owner's request (2026-09-12).
+  // Keep its registered fixture and model available for later reactivation.
+  // Neutral 1993 apparel on the existing rear vestibule glazing. Height and
+  // glass datum are resolved by the fixture; no floor or stock footprint.
+  { id: 'counter-apparel', kind: 'counter-apparel', position: { x: 15.5, z: 8.54 }, yaw: Math.PI },
+  // Open entrance foreground, before the aisle ends. Parallel to the runner;
+  // neither end closes the entrance. #222 continues to own vestibule mats.
+  // Entrance rope rails stay dormant until the owner chooses their location.
+  // Reserved left checkout bay, opposite the sale table; clear of the queue.
+  { id: 'release-cart-checkout', kind: 'release-cart', position: { x: -5, z: 3 }, yaw: 0, options: { noRentalCase: true } },
   // Floor displays are SPREAD down the store's open central corridor (the
   // island-free CENTER_WALKWAY, x roughly 3..19) instead of bunched in the back
   // area. The corridor runs clear from just behind the checkout counter's apex
@@ -204,6 +229,25 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
     yaw: Math.PI,
     options: { themes: COMING_SOON_LETTERBOARD_THEMES },
   },
+  // ── Changeable-strip information board family (#287) ─────────────────────
+  // Two distinct formats:
+  // 1. Tall silver-framed board behind registers near front glazing with companion
+  //    framed poster beside it. Attested in later store footage (post-1990);
+  //    does not displace the 1990 counter Coming Soon board.
+  {
+    id: 'wall-track-board-registers',
+    kind: 'wall-track-board',
+    position: { x: 8.8, z: 8.48 },
+    yaw: Math.PI,
+    options: {
+      format: 'tall',
+      themes: ['bb-1993', 'bb-2000', 'bb-2010'],
+      companionPoster: true,
+      surfaceY: 3.65,
+      rows: 14,
+    },
+  },
+  // Pin 113: the unsubstantiated blank rental-terms strip is not installed.
   // (The previously-viewed dump bin that used to sit at x 16.5, z 3.0 was
   // removed in #37: that spot is INSIDE the checkout counter's shield outline,
   // so its brown tub read as a stray brown box poking through the counter.)
@@ -387,12 +431,15 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
 // mom-and-pop spec (GH #33) bans them outright: "less floor space around the
 // runs, no big open areas, no floor displays".
 const FLOOR_DISPLAY_KINDS = new Set([
+  'queue-vitrine',
+  'catalog-podium',
   'four-sided-display',      // promo floor stands
   'bargain-bin',             // dump tub
   'pv-drape-table',          // previously-viewed drape table
   'mirror-column',           // clad structural pillar
   'previously-viewed-bin',
   'gold-clamshell',
+  'rope-stanchions',
 ]);
 
 // Fixture kinds that mount ON the checkout counter's walk-in BAND — its blue
@@ -400,6 +447,7 @@ const FLOOR_DISPLAY_KINDS = new Set([
 // is a standalone desk (counterShape 'desk') has no band, so these have nothing
 // to sit on and would hang in mid-air over the clerk's strip of floor.
 const COUNTER_BAND_KINDS = new Set([
+  'queue-vitrine',
   'coming-soon-letterboard',
   'candy-display',
   'tape-cleaner-display',
@@ -418,74 +466,32 @@ const COUNTER_BAND_KINDS = new Set([
  * is what holds the shelf runs far enough off the back wall for the alcove to
  * stand in front of it, so the two numbers are read together.
  */
-export function curtainedAlcovePlacements(): FixturePlacement[] {
+export function curtainedAlcovePlacements(roomDepth = 5): FixturePlacement[] {
   return [{
     id: 'curtained-alcove',
     kind: 'curtained-alcove',
     position: { x: STORE_CENTER_X, z: 0 }, // derived in the fixture — see above
     yaw: 0,
-    options: { cornerSide: 'right' },
+    options: { cornerSide: 'right', roomDepth },
   }];
 }
 
 /**
  * Potted plants for mom-and-pop mode (StoreFormatSpec.plants).
- * Authentic houseplants placed where independent video stores kept them:
- * catching sun by the storefront windows, tucked into the desk corner,
- * and beside the back-room beaded curtain.
+ * Plants sit on reserved shelf-end ledges, leaving the aisle floor clear.
  */
 export function momAndPopPlantPlacements(
-  storeWidth: number,
-  backWallZ: number,
-  _openEnds: { worldX: number; frontLocalZ: number }[] = [],
+  _storeWidth: number,
+  _backWallZ: number,
+  openEnds: { worldX: number; frontLocalZ: number; unit: { lineId: number } }[] = [],
 ): FixturePlacement[] {
-  const wallX = STORE_CENTER_X - storeWidth / 2;
-  const outerRightX = STORE_CENTER_X + storeWidth / 2;
-  const innerAlcoveX = outerRightX - 7.5;
-  const alcoveFrontZ = backWallZ + 5.0;
-
-  return [
-    // Tall floor palm by the front window right of the door, basking in daylight
-    {
-      id: 'plant-front-window',
-      kind: 'potted-plant',
-      position: { x: STORE_CENTER_X + 4.5, z: 13.6 },
-      yaw: 0.4,
-      options: { variant: 'floor-palm' }
-    },
-    // Upright snake plant in the front-left corner beside the side window & desk
-    {
-      id: 'plant-desk-corner',
-      kind: 'potted-plant',
-      position: { x: wallX + 1.8, z: 13.6 },
-      yaw: -0.6,
-      options: { variant: 'snake-plant' }
-    },
-    // Floor palm softening the return corner beside the back room beaded curtain
-    {
-      id: 'plant-alcove',
-      kind: 'potted-plant',
-      position: { x: innerAlcoveX - 1.4, z: alcoveFrontZ + 0.8 },
-      yaw: -0.85,
-      options: { variant: 'floor-palm', frondScale: 0.72, fanSpan: Math.PI * 1.1 }
-    },
-    // Tall ficus tree on the front-left corner of the center shelf
-    {
-      id: 'plant-shelves-left',
-      kind: 'potted-plant',
-      position: { x: 8.6, z: 1.65 },
-      yaw: 0.6,
-      options: { variant: 'tall-ficus' }
-    },
-    // Tall ficus tree on the front-right corner of the center shelf
-    {
-      id: 'plant-shelves-right',
-      kind: 'potted-plant',
-      position: { x: 13.4, z: 1.65 },
-      yaw: -0.6,
-      options: { variant: 'tall-ficus' }
-    },
-  ];
+  return openEnds.slice(0, Math.min(2, Math.max(0, openEnds.length - 1))).map((end) => ({
+    id: `plant-endcap-${end.unit.lineId}`,
+    kind: 'potted-plant',
+    position: { x: end.worldX, z: end.frontLocalZ + 0.46 },
+    yaw: 0,
+    options: { variant: 'pothos', surfaceY: 3.0, endcapShelf: true, lineId: end.unit.lineId },
+  }));
 }
 
 /**
@@ -607,29 +613,15 @@ export function counterAnchoredPlacements(
       {
         id: 'candy-display-front',
         kind: 'candy-display',
-        position: { x: 9.0, z: -4.0 }, // band outer face -3.6 − rackDepth/2 − 0.05
+        position: { x: 9.0, z: -4.45 }, // keep rear edge clear of band at z=-3.6
         yaw: 0,
-        options: { rows: 5, footprintWidth: 3.0 }
+        options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
       },
       {
         id: 'tape-rewinder-counter',
         kind: 'tape-rewinder',
         position: { x: 13.5, z: -1.3 }, // inner island spine (front -2.1 + innerD/2)
         yaw: 0
-      },
-      {
-        // On the front band top, left of centre. 6.9, not 8.6: the
-        // 'register-left' PLEASE REWIND tent stands on this same band top at
-        // cx - 1.8 = 9.2 (entrance/index.ts registerLeftOnBand), and at 8.6
-        // the 2.2 ft tray (7.5..9.7) swallowed the tent whole (visual sweep
-        // 2026-09-04). 6.9 puts the tray at 5.8..8.0 — 0.75 ft short of the
-        // tent and still 0.5 ft clear of the bag's wait spot at the band's
-        // left end (store-checkout.ts WAIT_DX/DZ off the island rest spot).
-        id: 'tape-cleaner-display-counter',
-        kind: 'tape-cleaner-display',
-        position: { x: 6.9, z: -2.85 },
-        yaw: Math.PI, // labels toward the store side (-z)
-        options: { count: 10 }
       },
       {
         // Tip jar: same band top, right of centre — the far side from the
@@ -648,20 +640,19 @@ export function counterAnchoredPlacements(
   // other at the mitred joints, and the walk-through gap near (1.2, 2.26)
   // (GAP_TRIM 2.2 in counter.ts) is left open.
   return [
-    {
-      id: 'counter-band-shoulder-left',
-      kind: 'structure-footprint',
-      position: { x: 3.85, z: 5.35 },
-      yaw: 2.0941,
-      options: { footprintWidth: 3.6, footprintDepth: 1.5 }
-    },
-    {
-      id: 'counter-band-front-left',
-      kind: 'structure-footprint',
-      position: { x: 6.88, z: -1.28 },
-      yaw: 0.6697,
-      options: { footprintWidth: 8.9, footprintDepth: 1.5 }
-    },
+    ...(() => {
+      const a={x:4.8,z:8.5}, b={x:1.2,z:2.26}, c={x:11,z:-5.5};
+      const length=Math.hypot(b.x-a.x,b.z-a.z), tx=(b.x-a.x)/length, tz=(b.z-a.z)/length;
+      const at=(d:number)=>({x:a.x+tx*d,z:a.z+tz*d});
+      // Conservative rectangular cores avoid overlapping at mitred joins.
+      // The built counter supplies the complete collision and clerk boundaries.
+      return [[a,at(1)],[at(4.6),b],[b,c]].map(([p,q],i)=>{
+        const len=Math.hypot(q.x-p.x,q.z-p.z), nx=-(q.z-p.z)/len,nz=(q.x-p.x)/len;
+        return {id:`counter-band-doorway-left-${i}`,kind:'structure-footprint',
+          position:{x:(p.x+q.x)/2+nx*.75,z:(p.z+q.z)/2+nz*.75},
+          yaw:Math.atan2(-(q.z-p.z),q.x-p.x),options:{footprintWidth:Math.max(.35,len-2.8),footprintDepth:1.5}};
+      });
+    })(),
     {
       id: 'counter-band-front-right',
       kind: 'structure-footprint',
@@ -690,9 +681,9 @@ export function counterAnchoredPlacements(
     {
       id: 'candy-display-front',
       kind: 'candy-display',
-      position: { x: 6.09, z: -2.12 },
+      position: { x: 5.81066, z: -2.47278 },
       yaw: 0.6697,
-      options: { rows: 5, footprintWidth: 3.0 }
+      options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
     },
     // Rewinder on the inner rental counter's top — z matches counter.ts's
     // getInnerCounterSpine(13.9), yaw matches that segment's rotY. See
@@ -703,20 +694,7 @@ export function counterAnchoredPlacements(
       position: { x: 13.9, z: -0.27 },
       yaw: -0.6697
     },
-    // Tape-cleaner display on the band's blue top — moved from the left
-    // FRONT segment (old #57 spot (4.61, 0.52)) to the left SHOULDER
-    // segment, 2.5 ft down its edge from the back corner (4.8, 8.5), labels
-    // facing the exit corridor: the old spot is now the checkout bag's WAIT
-    // stretch at the band's gap end (store-checkout.ts exit ritual), and
-    // anywhere else on the front segment blocks that ritual's stand-camera
-    // sightline. Exiting customers walk right past the labels instead.
-    {
-      id: 'tape-cleaner-display-counter',
-      kind: 'tape-cleaner-display',
-      position: { x: 4.20, z: 5.96 },
-      yaw: -1.0473,
-      options: { count: 10 }
-    },
+    // Head-cleaner merchandise remains dormant.
     // Tip jar on the FRONT-RIGHT band top, 3.4 ft up the segment from the
     // apex: the stretch a customer stands at while the clerk works the
     // register, and the opposite end of the counter from the bag's wait spot
@@ -790,3 +768,25 @@ export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
     }
   ];
 }
+
+/** Office kit rests entirely on the shield's rear band. Other shapes have no
+ * rear worktop/partition support. Datum follows Entrance's actual backZ. */
+export function counterOfficeKitAnchor(shape: CounterShape, cx: number, backZ: number) {
+  return shape === 'shield' ? { x: cx + 2.1, y: 3.54, z: backZ - .85 } : null;
+}
+
+/** Proposed 1993 dressing on the shield rear band's unused left end.
+ * Origin is the resting side at the shared laminate/rounded worktop datum. */
+export function priceLabelGunAnchor(shape: CounterShape, cx: number, backZ: number, theme: string) {
+  return shape === 'shield' && theme === 'bb-1993'
+    ? { x: cx - 3.9, y: 3.54, z: backZ - .75 } : null;
+}
+
+/** A fitted full-height concept-store portal at the side-wall department end. */
+export function departmentArchPlacements(host: DepartmentArchHost): FixturePlacement[] {
+  const fit = fitDepartmentArch(host);
+  return fit ? [{ id: 'department-arch', kind: 'department-arch', position: fit, yaw: 0,
+    options: { admitted: true } }] : [];
+}
+
+export { childrenChairPlacements } from './fixtures/clubhouse-layout';

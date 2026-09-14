@@ -19,7 +19,7 @@
 import type { AccountSummary, MediaSourceProvider } from './providers/media-source-provider';
 import { getActiveTheme } from './themes';
 import { BB_ANTON, BB_ARCHIVO_BLACK } from './bundled-fonts';
-import { HALCYON_CREAM } from './logo-spec';
+import { HALCYON_WHITE } from './logo-spec';
 
 export interface MembershipLoginSession {
   accessToken: string;
@@ -127,7 +127,7 @@ function drawCardFront(canvas: HTMLCanvasElement, user: AccountSummary, avatarIm
   const trim = theme.palette.secondary;
 
   // Cream laminate card stock.
-  ctx.fillStyle = HALCYON_CREAM;
+  ctx.fillStyle = HALCYON_WHITE;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
 
   // House-color header band with a diagonal underside, and a brass rule
@@ -149,7 +149,7 @@ function drawCardFront(canvas: HTMLCanvasElement, user: AccountSummary, avatarIm
   ctx.fillStyle = trim;
   ctx.fill();
 
-  ctx.fillStyle = HALCYON_CREAM;
+  ctx.fillStyle = HALCYON_WHITE;
   ctx.font = `900 42px ${BB_ARCHIVO_BLACK}, ${BB_ANTON}, sans-serif`;
   ctx.fillText(theme.brand.name.toUpperCase(), 36, 72);
 
@@ -189,7 +189,7 @@ function drawCardFront(canvas: HTMLCanvasElement, user: AccountSummary, avatarIm
   ctx.fillText(fakeMemberNumber(user.id), px + pw + 40, py + 186);
 
   if (user.hasPassword) {
-    ctx.fillStyle = HALCYON_CREAM;
+    ctx.fillStyle = HALCYON_WHITE;
     ctx.font = `700 20px ${BB_ARCHIVO_BLACK}, sans-serif`;
     ctx.textAlign = 'right';
     ctx.fillText('PASSWORD REQUIRED', CARD_W - 40, 60);
@@ -212,7 +212,7 @@ function drawCardFront(canvas: HTMLCanvasElement, user: AccountSummary, avatarIm
 // palette.primary, the rule under it palette.secondary, the wordmark is
 // theme.brand.name in the bundled display face. Install a brand pack and this
 // card changes with it — which is the whole point of the F8 pin (026) that
-// asked for it. HALCYON_CREAM is the card STOCK, not a house colour: it is
+// asked for it. HALCYON_WHITE is the card STOCK, not a house colour: it is
 // logo-spec's print-knockout token and stands in for laminated white board,
 // the same way drawCardFront uses it.
 export function drawRewardsCardFace(
@@ -235,7 +235,7 @@ export function drawRewardsCardFace(
   ctx.save();
   ctx.clip();
 
-  ctx.fillStyle = HALCYON_CREAM;
+  ctx.fillStyle = HALCYON_WHITE;
   ctx.fillRect(0, 0, w, h);
 
   // House-colour header band with the diagonal underside and the brass rule
@@ -273,7 +273,7 @@ export function drawRewardsCardFace(
 
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
-  ctx.fillStyle = HALCYON_CREAM;
+  ctx.fillStyle = HALCYON_WHITE;
   const brandName = theme.brand.name.toUpperCase();
   ctx.font = fitted(brandName, h * 0.17, w * 0.93);
   ctx.fillText(brandName, w * 0.035, h * 0.155);

@@ -389,6 +389,7 @@ export class FourSidedDisplay implements SlottedFixture {
       this.faceLabels.push(face?.label || this.campaign.topper);
       this.faceMovies.push(face?.movies || []);
     }
+    this.placement.options = { ...this.placement.options, retailBackstock: this.campaign.id === 'recently-played' };
     this.genre = this.campaign.topper;
     return this.campaign;
   }

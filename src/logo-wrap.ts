@@ -25,7 +25,7 @@
 // per frame. Pure 2D canvas: no three.js.
 import type { CaseMedium } from './video-case';
 import type { LogoSpec } from './logo-spec';
-import { HALCYON_TRIM, HALCYON_CREAM, HALCYON_BLUE, HALCYON_INK, logoSpecCacheKey } from './logo-spec';
+import { HALCYON_BLUE, HALCYON_INK, logoSpecCacheKey } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { brandString } from './brand-pack';
 import { bundledFontsReady } from './bundled-fonts';
@@ -42,13 +42,9 @@ const INK: Record<CaseMedium, string> = { vhs: '#211d19', dvd: '#0a0a0a' };
 const IMG_W = 1024;
 const IMG_H: Record<CaseMedium, number> = { vhs: 762, dvd: 683 };
 
-// Print inks. A wrap is a PRINTED object, not a lit sign: the panel emerald
-// runs a shade deeper than the emblem's, and the lettering prints in a warm
-// rust-brass rather than the signage's bright brass. Swapped in ONLY while the
-// spec still carries the untouched Halcyon defaults; any user recolor is
-// honored verbatim.
-const WRAP_PRINT_LETTER = '#b5731f'; // rust-brass lettering ink
-const WRAP_PRINT_BODY = HALCYON_INK; // deeper emerald for the printed panels
+// The default blue uses the house print ink. Lettering and borders retain
+// the active spec's colours, including the default white ink.
+const WRAP_PRINT_BODY = HALCYON_INK;
 
 // This print is drawn for a DARK house panel: the giant wordmark is knocked
 // out in paper cream, and the care copy sets in white. Both vanish the moment
@@ -85,11 +81,10 @@ function copyInk(panel: string, medium: CaseMedium, alpha: number): string {
 }
 
 function wrapPrintColors(spec: LogoSpec): { body: string; letter: string; stripe: string } {
-  const isDefaultInk = spec.textColor.toLowerCase() === HALCYON_CREAM;
   return {
     body: spec.bodyColor.toLowerCase() === HALCYON_BLUE ? WRAP_PRINT_BODY : spec.bodyColor,
-    letter: isDefaultInk ? WRAP_PRINT_LETTER : spec.textColor,
-    stripe: spec.borderColor.toLowerCase() === HALCYON_TRIM ? WRAP_PRINT_LETTER : spec.borderColor,
+    letter: spec.textColor,
+    stripe: spec.borderColor,
   };
 }
 

@@ -25,7 +25,7 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { FixtureContext, StoreFixture } from '../fixtures';
-import { FixturePlacement, FLOOR_FIXTURE_MAX_Z } from '../store-layout';
+import { FixturePlacement, FLOOR_FIXTURE_MAX_Z, mapWallSegmentUV } from '../store-layout';
 import { Footprint, FLOOR_DISPLAY_CLEARANCE } from '../layout-validator';
 import { themeTrimDarkHex, scaleHex } from '../themes';
 
@@ -114,14 +114,17 @@ export class MirrorColumn implements StoreFixture {
       { dx: 0, dz: -half, rotY: Math.PI },
       { dx: -half, dz: 0, rotY: -Math.PI / 2 },
     ];
-    const live = this.ctx.liveMirror;
-    const chromeMat = live ? null : new THREE.MeshStandardMaterial({
-      color: 0xd6dbe2, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.0,
+    const painted = !this.ctx.liveMirror;
+    const live = painted ? undefined : this.ctx.liveMirror;
+    const wallMat = painted ? this.ctx.wallSurface?.material : undefined;
+    const chromeMat = live || wallMat ? null : new THREE.MeshStandardMaterial({
+      color: painted ? this.ctx.activeTheme.palette.wall : 0xd6dbe2, metalness: painted ? 0 : 1, roughness: painted ? .92 : .12, envMapIntensity: painted ? 0 : 1,
     });
     if (chromeMat) this.disposables.push(chromeMat);
 
     for (const f of faces) {
       const geo = new THREE.PlaneGeometry(panelW, panelH - PANEL_INSET * 2);
+      if (wallMat && this.ctx.wallSurface) mapWallSegmentUV(geo, panelW, panelH - PANEL_INSET * 2, PLINTH_H + PANEL_INSET, this.ctx.wallSurface.storeWidth, this.ctx.wallSurface.roomHeight);
       this.disposables.push(geo);
       const panel = live
         ? new Reflector(geo, {
@@ -130,7 +133,8 @@ export class MirrorColumn implements StoreFixture {
             textureHeight: live.textureHeight,
             color: 0xffffff,
           })
-        : new THREE.Mesh(geo, chromeMat!);
+        : new THREE.Mesh(geo, wallMat ?? chromeMat!);
+      panel.name = painted ? 'painted-column-panel' : 'mirror-column-panel';
       panel.position.set(f.dx, PLINTH_H + panelH / 2, f.dz);
       panel.rotation.y = f.rotY;
       group.add(panel);

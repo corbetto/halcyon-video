@@ -1,3 +1,5 @@
+import { buildPreviouslyViewedTub } from './period-fixtures';
+import { finishEquipmentSurfaces } from './equipment-surfaces';
 import { selfLit } from '../material-lighting';
 // 1993 checkout-counter dressing, straight from the store footage: the
 // customer-facing VFD pole display, a cluster of latex balloons tied to the
@@ -24,6 +26,8 @@ import { loadProp } from '../props';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 import { buildImpactPrinter93 } from './impact-printer-93';
 import { installCounterTelephone } from './counter-telephone';
+import { installCounterScanner } from './counter-scanner';
+import { installCounterCashHousing } from './counter-cash-housing';
 
 const texCache = new Map<string, THREE.CanvasTexture>();
 
@@ -111,10 +115,12 @@ export function buildCounterProps93(scene: StoreScene): void {
   group.name = 'counter-props-93';
   scene.scene.add(group);
   scene.activeSignageObjects.push(group);
+  installCounterScanner(scene, group);
+  installCounterCashHousing(scene, group);
 
   const cx = inner.x;
   const matte = (color: number, roughness = 0.6) =>
-    new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.05 });
+    new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
   const printed = (tex: THREE.CanvasTexture) => {
     const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0.0 });
     return m;
@@ -202,6 +208,7 @@ export function buildCounterProps93(scene: StoreScene): void {
   }
 
   // 2. Balloon cluster tied to the band top near the left register.
+  // .66-foot ring clears the authored pear shoulders at both height tiers.
   // Ring layout with alternating heights: balloons can't interpenetrate
   // (user report: the random cluster clipped). Positions are shared by both
   // render paths below.
@@ -214,9 +221,9 @@ export function buildCounterProps93(scene: StoreScene): void {
       const jit = (seededRandom01(`bal-${i}`) - 0.5) * 0.1;
       return {
         color,
-        x: tie.x + Math.cos(angle) * 0.52 + jit,
+        x: tie.x + Math.cos(angle) * 0.66 + jit,
         y: tie.y + 2.35 + (i % 2) * 0.75 + jit,
-        z: tie.z + Math.sin(angle) * 0.52,
+        z: tie.z + Math.sin(angle) * 0.66,
         yaw: seededRandom01(`bal-yaw-${i}`) * Math.PI * 2,
       };
     });
@@ -231,6 +238,7 @@ export function buildCounterProps93(scene: StoreScene): void {
           transparent: true, opacity: 0.88, // latex translucency
           clearcoat: 0.6, clearcoatRoughness: 0.2,
         }));
+        balloon.name = 'balloon-fallback';
         balloon.position.set(s.x, s.y, s.z);
         balloon.scale.set(1, 1.18, 1);
         balloon.castShadow = true;
@@ -246,43 +254,83 @@ export function buildCounterProps93(scene: StoreScene): void {
       });
     };
 
-    // Real GLB path ("Balloon", Poly by Google — see props.ts): one shared
-    // geometry, per-color tinted material clones, the model's own knot +
-    // curly string replacing the taut cylinders. loadProp caches, so scene
-    // rebuilds resolve instantly; guard against a rebuild having torn the
-    // group down while the very first load was in flight.
+    // Shared authored shell, instance-owned latex finishes and posed cord.
+    // Detach before signage's traversal so it never disposes cached resources.
+    const owned: { inst: THREE.Group; cord: THREE.BufferGeometry[]; mats: THREE.Material[] }[] = [];
+    group.addEventListener('removed', () => {
+      for (const entry of owned) {
+        entry.inst.removeFromParent();
+        entry.cord.forEach(g => g.dispose());
+        entry.mats.forEach(m => m.dispose());
+      }
+      owned.length = 0;
+    });
     loadProp('balloon').then((handle) => {
-      if (!handle) { buildPrimitiveBalloons(); return; }
       if (!group.parent) return;
-      const h = handle.size.y;
+      if (!handle) {
+        buildPrimitiveBalloons();
+        scene.fixtureContext().requestShadowRefresh();
+        scene.requestRender();
+        return;
+      }
       spots.forEach((s) => {
         const inst = handle.instantiate();
+        const entry = { inst, cord: [] as THREE.BufferGeometry[], mats: [] as THREE.Material[] };
+        const tinted = new Map<THREE.Material, THREE.Material>();
         inst.traverse((o) => {
           const mesh = o as THREE.Mesh;
           if (!mesh.isMesh) return;
           const tint = (m: THREE.Material): THREE.Material => {
-            const t = new THREE.MeshPhysicalMaterial({ color: s.color, roughness: 0.15, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.2 });
-            const src = m as THREE.MeshStandardMaterial; if (src.map) t.map = src.map;
+            if (m.name !== 'BalloonLatex') return m;
+            let t = tinted.get(m);
+            if (!t) {
+              t = m.clone();
+              (t as THREE.MeshStandardMaterial).color.setHex(s.color);
+              tinted.set(m, t); entry.mats.push(t);
+            }
             return t;
           };
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(tint) : tint(mesh.material);
         });
-        // Prepped model: bbox bottom (string end) at y=0, balloon at the
-        // top — seat it so the balloon body sits at the ring spot.
-        inst.position.set(s.x, s.y - (h - 0.5), s.z);
+        // Keep the established .9-foot shell envelope and alternating heights.
         inst.rotation.y = s.yaw;
         group.add(inst);
+        inst.updateWorldMatrix(true, true);
+        const body = inst.getObjectByName('mount_body')!;
+        inst.position.add(new THREE.Vector3(s.x, s.y, s.z).sub(body.getWorldPosition(new THREE.Vector3())));
+        inst.updateWorldMatrix(true, true);
+        const end = inst.getObjectByName('mount_tie')!.getWorldPosition(new THREE.Vector3());
+        const neck = inst.getObjectByName('mount_neck')!.getWorldPosition(new THREE.Vector3());
+        const delta = tie.clone().sub(end);
+        const cord = inst.getObjectByName('ContinuousCottonString') as THREE.Mesh;
+        cord.geometry = cord.geometry.clone(); entry.cord.push(cord.geometry);
+        const pos = cord.geometry.getAttribute('position');
+        const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i); cord.localToWorld(v);
+          const t = THREE.MathUtils.clamp((neck.y - v.y) / (neck.y - end.y), 0, 1);
+          // Smooth endpoint blend leaves the knot wrap and its tangent intact.
+          v.addScaledVector(delta, t * t * (3 - 2 * t)); cord.worldToLocal(v);
+          pos.setXYZ(i, v.x, v.y, v.z);
+        }
+        pos.needsUpdate = true;
+        cord.geometry.computeVertexNormals();
+        cord.geometry.computeBoundingBox(); cord.geometry.computeBoundingSphere();
+        const tieMount = inst.getObjectByName('mount_tie')!;
+        tieMount.position.copy(tieMount.parent!.worldToLocal(tie.clone()));
+        inst.userData.tiePoint = tie.toArray();
+        owned.push(entry);
       });
+      scene.fixtureContext().requestShadowRefresh();
       scene.requestRender();
     });
   }
 
   // 4. Dot-matrix printer with fanfold paper, back of the inner counter.
   {
-    // Keep the printer between the VFD (-1.5) and the membership frame (+0.8).
-    // At +0.9 that frame's post ran through the printer and its paper feed.
-    // The centre-left top supports the feet on either island profile.
-    const a = entrance.getCounterTopAnchorAt(-.3)!;
+    // Left of the first register, on the extended inner worktop.
+    const printerOffset = scene.storefrontSpec.counterShape === 'usquare' ? -4.7 : -5.65;
+    const a = entrance.getCounterTopAnchorAt(scene.storefrontSpec.counterShape === 'desk' ? -.3 : printerOffset)!;
     buildImpactPrinter93(scene, group, a, fanfoldTex());
 
     // Beige corded desk phone beside the station — every register in the
@@ -401,4 +449,12 @@ export function buildCounterProps93(scene: StoreScene): void {
       group.add(pack);
     });
   }
+  buildPreviouslyViewedTub(scene, group);
+  const surfaceTextures = finishEquipmentSurfaces(group);
+  const releaseSurfaces = () => {
+    group.removeEventListener('removed', releaseSurfaces);
+    surfaceTextures.forEach(texture => texture.dispose());
+  };
+  group.addEventListener('removed', releaseSurfaces);
+
 }

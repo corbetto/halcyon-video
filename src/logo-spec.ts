@@ -36,9 +36,9 @@ export interface LogoSpec {
   // stable across boots. Off in every committed spec.
   tornEdge: boolean;
   tornSeed: number;
-  bodyColor: string;    // emblem fill      (default Halcyon emerald)
-  textColor: string;    // wordmark color   (default cream)
-  borderColor: string;  // inner pinstripe + 3D extrusion sides (default brass)
+  bodyColor: string;    // emblem fill      (default Halcyon blue)
+  textColor: string;    // wordmark color   (default white)
+  borderColor: string;  // inner pinstripe + 3D extrusion sides (default white)
   innerBorder: boolean; // the thin inset outline inside the emblem edge
   mainText: string;     // "HALCYON" — the big wordmark
   subText: string;      // "VIDEO" | "VIDEOS" | "ENTERTAINMENT" | "" — smaller, right-aligned below main
@@ -46,7 +46,7 @@ export interface LogoSpec {
   taglineText: string;  // banner under the emblem, e.g. "OPEN LATE" ("" = none)
   fontFamily: string;   // canvas font family; default 'Archivo Black'
   fontStyle: 'normal' | 'italic' | 'bold' | 'bold italic';
-  textTilt: number;     // degrees; the house emblem rakes 4
+  textTilt: number;     // degrees; the house emblem is level
   textOverflow: boolean;// main text may spill past the emblem edges
   storefront: {
     mode: 'emblem' | 'letters'; // letters = freestanding glyph letters on the facade, no emblem
@@ -152,35 +152,19 @@ export const LETTER_HEIGHT_DEFAULT_FT = 2.5;
 
 // ─── Built-in brand colors — single source of truth ─────────────────────────
 // themes.ts palettes AND the default logo specs below both point here, so the
-// theme's primary/secondary and the emblem's body/brass can never drift apart.
+// theme's primary/secondary and the emblem's body/trim can never drift apart.
 // The constants live on THIS side of the themes.ts ↔ logo-spec.ts boundary
 // because this module must stay free of runtime imports from themes.ts (see
 // the module comment above).
 //
-// Halcyon Video — the store's own identity: a true-blue board, CREAM
-// lettering, a gold keyline. (Owner ruling 2026-08-04 put gold lettering on
-// the board — "Halcyon" is the kingfisher, and blue and gold IS the bird.
-// SUPERSEDED 2026-08-13 on trademark grounds: DISH's own enforcement filings
-// name "the torn ticket design mark, yellow and blue color scheme, and
-// similar font" as the elements they police, and bright gold lettering on a
-// blue board was the one axis of that list this house sat on. The kingfisher
-// keeps its gold in the KEYLINE and the room trim; the wordmark — the mark
-// that actually identifies the source, and the one that lands in every press
-// screenshot — reads cream on blue.) The remaining marks (name, board shape,
-// Archivo face) carry the identity, and none of them is anyone else's.
-export const HALCYON_BLUE = '#1a49c2';      // brand body; palette.primary
-export const HALCYON_CREAM = '#f2e8c9';        // wordmark ink + print stock/knockout cream
-// Trim and accent are CREAM as of 2026-08-13, completing the de-gold: the wall
-// stripe, plaque borders, counter stripe, endcap trim and knee walls all read
-// palette.secondary, so the house wore gold everywhere those touched even after
-// the lettering moved. They stay two separate exports rather than one so a
-// brand pack can still drive trim and accent apart; the house just happens to
-// use one cream for both. (Anything that needs contrast ON cream stock must
-// take palette.primary — see the tip jar's rule.)
-export const HALCYON_TRIM = HALCYON_CREAM;    // keyline/trim; palette.secondary
-export const HALCYON_ACCENT = HALCYON_CREAM;  // highlights; palette.accent
-export const HALCYON_BLUE_LIT = '#1d50cf';  // counter top / lit blue surfaces
-export const HALCYON_INK = '#1c3f9e';          // wrap/print blue ink
+// Halcyon Video: white lettering and trim on a true-blue board.
+// All branded surfaces resolve these shared colors; custom brand colors remain editable.
+export const HALCYON_BLUE = '#1a49c2';       // brand body; palette.primary
+export const HALCYON_WHITE = '#ffffff';    // wordmark ink + print stock
+export const HALCYON_TRIM = HALCYON_WHITE;  // keyline/trim; palette.secondary
+export const HALCYON_ACCENT = HALCYON_WHITE;// highlights; palette.accent
+export const HALCYON_BLUE_LIT = '#1d50cf';   // counter top / lit blue surfaces
+export const HALCYON_INK = '#1c3f9e';        // wrap/print blue ink
 
 // Night Owl Video — the second chain, an after-hours store in purple and
 // amber. Deliberately nowhere near the Halcyon family so the theme picker
@@ -197,21 +181,20 @@ export function storefrontBrandGold(color: string): string {
   return color;
 }
 
-// The emblem's lettering lean, in degrees: a slight rake, not an italic
-// parallelogram.
-export const HALCYON_TILT_DEG = 4;
+// The default board and lettering sit level on every branded surface.
+export const HALCYON_TILT_DEG = 0;
 
 // Per-theme default specs. All four Halcyon eras wear the SAME board — the era
 // difference lives in the dressing, the toppers and the medium, not in two
 // greens. bodyColor mirrors each theme's palette.primary and borderColor its
 // palette.secondary, so a palette tweak and the emblem can never drift apart;
-// textColor is deliberately NOT palette-derived (see the cream ruling above).
+// textColor is deliberately NOT palette-derived (white ink above).
 const HALCYON_BASE: Omit<LogoSpec, 'bodyColor'> = {
   version: 1,
-  shape: 'rect',
+  shape: 'rounded-rect',
   tornEdge: false,
   tornSeed: 1985,
-  textColor: HALCYON_CREAM,    // cream lettering on the blue board
+  textColor: HALCYON_WHITE,    // white lettering on the blue board
   borderColor: HALCYON_TRIM,   // mirrors theme.palette.secondary
   innerBorder: true,
   mainText: 'HALCYON',

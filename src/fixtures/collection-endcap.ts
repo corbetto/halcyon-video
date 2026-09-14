@@ -1,3 +1,4 @@
+import { ABOVE_R_LIBRARY_ID } from '../above-r-room';
 // COLLECTION ENDCAP — the franchise-collection aisle end.
 //
 // Reference: public/user-assets/reference/video-stores-flickr-2026-07-26
@@ -82,6 +83,7 @@ import { tryLoadUserAssetTexture, tryLoadUserSignArtTexture } from '../user-asse
 import type { StoreScene } from '../three-scene';
 import { BB_BRUSH } from '../bundled-fonts';
 import { inSeason } from '../promo-campaigns';
+import { installStandeeConstruction } from './standee-construction';
 
 // ─── Selection tuning ───────────────────────────────────────────────────────
 /**
@@ -934,6 +936,7 @@ export class CollectionEndcap extends GenreEndcap {
   private coreTex: THREE.Texture | null = null;
   /** Only set when a user-asset tree skin actually landed (see buildHeader). */
   private treeArtTex: THREE.Texture | null = null;
+  private standeeConstruction: ReturnType<typeof installStandeeConstruction> | null = null;
   /** Its mirrored twin for the tree's BACK plane — this fixture owns both. */
   private treeArtBackTex: THREE.Texture | null = null;
 
@@ -1044,6 +1047,9 @@ export class CollectionEndcap extends GenreEndcap {
       if (dz < 0) face.rotation.y = Math.PI;
       kit.add(face);
     }
+    this.standeeConstruction = installStandeeConstruction(
+      this.ctx, kit, treeW, treeH, coreHeight, treeMat.map!.image as CanvasImageSource,
+    );
     // Faithful campaign art drops in here, off the repo (silent 404 = the
     // procedural tree stays up). Alpha then comes from the PNG.
     tryLoadUserAssetTexture('fixtures/xmas-tree-standee/front.png', (artTex) => {
@@ -1055,6 +1061,7 @@ export class CollectionEndcap extends GenreEndcap {
       this.treeArtTex = artTex;
       treeMat.map = artTex;
       treeMat.needsUpdate = true;
+      this.standeeConstruction?.update(artTex.image as CanvasImageSource);
       // The BACK plane takes the same skin, MIRRORED — the back plane is spun
       // 180 deg about Y, so an un-mirrored copy would hang the art reversed and
       // slide its alpha cut off the front's. Same trick the procedural faces get
@@ -1164,6 +1171,8 @@ export class CollectionEndcap extends GenreEndcap {
   }
 
   protected override disposeHeader(): void {
+    this.standeeConstruction?.dispose();
+    this.standeeConstruction = null;
     super.disposeHeader();
     // The slat texture AND the four kit-sheet textures (tree/tag, front/back)
     // are module-shared and outlive the fixture — never disposed here, same
@@ -1211,6 +1220,7 @@ function isOwnedStock(m: Movie): boolean {
 export function qualifyingCollections(scene: StoreScene): CollectionCandidate[] {
   const byName = new Map<string, { members: Movie[]; perLib: Map<number, number> }>();
   scene.libraries.forEach((lib, libIdx) => {
+    if (lib.id === ABOVE_R_LIBRARY_ID) return;
     for (const m of lib?.movies ?? []) {
       if (!m.collectionName || !isOwnedStock(m)) continue;
       let g = byName.get(m.collectionName);

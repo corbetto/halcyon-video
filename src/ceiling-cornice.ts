@@ -9,6 +9,7 @@ import { corniceJoints, fitCorniceVertex, CORNICE_MIRROR_HEIGHT, CORNICE_MIRROR_
 export function buildCornice(
   scene: THREE.Scene, points: CornicePoint[], ceilingY: number,
   live: boolean, target: {w:number;h:number}, refresh: () => void,
+  downlights: { x: number; y: number; z: number }[] = [],
 ): THREE.Group {
   const group = new THREE.Group(); group.name = 'Fitted ceiling cornice';
   group.position.y = ceilingY; scene.add(group);
@@ -22,11 +23,27 @@ export function buildCornice(
     const geo = source.clone(), p = geo.getAttribute('position');
     const a = joints[i], b = joints[(i+1)%joints.length];
     for(let j=0;j<p.count;j++) p.setXYZ(j,...fitCorniceVertex(a,b,p.getX(j),p.getY(j),p.getZ(j)));
+    if (downlights.length && geo.index) {
+      // Replace the flat underside with a continuous panel whose apertures
+      // are actual geometry. The can and lamp can then sit inside the chase.
+      const old = geo.index, kept: number[] = [];
+      const groups = geo.groups.length ? geo.groups.slice() : [{ start: 0, count: old.count, materialIndex: 0 }];
+      geo.clearGroups();
+      for (const g of groups) {
+        const start = kept.length;
+        for (let k = g.start; k < g.start + g.count; k += 3) {
+          const ids = [old.getX(k), old.getX(k + 1), old.getX(k + 2)];
+          if (!ids.every(v => Math.abs(p.getY(v) + 2.7) < .0001)) kept.push(...ids);
+        }
+        if (kept.length > start) geo.addGroup(start, kept.length - start, g.materialIndex);
+      }
+      geo.setIndex(kept);
+    }
     p.needsUpdate=true; geo.computeVertexNormals();geo.computeBoundingBox();geo.computeBoundingSphere();return geo;
   };
   // A fitted closed strip remains usable on an offline/missing model boot.
   const fallbackSection = new THREE.BufferGeometry();
-  const section = [[-1.8,0],[-1.8,-2.7],[.06,-2.7],[0,bottom],[spread,top],[.60,0]];
+  const section = [[-1.8,0],[-1.75,-2.7],[.025,-2.7],[0,bottom],[spread,top],[.60,0]];
   const positions:number[]=[], indices:number[]=[];
   for(const t of [0,1]) for(const [d,y] of section) positions.push(t,y,d);
   for(let i=0;i<section.length;i++){const j=(i+1)%section.length,n=section.length;indices.push(i,j,j+n,i,j+n,i+n);}
@@ -51,6 +68,23 @@ export function buildCornice(
     mirror.rotation.order='YXZ';mirror.rotation.y=Math.atan2(nx,nz);mirror.rotation.x=tilt;group.add(mirror);
   }
   fallbackSection.dispose();
+  if (downlights.length) {
+    // One continuous ring lets an aperture cross a mitred corner naturally.
+    const contour = (d: number) => joints.map((a,i) => {
+      const p = fitCorniceVertex(a,joints[(i+1)%joints.length],0,-2.7,d);
+      return new THREE.Vector2(p[0],p[2]);
+    });
+    const sides = [contour(-1.75),contour(.025)].sort((a,b) => Math.abs(THREE.ShapeUtils.area(b))-Math.abs(THREE.ShapeUtils.area(a)));
+    const shape = new THREE.Shape(sides[0]); shape.closePath();
+    const middle = new THREE.Path(sides[1]); middle.closePath(); shape.holes.push(middle);
+    for (const lamp of downlights) {
+      const hole = new THREE.Path(); hole.absarc(lamp.x,lamp.z,.32,0,Math.PI*2,true); shape.holes.push(hole);
+    }
+    const panel = new THREE.Mesh(new THREE.ShapeGeometry(shape,24),chrome);
+    panel.name = 'Cornice underside with recessed apertures'; panel.userData.downlightCount = downlights.length;
+    panel.rotation.x = Math.PI/2; panel.position.y = -2.7;
+    panel.castShadow = panel.receiveShadow = true; group.add(panel);
+  }
   let removed=false;
   group.addEventListener('removed',()=>{removed=true;});
   // Scene teardown disposes the fallback geometry. Its dispose event also

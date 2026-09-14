@@ -1,3 +1,5 @@
+import { facadeEmblemScale } from './facade-emblem-fit';
+import { facadeStyle } from './storefront-architecture';
 import { selfLit } from './material-lighting';
 // Phase B1 of the LogoSpec system: the storefront sign in TRUE 3D. Two modes
 // beyond the classic flat layered quads:
@@ -154,10 +156,12 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
   const faceCtx = faceCanvas.getContext('2d')!;
   faceCtx.fillStyle = spec.bodyColor;
   faceCtx.fillRect(0, 0, FRAME_W, FRAME_H);
-  // A composed emblem's artwork lives on the BODY layer (see drawGeneric), so
-  // the cap has to take both passes or the sign extrudes the right shape and
+  // A composed or dropped emblem's artwork lives on the BODY layer (see drawGeneric),
+  // so the cap has to take both passes or the sign extrudes the right shape and
   // wears none of the art.
-  if (spec.emblem) drawStorefrontLogoLayer(faceCtx, spec, 'body');
+  if (spec.emblem || spec.shape === 'image' || spec.shape === 'path') {
+    drawStorefrontLogoLayer(faceCtx, spec, 'body');
+  }
   drawStorefrontTextLayer(faceCtx, spec);
   const faceTex = toSignTexture(faceCanvas);
 
@@ -168,12 +172,12 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
   const glowCtx = glowCanvas.getContext('2d')!;
   glowCtx.fillStyle = BODY_GLOW_BG;
   glowCtx.fillRect(0, 0, FRAME_W, FRAME_H);
-  // A COMPOSED emblem's whole face is artwork, and at the lettering's emissive
+  // A COMPOSED or DROPPED emblem's whole face is artwork, and at the lettering's emissive
   // strength it would read as a white slab after dark. The face goes on at a
   // lit-lightbox level instead — EMBLEM_GLOW_ALPHA x EMISSIVE_INTENSITY lands
   // it near 1.0, in the brand's own colours — and the wordmark over it keeps
   // full strength, so the store's NAME is what actually glows.
-  if (spec.emblem) {
+  if (spec.emblem || spec.shape === 'image') {
     glowCtx.globalAlpha = EMBLEM_GLOW_ALPHA;
     drawStorefrontLogoLayer(glowCtx, spec, 'body');
     glowCtx.globalAlpha = 1;
@@ -471,7 +475,29 @@ export function buildStorefrontLogo3D(
   anchor: FacadeLogoAnchor,
   spec: LogoSpec = getActiveLogoSpec(),
 ): StorefrontLogo3D | null {
-  if (spec.storefront.mode === 'letters') return buildFreestandingLetters(spec, anchor);
+  if (spec.storefront.mode === 'letters') {
+    if (anchor.wallBands) {
+      const group = new THREE.Group(); group.name = 'storefrontLogo3D';
+      // Each flank uses its own flat wall field and mounting depth.
+      const rows = anchor.wallBands.map(band => buildFreestandingLetters(spec, {
+        ...anchor, x: band.x, z: band.z, fascia: band,
+        gable: { baseY: band.bottomY, halfWidth: 0, height: 1 },
+      })).filter((row): row is StorefrontLogo3D => row !== null);
+      if (!rows.length) return null;
+      rows.forEach((row, index) => { row.group.name = `storefrontWallLetters${index}`; group.add(row.group); });
+      return { group, dispose: () => rows.forEach(row => row.dispose()) };
+    }
+    return buildFreestandingLetters(spec, anchor);
+  }
   if (spec.storefront.extrudeDepth > 0) return buildExtrudedEmblem(spec, anchor);
   return null;
+}
+
+/** Large emblems stay supported by the facade across configurable brand shapes. */
+export function fitStorefrontEmblemAnchor(anchor: FacadeLogoAnchor): FacadeLogoAnchor {
+  const spec = getActiveLogoSpec();
+  if (spec.storefront.mode === 'letters') return anchor;
+  const points = emblemLoopsInFrame(spec).flat().map(p => ({ x: (p.x - .5) * anchor.width, y: (.5 - p.y) * anchor.height }));
+  const scale = facadeEmblemScale(points, anchor.y, anchor.gable, facadeStyle() === 'gabled-brick');
+  return { ...anchor, width: anchor.width * scale, height: anchor.height * scale };
 }

@@ -1,3 +1,9 @@
+import { CLEANER_CARTON, installCleanerCartons } from './cleaner-carton';
+export { buildPreviouslyViewedTub } from './previously-viewed-tub';
+import { createCandyRackFinish } from './candy-rack-finish';
+import { installCandyPowerWing } from './candy-power-wing';
+import { installCandyDispenserPacks } from './candy-dispenser-pack';
+import { CANDY_TRAY_ANGLE, installCandyRackModel, candyStockMatrix } from './candy-rack-model';
 import { selfLit } from '../material-lighting';
 // T06 — period fixtures & props: candy display, previously-viewed bin, tape
 // rewinder, tape-cleaner display. All primitive-geometry + canvas-texture,
@@ -84,6 +90,8 @@ export class CandyDisplay implements StoreFixture {
   private ctx: FixtureContext;
   private group: THREE.Group | null = null;
   private disposables: Disposable[] = [];
+  private disposeHardware: (() => void) | null = null;
+  private disposeDispenserPacks: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -91,10 +99,15 @@ export class CandyDisplay implements StoreFixture {
   }
 
   build(): void {
+    this.dispose();
+    this.rowIds = [];
+    this.rows = [];
     const options = this.placement.options || {};
     const rows = (options.rows as number) || 5;
     const width = (options.footprintWidth as number) || 3.0;
-    const depth = (options.footprintDepth as number) || 0.7;
+    const depth = (options.footprintDepth as number) || 1.6;
+    const powerWing = !!options.powerWing && getActiveTheme().id === 'bb-1993' && width === 3 && depth === 1.6 && rows === 5;
+    const dispenserPacks = !powerWing && !!options.dispenserPacks && width >= 3 && depth >= 1 && rows >= 5;
     const labels = (options.labels as string[]) || DEFAULT_CANDY_LABELS;
     const palette = (options.palette as string[]) || ['#c81e2c', '#1a3fae', '#e08a00', '#1c8a4a', '#7a1cae'];
 
@@ -102,8 +115,12 @@ export class CandyDisplay implements StoreFixture {
     group.position.set(this.placement.position.x, 0, this.placement.position.z);
     group.rotation.y = this.placement.yaw;
     this.group = group;
+    const fallback = new THREE.Group();
+    fallback.name = 'candy-rack-fallback';
+    group.add(fallback);
 
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x232323, roughness: 0.45, metalness: 0.75 });
+    const { material: frameMat, texture: frameGrain } = createCandyRackFinish();
+    this.disposables.push({ tex: frameGrain });
     const postGeo = new THREE.CylinderGeometry(0.03, 0.03, 4.0, 8);
     const footGeo = new THREE.BoxGeometry(width - 0.1, 0.06, depth - 0.1);
     this.disposables.push({ geo: postGeo }, { geo: footGeo }, { mat: frameMat });
@@ -119,15 +136,15 @@ export class CandyDisplay implements StoreFixture {
       post.position.set(x, 2.0, z);
       post.castShadow = true;
       post.receiveShadow = true;
-      group.add(post);
+      fallback.add(post);
     });
 
     const foot = new THREE.Mesh(footGeo, frameMat);
     foot.position.set(0, 0.03, 0);
     foot.receiveShadow = true;
-    group.add(foot);
+    fallback.add(foot);
 
-    const shelfGeo = new THREE.BoxGeometry(width - 0.1, 0.03, depth - 0.1);
+    const shelfGeo = new THREE.BoxGeometry(width - (dispenserPacks ? .17 : .1), 0.03, depth - 0.1);
     const boxGeo = new THREE.BoxGeometry(0.32, 0.42, 0.18);
     this.disposables.push({ geo: shelfGeo }, { geo: boxGeo });
 
@@ -137,23 +154,33 @@ export class CandyDisplay implements StoreFixture {
       shelf.position.set(0, y, 0);
       shelf.castShadow = true;
       shelf.receiveShadow = true;
-      group.add(shelf);
+      shelf.rotation.x = CANDY_TRAY_ANGLE;
+      fallback.add(shelf);
 
       const label = labels[r % labels.length];
       const bg = palette[r % palette.length];
       const tex = createLabelTexture(label, bg, '#ffffff');
-      const boxMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.65, metalness: 0.05 });
+      const boxMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.65,
+        metalness: 0.05,
+      });
       this.disposables.push({ mat: boxMat, tex });
 
       const perRow = Math.max(3, Math.floor((width - 0.3) / 0.36));
-      const inst = new THREE.InstancedMesh(boxGeo, boxMat, perRow);
+      const stockDepth = Math.max(1, Math.floor((depth - .22) / .24));
+      const inst = new THREE.InstancedMesh(boxGeo, boxMat, perRow * stockDepth);
+      inst.name = `candy-stock-${r}`;
       inst.castShadow = true;
       inst.receiveShadow = true;
       const m4 = new THREE.Matrix4();
       for (let i = 0; i < perRow; i++) {
-        const bx = -width / 2 + 0.3 + i * ((width - 0.6) / Math.max(1, perRow - 1) || 0.36);
-        m4.makeTranslation(bx, y + 0.24, 0);
-        inst.setMatrixAt(i, m4);
+        const span = width * .9 - .32;
+        const bx = -span / 2 + i * span / Math.max(1, perRow - 1);
+        for (let d = 0; d < stockDepth; d++) {
+          candyStockMatrix(m4, bx, y + .015, (d - (stockDepth - 1) / 2) * .24);
+          inst.setMatrixAt(i * stockDepth + d, m4);
+        }
       }
       inst.instanceMatrix.needsUpdate = true;
       group.add(inst);
@@ -166,6 +193,12 @@ export class CandyDisplay implements StoreFixture {
 
     this.ctx.scene.add(group);
     this.ctx.addCollider(group);
+    if (dispenserPacks) {
+      this.disposeDispenserPacks = installCandyDispenserPacks(this.ctx, group, width, depth);
+    }
+    this.disposeHardware = powerWing
+      ? installCandyPowerWing(this.ctx, group, fallback)
+      : installCandyRackModel(this.ctx, group, fallback, width, depth, rows, frameMat);
     this.ctx.requestShadowRefresh();
   }
 
@@ -174,7 +207,7 @@ export class CandyDisplay implements StoreFixture {
   getFootprint(): Footprint {
     const options = this.placement.options || {};
     const width = (options.footprintWidth as number) || 3.0;
-    const depth = (options.footprintDepth as number) || 0.7;
+    const depth = (options.footprintDepth as number) || 1.6;
     return {
       label: `fixture:${this.placement.id}`,
       kind: 'fixture',
@@ -191,6 +224,10 @@ export class CandyDisplay implements StoreFixture {
   }
 
   dispose(): void {
+    this.disposeDispenserPacks?.();
+    this.disposeDispenserPacks = null;
+    this.disposeHardware?.();
+    this.disposeHardware = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;
@@ -667,15 +704,12 @@ export class TapeRewinder implements StoreFixture {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. Tape-cleaner display — countertop cardboard tray of VHS head-cleaner
-//    clamshells, standing on the checkout counter band's blue top.
+//    cartons, standing on the checkout counter band's blue top.
 // ═══════════════════════════════════════════════════════════════════════════
-// A real tape head cleaner ships in a standard VHS clamshell, so each display
-// box uses exact VHS-case dimensions. These match CASE_DIMS.vhs in
-// video-case.ts but are hardcoded on purpose: this prop is a fixed-era VHS
-// product and must not resize if the store's live case medium is DVD.
-const CLEANER_W = 0.365; // ft — VHS clamshell width
-const CLEANER_H = 0.667; // ft — VHS clamshell height
-const CLEANER_D = 0.082; // ft — VHS clamshell depth
+// Nominal inherited carton envelope, fixed across live case-medium changes.
+const CLEANER_W = CLEANER_CARTON.width;
+const CLEANER_H = CLEANER_CARTON.height;
+const CLEANER_D = CLEANER_CARTON.depth;
 
 // The box front. Owner F8 pin 030 saw a real chain's wordmark on this set of
 // tape cleaners and ruled: strip it, "make it the primary store color" — so
@@ -784,6 +818,7 @@ export class TapeCleanerDisplay implements StoreFixture {
   private ctx: FixtureContext;
   private group: THREE.Group | null = null;
   private disposables: Disposable[] = [];
+  private releaseCartons: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -805,7 +840,7 @@ export class TapeCleanerDisplay implements StoreFixture {
     group.rotation.y = this.placement.yaw;
     this.group = group;
 
-    // Cardboard tray the clamshells stand in — sized so two rows of five
+    // Cardboard tray the cartons stand in — sized so two rows of five
     // upright VHS boxes fit inside its lip.
     const baseMat = new THREE.MeshStandardMaterial({ color: 0xcabf9e, roughness: 0.85 });
     const baseGeo = new THREE.BoxGeometry(2.2, 0.35, 0.5);
@@ -839,6 +874,7 @@ export class TapeCleanerDisplay implements StoreFixture {
       [caseMat, caseMat, caseMat, caseMat, faceMat, caseMat],
       count
     );
+    inst.name = 'cleaner-carton-fallback';
     inst.castShadow = true;
     inst.receiveShadow = true;
     const cols = 5;
@@ -858,6 +894,10 @@ export class TapeCleanerDisplay implements StoreFixture {
     this.ctx.scene.add(group);
     this.ctx.addCollider(base);
     this.ctx.requestShadowRefresh();
+    this.releaseCartons = installCleanerCartons(group, inst, { front: tex }, new THREE.Color(getActiveTheme().palette.primary), () => {
+      this.ctx.requestShadowRefresh();
+      this.ctx.requestRender();
+    });
   }
 
   // Sits ON the checkout counter band (see build()'s surfaceY) — like
@@ -873,6 +913,10 @@ export class TapeCleanerDisplay implements StoreFixture {
   }
 
   dispose(): void {
+    this.releaseCartons?.();
+    this.releaseCartons = null;
+    const stock = this.group?.getObjectByName('cleaner-carton-fallback');
+    if (stock instanceof THREE.InstancedMesh) stock.dispose();
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;

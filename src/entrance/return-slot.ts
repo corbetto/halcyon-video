@@ -26,6 +26,7 @@
 // case is swallowed. Event-time work allocates freely; update() is
 // allocation-free (scratch objects only).
 import * as THREE from 'three';
+import { installReturnSlotModel } from './return-slot-model';
 import type { Movie } from '../jellyfin';
 import { FixtureContext } from '../fixtures';
 import { getActiveTheme } from '../themes';
@@ -121,6 +122,7 @@ export class ReturnSlot {
 
   private group = new THREE.Group();
   private drops: Drop[] = [];
+  private model: ReturnType<typeof installReturnSlotModel> | null = null;
   private dropStart = 0;
   // Harness (`--state return --x <ms>`): pin the ritual at a fixed elapsed.
   private frozenElapsed: number | null = null;
@@ -137,6 +139,7 @@ export class ReturnSlot {
   private readonly _p = new THREE.Vector3();
 
   constructor(private ctx: FixtureContext, parent: THREE.Group, anchor: { x: number; z: number }, faceYaw: number) {
+    this.group.name = 'interior-return-chute';
     parent.add(this.group);
     this.group.position.set(anchor.x, 0, anchor.z);
     this.group.rotation.y = faceYaw;
@@ -204,7 +207,7 @@ export class ReturnSlot {
     if (rightW > 0.01) box(rightW, SLOT_H, FRONT_T, CHUTE_W / 2 - rightW / 2, SLOT_Y, faceZ, blueMat);
     // Brushed-metal slot frame (the footage flap unit reads stainless, not
     // white trim) + the flap plate itself resting tilted into the throat.
-    const metalMat = new THREE.MeshStandardMaterial({ color: 0xb9bcbf, roughness: 0.35, metalness: 0.85 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.45, metalness: 0 });
     this.ownedMats.push(metalMat);
     const LINER = 0.03;
     box(SLOT_W, LINER, FRONT_T, SLOT_X, slotTop - LINER / 2, faceZ, metalMat, false);
@@ -232,7 +235,19 @@ export class ReturnSlot {
     box(CHUTE_W - 0.2, CHUTE_H - 0.15, depth - FRONT_T - 0.1, 0, (CHUTE_H - 0.15) / 2, midZ - (FRONT_T + 0.1) / 2, darkMat, false);
 
     // "▼ RETURN TAPES HERE ▼" across the top panel, theme gold on body blue.
-    this.buildLettering(zFace, slotTop, blueHex, goldHex);
+    const fallback = [...this.group.children];
+    this.buildLettering(zFace, slotTop, theme.palette.counterTop, goldHex);
+    this.model = installReturnSlotModel(ctx, this.group, fallback, blueHex);
+    const titles = ctx.libraries.flatMap(l => l.movies).filter(m => !m.discovery && !m.collectionGap && !m.comingSoon).slice(0, 4);
+    titles.forEach((movie, index) => {
+      const materials = createHeroRentalMaterials(movie).map(m => m.clone()); this.ownedMats.push(...materials);
+      for (let level = 0; level < 5; level++) {
+        const tape = new THREE.Mesh(getRentalCaseGeometry(false), materials);
+        tape.name = 'Returned tape in receiver'; tape.position.set((index % 2 ? .44 : -.44), 1 + level * .12, -.98 + Math.floor(index / 2) * .68);
+        tape.rotation.set(-Math.PI / 2, 0, (index % 2 ? 1 : -1) * .055);
+        tape.castShadow = tape.receiveShadow = true; this.group.add(tape);
+      }
+    });
   }
 
   /**
@@ -354,6 +369,11 @@ export class ReturnSlot {
     const screwG = new THREE.CylinderGeometry(0.0095, 0.0095, 0.022, 10);
     screwG.rotateX(Math.PI / 2);
     this.ownedGeoms.push(plateG, textG, glossG, screwG);
+    // Preserve the original high-contrast label on the newly white housing.
+    const labelBack = new THREE.MeshStandardMaterial({ color: _blueHex, roughness: .65 });
+    this.ownedMats.push(labelBack);
+    const backing = new THREE.Mesh(plateG, labelBack);
+    backing.position.set(0, stripY, zFace + .01); backing.receiveShadow = true; this.group.add(backing);
     const plate = new THREE.Mesh(plateG, plateMat);
     plate.position.set(0, stripY, zFace + 0.012);
     plate.castShadow = false;
@@ -472,6 +492,7 @@ export class ReturnSlot {
 
   /** Per-frame (only does work while a ritual is live). Zero allocations. */
   update(now: number): void {
+    this.model?.setOpen(this.drops.length > 0);
     if (this.drops.length === 0) return;
     const elapsed = this.frozenElapsed ?? (now - this.dropStart);
     let pending = 0;
@@ -513,6 +534,8 @@ export class ReturnSlot {
   }
 
   dispose(): void {
+    this.model?.dispose();
+    this.model = null;
     this.clearDrops();
     this.group.parent?.remove(this.group);
     for (const g of this.ownedGeoms) g.dispose();

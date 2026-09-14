@@ -17,6 +17,7 @@ export interface ShelfPart {
   pitch?: number;
   panel?: boolean;
   topDepth?: number;
+  physicalUV?: boolean;
 }
 interface Replacement { fallback: THREE.Mesh; parts: ShelfPart[]; material: THREE.Material | THREE.Material[]; inPlace: boolean }
 
@@ -58,7 +59,7 @@ export class ShelfModelBatch {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => ownedMats.add(m));
       });
       try {
-        if (disposed || ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel'].some(name => !kit.has(name))) return;
+        if (disposed || ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel', 'RailClip', 'RailEndStop'].some(name => !kit.has(name))) return;
         const fittedCaps = new Set<THREE.BufferGeometry>();
         for (const entry of entries) {
           const { fallback, material } = entry;
@@ -121,6 +122,14 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     // Use geometry coordinates, not the separated editing positions of the
     // Blender objects. Preserve physical section thickness when extending runs.
     g.scale(sx, sy, sz);
+    if (name === 'Slat') {
+      // Physical planar UVs replace packed islands stretched over an entire run.
+      const pos = g.getAttribute('position'), normal = g.getAttribute('normal'), uv = g.getAttribute('uv');
+      for (let i = 0; i < pos.count; i++) {
+        uv.setXY(i, (Math.abs(normal.getX(i)) > .5 ? pos.getZ(i) : pos.getX(i)) / 4,
+          (Math.abs(normal.getY(i)) > .5 ? pos.getZ(i) : pos.getY(i)) / 4);
+      }
+    }
     g.rotateY(yaw);
     g.translate(x, y, z);
     g.rotateX(p.pitch ?? 0);
@@ -137,13 +146,15 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
       const sourceWidth = 2.16 + (1.4 - 2.16) * t;
       const width = p.depth + ((p.topDepth ?? p.depth) - p.depth) * t;
       pos.setXYZ(i, pos.getX(i) * (p.kind !== 'spine' ? width / sourceWidth : p.depth / .5),
-        y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8,
+        p.kind === 'spine' && (p.height ?? 5) < .5 ? (y - .20) * (p.height ?? 5) / 4.8
+          : y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8,
         pos.getZ(i) * (p.kind === 'spine' ? p.length : 1));
     }
     if (p.kind === 'cap') {
       const uv = g.getAttribute('uv');
       for (let i = 0; i < pos.count; i++) {
-        uv.setXY(i, pos.getX(i) / p.depth + .5, pos.getY(i) / (p.height ?? 5));
+        uv.setXY(i, p.physicalUV ? pos.getX(i) : pos.getX(i) / p.depth + .5,
+          p.physicalUV ? pos.getY(i) : pos.getY(i) / (p.height ?? 5));
       }
     }
     g.computeVertexNormals();
@@ -175,13 +186,18 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     g.translate(p.x ?? 0, p.y ?? 0, p.z ?? 0);
     result.push(g);
   } else if (p.kind === 'rail') {
-    place('Rail', 1, 1, p.length);
+    place('Rail', 1, 1, p.length - .024);
+    for (const z of [-1, 1]) place('RailEndStop', 1, 1, 1, 0, 0, z * (p.length / 2 - .006));
+    const clips = Math.max(2, Math.ceil(p.length / 2));
+    for (let i = 0; i < clips; i++) {
+      place('RailClip', 1, 1, 1, 0, 0, -p.length / 2 + .12 + i * (p.length - .24) / (clips - 1));
+    }
   } else if (p.kind === 'slat') {
     const height = p.height!;
     const count = Math.ceil(height / .25);
     for (let i = 0; i < count; i++) {
       const h = Math.min(.25, height - i * .25);
-      place('Slat', p.depth / .5, h / .25, p.length, 0, -height / 2 + i * .25 + h / 2);
+      place('Slat', p.depth / .5, (h - .002) / .25, p.length, 0, -height / 2 + i * .25 + h / 2);
     }
   } else {
     // Real opaque round wires: no transparent grid planes or alpha sorting.

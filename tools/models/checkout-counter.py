@@ -36,7 +36,7 @@ for name, color, roughness in [
     MATERIALS.append(mat)
 
 
-def section(depth, island=False, rounded=False):
+def section(depth, island=False, rounded=False, drawers=False):
     """(inset, height, material on the following strip). Closed joinery profile."""
     h = 2.82 if island else 3.54
     top = 3 if island else 1
@@ -67,10 +67,18 @@ def section(depth, island=False, rounded=False):
           (depth-.035, h-.25, 0), (depth-.035, .35, 0),
           (depth-.055, .32, 4), (depth-.20, .32, 4),
           (depth-.20, 0, 4)]
+    if drawers and island:
+        # Routed drawer reveals are closed recesses in the same skin.
+        start = p.index((depth-.035, .35, 0))
+        seams = []
+        for y in [2.17, 1.55, .94]:
+            seams += [(depth-.035,y+.015,0),(depth-.06,y+.008,5),
+                      (depth-.06,y-.008,5),(depth-.035,y-.015,0)]
+        p[start:start] = seams
     return p
 
 
-def sweep(name, path, depth, island=False, rounded=False):
+def sweep(name, path, depth, island=False, rounded=False, drawers=False):
     """Welded quad rings, including mitres, routed seams and closed cut ends."""
     pts = [Vector(p) for p in path]
     tangents = [(b-a).normalized() for a, b in zip(pts, pts[1:])]
@@ -98,7 +106,7 @@ def sweep(name, path, depth, island=False, rounded=False):
             t = s/length
             rings.append((a.lerp(b, t), offsets[i].lerp(offsets[i+1], t), distance+s, seam))
         distance += length
-    profile = section(depth, island, rounded)
+    profile = section(depth, island, rounded, drawers)
     verts, faces, materials, uv = [], [], [], []
     perimeter = [0]
     for a, b in zip(profile, profile[1:]):
@@ -171,37 +179,62 @@ def sweep(name, path, depth, island=False, rounded=False):
     return obj
 
 
-def shield():
+def shield(modern=False):
     points = [Vector(p) for p in [(-6.2,-.1),(-9.8,-6.34),(0,-14.1),(9.8,-6.34),(6.2,-.1)]]
     # Same 2.2-foot trims as counter.ts: an open staff entrance at the left shoulder.
     a = points[1] + (points[2]-points[1]).normalized()*2.2
     b = points[1] + (points[0]-points[1]).normalized()*2.2
     path = [a, points[2], points[3], points[4], points[0], b]
+    t0 = (points[1]-points[0]).normalized()
+    path = [points[0]+t0*4.6,points[1],points[2],points[3],points[4],points[0],points[0]+t0*1.0]
     t = (points[2]-points[1]).normalized()
     n = Vector((-t.y,t.x))
     apex = Vector((0,-14.1 + 1.5/n.y))
-    left = Vector((-6, apex.y + 6*7.76/9.8))
-    right = Vector((6,left.y))
+    left = Vector((-6.6, apex.y + 6.6*7.76/9.8))
+    right = Vector((6,apex.y + 6*7.76/9.8))
     return [path], [left,apex,right]
 
 
+def cut_return_receiver(objects, shape):
+    anchor = (8.0, -3.22) if shape == 'shield' else (6.8, -3.3)
+    yaw = math.atan2(6.24, 3.6) if shape == 'shield' else math.pi/2
+    center_z = -.70
+    cx = anchor[0] + math.sin(yaw)*center_z
+    cz = anchor[1] + math.cos(yaw)*center_z
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx,-cz,2.35))
+    cutter=bpy.context.object;cutter.name='Return receiver clearance'
+    cutter.data.materials.append(MATERIALS[0])
+    cutter.dimensions=(2.42,1.80,3.3);cutter.rotation_euler.z=yaw
+    bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+    for obj in objects:
+        bpy.context.view_layer.objects.active=obj
+        cut=obj.modifiers.new('Open staff return receiver','BOOLEAN');cut.operation='DIFFERENCE';cut.object=cutter
+        bpy.ops.object.modifier_apply(modifier=cut.name)
+        bm=bmesh.new();bm.from_mesh(obj.data);assert all(e.is_manifold for e in bm.edges),obj.name;bm.free()
+    bpy.data.objects.remove(cutter,do_unlink=True)
+
+
 variants = []
-for shape in ['shield', 'usquare', 'desk']:
+for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
+    modern = variant.endswith('-2010')
+    shape = variant.removesuffix('-2010')
     if shape == 'shield':
-        paths, island = shield()
+        paths, island = shield(modern)
     elif shape == 'usquare':
         paths = [[(-6.8,-5.2),(-6.8,-12.1),(6.8,-12.1),(6.8,-.11)],
                  [(-6.8,-.11),(-6.8,-3.0)]]
-        island = [(-5,-10.6),(5,-10.6)]
+        island = [(-5.25,-10.6),(5,-10.6)]
     else:
         paths, island = [], [(-3,0),(3,0)]
     for style in ['laminate', 'rounded']:
-        collection = bpy.data.collections.new(f'{shape}-{style}')
+        collection = bpy.data.collections.new(f'{variant}-{style}')
         bpy.context.scene.collection.children.link(collection)
         objects = []
         for i, path in enumerate(paths):
             objects.append(sweep(f'{shape}-surround-{i}', path, 1.5, rounded=style == 'rounded'))
-        objects.append(sweep(f'{shape}-work-cabinet', island, 1.6, island=True, rounded=style == 'rounded'))
+        objects.append(sweep(f'{shape}-work-cabinet', island, 1.6, island=True, rounded=style == 'rounded', drawers=modern))
+        if shape != 'desk' and not modern:
+            cut_return_receiver(objects[:-1], shape)
         for obj in objects:
             for owner in list(obj.users_collection):
                 owner.objects.unlink(obj)
@@ -210,7 +243,7 @@ for shape in ['shield', 'usquare', 'desk']:
         for obj in objects:
             obj.select_set(True)
         bpy.context.view_layer.objects.active = objects[0]
-        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}.glb'),
+        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}{"-2010" if modern else ""}.glb'),
                                   export_format='GLB', use_selection=True,
                                   export_extras=True, export_yup=True)
         tris = sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in objects)

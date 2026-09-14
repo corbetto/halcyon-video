@@ -86,6 +86,7 @@ import {
 } from './boot-flow';
 import { setupTerminalInput } from './store-setup-flow';
 import { registerLibraryToggles } from './library-settings';
+import { formatAmbientTvStatus } from './ambient-tv-status';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
 import { runDeviceGate, detectGateReason } from './device-gate';
 import {
@@ -103,6 +104,8 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { InputManager, type InputCallbacks } from './input';
 import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
+import { isStreamingChoiceActive, cancelStreamingServiceChoice, setStreamingStockResolver } from './streaming-checkout';
+setStreamingStockResolver(getStreamingMovies);
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
 import { showClerkToast } from './carried-tapes';
 import { initSharedPlace } from './shared-place-ui';
@@ -847,12 +850,16 @@ function updateMovieHUD(movie: Movie | null) {
     if (isTouchInputActive()) {
       hint.textContent = touchMovieHUDText(
         !!isInspecting, !!movie.game, !!movie.discovery, !!movie.collectionGap,
-        !!movie.comingSoon, !!isRequestedDiscovery);
+        !!movie.comingSoon, !!isRequestedDiscovery, !!movie.streaming, !!(movie.streaming && isStreamingChoiceActive(movie)));
       return;
     }
     if (isInspecting) {
       if (movie.game) {
         hint.textContent = 'FLIP CASE  •  OK TO RENT & PLAY THIS GAME';
+      } else if (movie.streaming) {
+        hint.textContent = isStreamingChoiceActive(movie)
+          ? 'ARROWS SELECT SERVICE  •  OK TO CONFIRM  •  BACK TO CANCEL'
+          : 'FLIP CASE  •  OK TO CHECK OUT';
       } else if (movie.discovery) {
         hint.textContent = isRequestedDiscovery
           ? 'FLIP CASE  •  ALREADY REQUESTED'
@@ -1357,9 +1364,12 @@ function generateSettingsDrawer() {
         if (def.subpage) {
           if (!subpagesSeen.has(def.subpage)) {
             subpagesSeen.add(def.subpage);
+            const subpageHint = def.subpage === 'Overhead TVs'
+              ? `Ceiling CRT TV status: ${formatAmbientTvStatus()}. Configure library feeds and fallback.`
+              : SUBPAGE_HINTS[def.subpage];
             groupEl.appendChild(makeRow(
               SETTINGS_SUBPAGE_PREFIX + def.subpage, def.subpage,
-              SUBPAGE_HINTS[def.subpage], '›'));
+              subpageHint, '›'));
           }
           continue;
         }
@@ -1396,6 +1406,15 @@ function refreshSettingsValues() {
   for (const def of allSettings()) {
     const el = document.getElementById(`setting-value-${def.key}`);
     if (el) el.textContent = currentValueLabel(def.key);
+    const rowEl = document.getElementById(`setting-row-${def.key}`);
+    if (rowEl) {
+      const hint = resolveHint(def);
+      if (hint) rowEl.dataset.hint = hint;
+    }
+  }
+  const tvSubpageRow = document.getElementById(`setting-row-${SETTINGS_SUBPAGE_PREFIX}Overhead TVs`);
+  if (tvSubpageRow) {
+    tvSubpageRow.dataset.hint = `Ceiling CRT TV status: ${formatAmbientTvStatus()}. Configure library feeds and fallback.`;
   }
 }
 
@@ -1476,6 +1495,9 @@ function activateSetting(key: string, dir: number) {
   }
   const def = allSettings().find((d) => d.key === key);
   if (!def) return;
+  if (def.kind === 'readout') {
+    return; // Readout rows are informational and cannot be toggled
+  }
 
   if (def.kind === 'toggle') {
     setSetting(key, !getSetting<boolean>(key));
@@ -1720,6 +1742,13 @@ async function finishConnectionEditsAndReload() {
   setTimeout(() => location.reload(), 400);
 }
 
+window.addEventListener('halcyon:tv-status', () => {
+  if (ui.isSettingsDrawerOpen) {
+    refreshSettingsValues();
+    updateSettingsCrtChrome();
+  }
+});
+
 // ─── Feedback Pin (F8) ────────────────────────────────────────────────────────
 // Lets a user who can't read code flag a visual bug in place: F8 grabs the
 // exact camera pose + a screenshot via StoreScene.captureFeedbackSnapshot()
@@ -1728,7 +1757,7 @@ async function finishConnectionEditsAndReload() {
 // middleware in vite.config.ts, which writes it to feedback/NNN/.
 const FEEDBACK_CONFIG_KEYS = [
   'bb_theme', 'bb_medium', 'bb_arrangement', 'bb_outside', 'bb_corner',
-  'bb_ceiling', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_walldecor',
+  'bb_ceiling', 'bb_ceiling_structure', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_walldecor',
 ] as const;
 
 let feedbackOverlayEl: HTMLDivElement | null = null;
@@ -2363,7 +2392,7 @@ function applyLiveSettings(scene: StoreScene) {
  * changes on close.
  */
 async function rebuildStoreScene() {
-  if (librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0) return; // nothing loaded yet
+  if (librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0 && !streamingStockIsStale()) return; // nothing loaded yet
   logToConsole('[System] Applying store changes (rebuilding scene, no reload)...', 'system');
   showBootOverlay();
   // Nothing is interactive behind the overlay — drain texture uploads at burst
@@ -2552,16 +2581,12 @@ async function initializeStoreScene(preservePosterCache = false) {
     await calibrateQualityIfNeeded();
 
     const { StoreScene } = await import('./three-scene');
-    // The constructor below is one uninterrupted stretch of main thread — floor
-    // plan, every fixture, every case, and the first bind of each shader
-    // program — and nothing on screen can change until it returns. Measured at
-    // 9.5s for a 6000-title catalog on a fast desktop GPU, and the shader links
-    // in it are far slower on integrated graphics. So name the wait BEFORE
-    // entering it: this line is the last thing the boot log can say for a
-    // while, and silence here is what makes a slow open look like a hang.
-    const plannedTitles = storeLibraries.reduce((n, l) => n + l.movies.length, 0);
+    // Every carried library belongs on the floor. Keep stock construction
+    // batched and offscreen shelves culled without paging away departments.
+    const plannedTitles = storeLibraries.reduce((sum, lib) => sum + lib.movies.length, 0) + storeGameMovies.length;
     logToConsole(`[System] Planning the store floor for ${plannedTitles} title(s)...`, 'system');
-    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon, storeDiscovery, storeGameMovies, staffPicks);
+    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon.slice(0, 100), storeDiscovery.slice(0, 100), storeGameMovies, staffPicks, { libraries: storeLibraries, games: storeGameMovies });
+    try { await scene.ready; } catch (error) { scene.destroy(); throw error; }
     armQualityBackstop();
     // A fresh attempt is underway — any earlier give-up no longer applies (it
     // could only be reached again via a brand-new page load, which is a fresh
@@ -2658,6 +2683,7 @@ async function initializeStoreScene(preservePosterCache = false) {
         void handleGameLaunch(movie, false);
       } else if (movie.streaming) {
         handleStreamingLaunch(movie);
+        scene.returnToEntrance();
       } else {
         void launchVideoPlayback(movie);
       }
@@ -3564,7 +3590,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     buildSubtitleTrack: (streamIndex) => {
       const d = pickSubtitleDelivery(streams, streamIndex);
       return d.kind === 'text'
-        ? buildSourceSubtitleTrackUrl(jellyfinUrl, token, playbackId, d.streamIndex, mediaSourceId, titleKind)
+        ? (buildSourceSubtitleTrackUrl(jellyfinUrl, token, playbackId, d.streamIndex, mediaSourceId, titleKind) ?? null)
         : null;
     },
     startPositionTicks: resumeTicks || undefined,
@@ -4051,6 +4077,10 @@ async function main() {
         return;
       }
 
+      if (storeScene && cancelStreamingServiceChoice(storeScene)) {
+        updateMovieHUD(storeScene.getSelectedMovie() || null);
+        return;
+      }
       const handled = storeScene?.backAction();
       if (handled) {
         updateMovieHUD(storeScene?.getSelectedMovie() || null);

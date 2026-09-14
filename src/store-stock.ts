@@ -1,4 +1,5 @@
-import { mobileStoreActive, slotWorld } from './mobile-store';
+import { disposeShelfVisibility, initializeHiddenShelfInstances } from './shelf-visibility';
+import { mobileStoreActive } from './mobile-store';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): building/clearing the instanced shelf
 // stock (buildAllMovieBoxes/clearMovieBoxes/rebuildMovieBoxes), the stacked
@@ -16,7 +17,7 @@ import { isPublicDemo } from './demo-mode';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
 import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
-import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
+import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, NR_WALL_SLOPE, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { validateCaseFit, type CaseFitPair } from './layout-validator';
 import { retailAudio } from './audio';
 import { clearPosterPrefetch } from './poster-prefetch';
@@ -157,6 +158,7 @@ function validateCaseFitForStock(scene: StoreScene): void {
 }
 
 export function clearMovieBoxes(scene: StoreScene) {
+  disposeShelfVisibility(scene);
   forgetBackstock(scene);
   caseModelSubscriptions.get(scene)?.(); caseModelSubscriptions.delete(scene);
   scene.meshes.forEach(mesh => {
@@ -208,7 +210,7 @@ export function updateColsCount(scene: StoreScene) {
   }
 }
 
-export function buildAllMovieBoxes(scene: StoreScene) {
+export async function buildAllMovieBoxes(scene: StoreScene) {
   scene.clearMovieBoxes();
   caseModelSubscriptions.set(scene, onCaseModelsChanged(() => {
     scene.queueStructuralShadowRefresh(); scene.requestRender();
@@ -352,11 +354,19 @@ export function buildAllMovieBoxes(scene: StoreScene) {
     backWallCounts.set(k, (backWallCounts.get(k) || 0) + 1);
   });
 
+  // A macrotask yield allows input/boot progress to paint between batches.
+  // Clearing a scene cancels its unfinished build before another allocation.
+  const buildSubscription = caseModelSubscriptions.get(scene);
+  const yieldBuild = async () => {
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    if (caseModelSubscriptions.get(scene) !== buildSubscription) throw new Error('Stock build cancelled');
+  };
+
   // 3. Allocate InstancedMesh objects for each unit side
   scene.unitSideFrontMeshMap.clear();
   scene.unitSideBackMeshMap.clear();
 
-  // Instances start ZERO-SCALE (all-zero matrices), not three.js's default
+  // Instances start ZERO-SCALE (affine matrices with w=1), not three.js's default
   // identity: real placement happens later, per slot, in animate()'s dirty-slot
   // pass (as posters stream in). With identity starts, every not-yet-placed and
   // never-used tail instance renders as a case clump at the world origin — and
@@ -364,10 +374,11 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // probes, mirrors) both captures that clump and caches a wrong culling
   // sphere for the mesh.
   const initInstancesHidden = (mesh: THREE.InstancedMesh) => {
-    (mesh.instanceMatrix.array as Float32Array).fill(0);
+    initializeHiddenShelfInstances(mesh);
   };
 
-  unitSideCapacity.forEach((capacity, key) => {
+  for (const [key, capacity] of unitSideCapacity) {
+    await yieldBuild();
     const isAnimated = aisleKeyShape(key) === 'white';
 
     if (key.startsWith('fixture_')) {
@@ -437,8 +448,12 @@ export function buildAllMovieBoxes(scene: StoreScene) {
           frontMesh.frustumCulled = true;
           initInstancesHidden(frontMesh);
 
-          // rental back mesh is always regular (false)
-          const backMesh = new THREE.InstancedMesh(createClonedCaseGeometry(used, false, true), getGlobalBackMaterials(false), used);
+          // Previously viewed stock is sold as retail boxes, including the rear copy.
+          const retailBackstock = scene.slottedFixtures.some(f =>
+            `fixture_${f.placement.id}` === key && f.placement.options?.retailBackstock === true);
+          const backMesh = new THREE.InstancedMesh(
+            retailBackstock ? frontMesh.geometry.clone() : createClonedCaseGeometry(used, false, true),
+            retailBackstock ? frontMesh.material : getGlobalBackMaterials(false), used);
           backMesh.castShadow = true;
           backMesh.receiveShadow = true;
           backMesh.frustumCulled = true;
@@ -483,7 +498,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       scene.unitSideFrontMeshMap.set(key, frontMesh);
       scene.unitSideBackMeshMap.set(key, backMesh);
     }
-  });
+  }
 
   // Allocate back wall meshes — sized to the placements counted above rather
   // than full wall capacity; a combination with no placements gets no mesh at
@@ -679,27 +694,28 @@ export function buildAllMovieBoxes(scene: StoreScene) {
     const layoutEntries = scene.layoutFor(libIdx).entries;
     const blockOrder = scene.plan.entryBlockOrder(libIdx);
 
-    layoutEntries.forEach((movie, idx) => {
-      if (!movie) return;
+    for (const [idx, movie] of layoutEntries.entries()) {
+      if (idx % 96 === 0) await yieldBuild();
+      if (!movie) continue;
       // Entry blocks flow in customer walk order — front of a line, around
       // the end cap, back of that line (line-reversed so it reads
       // left-to-right from the far aisle), then the next line. See
       // StorePlan.entryBlockOrder.
       const blockIdx = Math.floor(idx / UNIT_SIDE_CAPACITY);
       const bo = blockOrder[blockIdx];
-      if (!bo) return;
+      if (!bo) continue;
       const side = bo.side;
       const unitIdxInLibrary = bo.unit;
       const unit = libUnits[unitIdxInLibrary];
-      if (!unit) return;
+      if (!unit) continue;
 
       const xCenter = unit.xCenter;
       const remSide = idx % UNIT_SIDE_CAPACITY;
 
       // Calculate total columns on this side of this unit for mapping
       const startIdx = blockIdx * UNIT_SIDE_CAPACITY;
-      const entriesForSide = layoutEntries.slice(startIdx, startIdx + UNIT_SIDE_CAPACITY);
-      const { shelfIdx, col } = sideEntrySlot(entriesForSide.length, remSide);
+      const entriesForSideCount = Math.min(UNIT_SIDE_CAPACITY, layoutEntries.length - startIdx);
+      const { shelfIdx, col } = sideEntrySlot(entriesForSideCount, remSide);
 
       const shelfY = AISLE_SHELF_HEIGHTS[shelfIdx];
       // Games stand at their platform's real carton size; movies at the
@@ -776,7 +792,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       setupSlot(slot);
       scene.slotsByPosition.set(key, slot);
       scene.dirtySlots.add(slot);
-    });
+    }
   }
 
   // 5. Populate all Back Wall (New Releases) Slots (only once, libIdx = 0)
@@ -789,11 +805,12 @@ export function buildAllMovieBoxes(scene: StoreScene) {
     const shelfIdx = slotPos.shelfIdx;
 
     const shelfY = WALL_SHELF_HEIGHTS[shelfIdx];
-    const transform = scene.getNewReleasesSlotTransform(col, movie);
+    const transform = scene.getNewReleasesSlotTransform(col, movie, shelfY);
     const hinge = scene.leanHingeOffset(LEAN_ANGLE, transform.rotationY, boxHeight);
     // Series boxsets are SERIES_DEPTH_MULT deeper, so their leaned bottom
     // edge needs proportionally more lift to stay out of the shelf board.
-    const yPos = shelfY + 0.03 + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
+    const yPos = shelfY + 0.03 + NR_WALL_SLOPE * -.14
+      + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
     const bwX = transform.x + hinge.x;
     const bwZ = transform.z + hinge.z;
 
@@ -884,7 +901,8 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       const instIdx = currentInstanceIdx.get(fixtureKey) || 0;
       currentInstanceIdx.set(fixtureKey, instIdx + 1);
 
-      const backJitter = (seededRandom01(movie.id) - 0.5) * COPY_X_JITTER_RANGE;
+      const retailBackstock = fixture.placement.options?.retailBackstock === true;
+      const backJitter = retailBackstock ? 0 : (seededRandom01(movie.id) - 0.5) * COPY_X_JITTER_RANGE;
       const slot: MovieSlot = {
         movie,
         libraryIdx: 0,
@@ -921,8 +939,8 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         backJitter,
         backX: backJitter,
         backZ: -slotRentalHalfDepth(movie, tilt),
-        rentalRestZ: -slotRentalHalfDepth(movie, tilt),
-        backYLift: slotRentalLift(movie),
+        rentalRestZ: retailBackstock ? -depth / 2 - .015 : -slotRentalHalfDepth(movie, tilt),
+        backYLift: retailBackstock ? 0 : slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
         loadShelfDetails: () => {},
@@ -957,21 +975,11 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // 7. Build static extra-copy cases for high-rated films.
   scene.rebuildExtraCopies();
 
-  // 8. Pre-load all covers in low-res in the background, tracking completion
-  // via texturesReadyPromise so the caller can hold the scene hidden/non-
-  // interactive until every cover has settled (loaded or failed) rather than
-  // revealing a wall of gray placeholder spines that fill in over time.
+  // Reveal after a small entrance preview, never after a catalog-wide queue.
+  // Other artwork is demand-loaded as the camera approaches a shelf.
   const allSlots = Array.from(scene.slotsByPosition.values());
-  // Streaming-service titles (GH #86) hotlink their art from a third-party
-  // CDN (image.tmdb.org) that is nobody's server here: it can be slow, proxied
-  // or blocked, and on the hosted demo it was the last ~3s of every boot's
-  // texture wait — 160 covers that queue behind the whole catalog and gate the
-  // reveal of aisles they aren't in. They still load (queued in the .then
-  // below, same priority) and paint in as they land; they just don't hold the
-  // door.
-  // Public entry never waits on this promise. Include its real movie covers
-  // now so they consume the early prefetch rather than starting after reveal.
-  const gatedSlots = isPublicDemo ? allSlots : allSlots.filter(slot => !slot.movie.streaming);
+  const gatedSlots = allSlots.filter(slot => !slot.movie.streaming &&
+    (slot.restingX - OVERVIEW_POS.x) ** 2 + (slot.restingZ - OVERVIEW_POS.z) ** 2 < 400).slice(0, 96);
   // Nearby shelf faces lead the download queue. Copies share one decode.
   if (mobileStoreActive()) {
     const eye = OVERVIEW_POS;
@@ -1011,13 +1019,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
     // Media the store held back so it would not compete with the covers for
     // bandwidth while the overlay was up (the ceiling TVs' bundled loop).
     scene.ambientTvs?.releaseDeferredMedia();
-    // Now the third-party streaming covers: queued after the reveal rather
-    // than at the tail of the gated set, because on a home connection the
-    // gated tail and these were sharing one pipe — they paint in over the
-    // first seconds instead of stretching the wait for aisles they aren't in.
-    if (!isPublicDemo) {
-      for (const slot of allSlots) if (slot.movie.streaming) slot.loadShelfDetails(0);
-    }
+    scene.updateLOD();
   });
 
   // T25 #26 (superseded): the per-rented-title gold filler group is gone —
@@ -1212,8 +1214,8 @@ export function rebuildMovieBoxes(scene: StoreScene) {
 
       // Calculate total columns on this side of this unit
       const startIdx = blockIdx * UNIT_SIDE_CAPACITY;
-      const entriesForSide = layoutEntries.slice(startIdx, startIdx + UNIT_SIDE_CAPACITY);
-      const { shelfIdx, col } = sideEntrySlot(entriesForSide.length, remSide);
+      const entriesForSideCount = Math.min(UNIT_SIDE_CAPACITY, layoutEntries.length - startIdx);
+      const { shelfIdx, col } = sideEntrySlot(entriesForSideCount, remSide);
 
       const shelfY = AISLE_SHELF_HEIGHTS[shelfIdx];
       const { height: boxHeight, liftDepth } = aisleCaseDims(movie);
@@ -1415,45 +1417,29 @@ export function restockSlottedFixtures(scene: StoreScene): void {
 const priorityPoint = new THREE.Vector3();
 const requestedPriority = new WeakMap<MovieSlot, number>();
 export function updateLOD(scene: StoreScene) {
-  if (mobileStoreActive()) {
-    // One narrow visible lane plus a margin for the next finger movement.
-    // Leave distant covers low-res; do not promote a whole library at once.
-    scene.camera.updateMatrixWorld();
-    for (const slot of scene.slotsByPosition.values()) {
-      if (slot.hidden) continue;
-      slotWorld(slot, priorityPoint);
-      const distance = priorityPoint.distanceToSquared(scene.camera.position);
-      priorityPoint.project(scene.camera);
-      if (priorityPoint.z < -1 || priorityPoint.z > 1 || Math.abs(priorityPoint.x) > 1.5
-          || Math.abs(priorityPoint.y) > 1.5 || distance > 900) continue;
-      const priority = distance < 144 ? 3 : 1;
-      if ((requestedPriority.get(slot) ?? 0) >= priority) continue;
-      requestedPriority.set(slot, priority);
-      slot.loadShelfDetails(priority);
-    }
-    return;
-  }
-  // 1. Update reflection probe on global materials
-  const probeIdx = Math.min(scene.selectedLibraryIdx, 4);
-  const activeEnvMap = reflectionProbes[probeIdx] || null;
+  const activeEnvMap = reflectionProbes[Math.min(scene.selectedLibraryIdx, 4)] || null;
   updateGlobalMaterialsEnvMap(activeEnvMap);
   scene.entrance?.setEnvMap(activeEnvMap);
-
-  // 2. Stream high-resolution covers for the active shelving units
-  const currentLibIdx = scene.selectedLibraryIdx;
-  scene.slotsByPosition.forEach(slot => {
-    let isActive = false;
-    if (slot.unitIdx === BACK_WALL_UNIT_IDX) {
-      isActive = true;
-    } else if (slot.source === 'fixture') {
-      isActive = true;
-    } else if (slot.libraryIdx === currentLibIdx) {
-      isActive = true;
-    }
-
-    if (isActive) {
-      // Load high-resolution cover
-      slot.loadShelfDetails(1);
-    }
-  });
+  // One narrow visible lane plus a margin for the next finger movement.
+  // Leave distant covers low-res; do not promote a whole library at once.
+  scene.camera.updateMatrixWorld();
+  const camPos = scene.camera.position;
+  let requested = 0;
+  for (const slot of scene.slotsByPosition.values()) {
+    if (slot.hidden) continue;
+    const sx = slot.currentX ?? slot.restingX;
+    const sy = slot.currentY ?? slot.restingY;
+    const sz = slot.currentZ ?? slot.restingZ;
+    const dx = sx - camPos.x, dy = sy - camPos.y, dz = sz - camPos.z;
+    const distance = dx * dx + dy * dy + dz * dz;
+    if (distance > 900) continue;
+    priorityPoint.set(sx, sy, sz).project(scene.camera);
+    if (priorityPoint.z < -1 || priorityPoint.z > 1 || Math.abs(priorityPoint.x) > 1.5
+        || Math.abs(priorityPoint.y) > 1.5) continue;
+    const priority = distance < 144 ? 3 : 1;
+    if ((requestedPriority.get(slot) ?? 0) >= priority) continue;
+    requestedPriority.set(slot, priority);
+    slot.loadShelfDetails(priority);
+    if (++requested >= 24) break;
+  }
 }

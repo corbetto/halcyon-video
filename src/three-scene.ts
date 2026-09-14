@@ -1,5 +1,17 @@
+import { ABOVE_R_LIBRARY_ID, partitionAboveRRoom } from './above-r-room';
+import { createNrBayWash } from './nr-bay-wash';
+import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
+import { activeStoreFormat } from './store-format';
+import { planNrRuns, nrSlotTransform, type NrRun } from './nr-run-layout';
+import { disposeSceneMeshes } from './scene-mesh-disposal';
+import { installStoreSurfaceFinishes } from './store-surface-finish';
+import { fitSteppedCornerDepth } from './stepped-corner-clearance';
+import { placementBudget } from './progressive-placement';
+import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility';
 import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
 import * as THREE from 'three';
+import { installDirectLightVisibility } from './direct-light-visibility';
+installDirectLightVisibility();
 import { isPublicDemo } from './demo-mode';
 import { Movie, JellyfinLibrary, Episode } from './jellyfin';
 import { assetUrl } from './asset-url';
@@ -35,6 +47,7 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import * as mirrors from './store-mirrors';
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture } from './fixtures';
+import { disposeRooftopHVAC } from './rooftop-hvac';
 import { setWindowAwningLighting, disposeWindowAwnings } from './storefront-awning';
 import { setFacadeEntryLighting, disposeFacadeEntry } from './storefront-entry-model';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
@@ -43,14 +56,12 @@ import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { ExteriorEnvironment } from './exterior-environment';
 import {
-  NR_RUN_DEPTH,
+  NR_RUN_DEPTH, nrWallStockOffset,
   NR_LEFT_UNIT_STANDOFF,
   FIELD_Z_FRONT,
   AISLE_SHELF_HEIGHTS,
   WALL_SHELF_HEIGHTS,
-  BOX_SPACING,
   STAGGER_OFFSET,
-  SECTION_COLS,
   UNIT_SIDE_CAPACITY,
   BACK_WALL_UNIT_IDX,
   seededRandom01,
@@ -62,7 +73,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols, wallAllowsFeatureSections,
+  FixturePlacement, newReleasesWallSpan, wallAllowsFeatureSections,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -71,7 +82,7 @@ import { CandyDisplay, CandyRow } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
 import { openTipOverlay } from './tip-jar';
 import { gamepadEverConnected } from './gamepad-tracker';
-import { StoreTheme } from './themes';
+import { StoreTheme, getActiveTheme } from './themes';
 import {
   CASE_EULER_ORDER,
   NewReleasesSection,
@@ -133,6 +144,7 @@ import { StorefrontLogo3D } from './logo-storefront';
 import { retailAudio } from './audio';
 import { clearActiveSignage } from './fixtures/signage';
 import { CarriedTapes, CarryPose, showClerkToast, disposeClerkToast } from './carried-tapes';
+import { getStreamingCheckoutMovie, clearStreamingCheckoutMovie, cancelStreamingServiceChoice } from './streaming-checkout';
 import { BackRoom, disposeBackRoomFade } from './back-room';
 import { RentalRecord, loadRentalRecord, clearRentalRecord, isLockedOut, formatUnlockLabel } from './rental-clock';
 import { perfTrace, perfSlot } from './perf-trace';
@@ -182,10 +194,6 @@ declare module './store-layout' {
 // the mechanical grid, small enough that the shelf never looks knocked-about.
 const CASE_LEAN_JITTER = 0.06;
 
-
-
-
-
 // Tolerant matrix compare for the AO view cache: the browse-mode camera lerp
 // approaches its target asymptotically, so exact equals() would keep reading
 // "moved" (and recomputing AO) for seconds of microscopic sub-visible drift.
@@ -199,6 +207,7 @@ function matrixAlmostEquals(a: THREE.Matrix4, b: THREE.Matrix4, eps = 1e-6): boo
 }
 
 export class StoreScene {
+  private disposeSurfaceFinishes: (() => void) | null = null;
   public container: HTMLDivElement;
   public renderer!: THREE.WebGLRenderer;
   public scene!: THREE.Scene;
@@ -465,6 +474,8 @@ export class StoreScene {
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
     onEnvironmentRebaked: () => {
+      mirrors.updateMirrorThrottle(this, true);
+      this.requestRender();
       this.rebuildSSAOExclusionList();
       this.generateReflectionProbes();
       this.updateLOD();
@@ -532,6 +543,7 @@ export class StoreScene {
   // (user: "carpet is dark as night"). Real troffers pour direct light DOWN;
   // brighten the key spots after dark so the carpet actually receives it.
   private applyModeLighting(mode: OutsideMode) {
+    this.exterior?.setOutsideMode(mode);
     setWindowAwningLighting(this.scene, mode);
     setFacadeEntryLighting(this.scene, mode);
     // Day 110 -> 145 -> 180 chased a dark carpet by raising energy, but the
@@ -544,7 +556,7 @@ export class StoreScene {
     // and the env's ceiling hemisphere is mostly dark acoustic tile, so the
     // floor (normal up, integrating exactly that hemisphere) has no other
     // source. Real troffers are what light a store floor; give them the energy.
-    const spotIntensity = mode === 'night' ? 120 : 105; // candela — see trofferKeyLights
+    const spotIntensity = (mode === 'night' ? 120 : 105) * 1.56; // candela — see trofferKeyLights
     for (const key of this.trofferKeyLights ?? []) key.intensity = spotIntensity;
     this.requestRender();
   }
@@ -766,6 +778,7 @@ export class StoreScene {
   // come through here: they refresh the sun's map alone.
   public queueStructuralShadowRefresh(frames = 3) {
     this.shadowRefreshFrames = frames;
+    this.exterior?.refreshShadows();
     for (const key of this.trofferKeyLights) {
       if (key.castShadow) key.shadow.needsUpdate = true;
     }
@@ -785,8 +798,11 @@ export class StoreScene {
   // ribbon, back-aligned into the back-left corner) and continues contiguously
   // onto the back wall, which carries shelving spanning the whole wall and is
   // stepped: the right portion juts forward toward the viewer. The RIGHT wall
-  // carries no New Releases — its stretch behind the window ribbon holds the
-  // exterior side door instead.
+  // carries matching bays, ending before the service-door clearance.
+  public nrBayLightAnchors: { x: number; y: number; z: number }[] = [];
+  public nrBayLightingUpdate: (() => void) | null = null;
+  public applyNrBayWash: ((mesh: THREE.Mesh) => void) | null = null;
+  public nrRuns: NrRun[] = [];
   public nrLeftWallCols = 36;
   // Side-window ribbon z-span shared by BOTH side walls (null = no ribbon,
   // walls stay solid). Computed with the NR wall layout below; consumed by the
@@ -794,8 +810,7 @@ export class StoreScene {
   public sideRibbon: { frontZ: number; backZ: number } | null = null;
   public nrBackWallColsRun1 = 0;
   public nrBackWallColsRun2 = 0;
-  private nrBackWallColsRun3 = 0;
-  private nrBackWallCols = 36;
+  public nrBackWallColsRun3 = 0;
   public nrTotalCols = 72;
   public nrBackLeftX = -6.0;       // left X where back-wall shelving begins (after the left sliver)
   public nrBackRightEdgeX = 30.5;  // right X where back-wall shelving ends
@@ -807,7 +822,8 @@ export class StoreScene {
   private readonly LEFT_SLIVER = NR_LEFT_UNIT_STANDOFF + NR_RUN_DEPTH;
   public stepX = 15.0;             // X at which the back wall steps forward
   public stepDepth = 7.0;          // how far the right section comes toward the viewer (+Z)
-  public hasStep = true;           // false when bb_corner === 'none' (flat back-right wall)
+  public get nrBackRun1EndX(): number { return this.stepX - (this.hasStep ? NR_RUN_DEPTH + .25 : 0); }
+  public hasStep = false;           // false when bb_corner === 'none' (flat back-right wall)
 
   // Data-driven room-shell options (T07): ceiling height, stepped-corner
   // footprint, and decorated wall zones. Read once at construction so a
@@ -912,6 +928,7 @@ export class StoreScene {
   
   // Render loop tracking
   private isRendering = true;
+  private rafId: number | null = null;
   private frameCount = 0;
   // Render-on-demand (issue #24): the requestAnimationFrame loop runs forever (a
   // no-op tick is ~free) but the composer only draws when something changed. We
@@ -1064,6 +1081,10 @@ export class StoreScene {
   public promoSignMat: THREE.MeshStandardMaterial | null = null;
   public promoSignRedMat: THREE.MeshStandardMaterial | null = null;
 
+  public catalogLibraries: JellyfinLibrary[];
+  public catalogGames: Movie[];
+  public ready: Promise<void>;
+
   constructor(
     container: HTMLDivElement,
     libraries: JellyfinLibrary[],
@@ -1076,11 +1097,15 @@ export class StoreScene {
     // Watch-history recommendations (see staff-picks.ts): ownedPicks is the
     // ranked owned pool (deliberately unmarked on the shelf — no flag, no
     // sticker); discoveryPicks are not-in-library endcap candidates.
-    staffPicks: { ownedPicks: Movie[]; discoveryPicks: Movie[] } | null = null
+    staffPicks: { ownedPicks: Movie[]; discoveryPicks: Movie[] } | null = null,
+    catalog?: { libraries: JellyfinLibrary[]; games: Movie[] }
   ) {
     this.container = container;
     this.onConsoleLog = onConsoleLog;
-    this.libraries = libraries;
+    this.libraries = partitionAboveRRoom(libraries, activeStoreFormat().id === 'mom-and-pop'
+      && localStorage.getItem('bb_above_r_room') === '1');
+    this.catalogLibraries = catalog?.libraries ?? libraries;
+    this.catalogGames = catalog?.games ?? gameMovies;
     // The store renders on demand, so a live brand repaint has to ask for a
     // frame or it sits in the texture unseen until the next input.
     setBrandRenderHook(() => this.requestRender());
@@ -1141,6 +1166,7 @@ export class StoreScene {
       let shelfLib: JellyfinLibrary | null = null;
       let best = -1;
       for (const lib of this.libraries) {
+        if (lib.id === ABOVE_R_LIBRARY_ID) continue;
         const n = lib.movies.filter((m) => !m.isSeries && !m.game && !m.collectionGap).length;
         if (n > best) { best = n; shelfLib = lib; }
       }
@@ -1190,7 +1216,7 @@ export class StoreScene {
     // per library, unit placement in hatched runs for the active arrangement, and
     // the room bounds (backWallZ, aisle pivot). See store-plan.ts.
     this.plan = new StorePlan(this.libraries, mobileStoreActive());
-    this.plan.plan();
+    this.plan.plan(getActiveTheme().id, this.ceilingY);
 
     // Derive the New Releases wall layout from the store width. The back-wall
     // shelving covers the entire back wall except a sliver on the left next to
@@ -1200,7 +1226,7 @@ export class StoreScene {
       const leftEdge = 11.0 - sw / 2;
       const rightEdge = 11.0 + sw / 2;
       // How much back wall New Releases gets is the FORMAT's call (GH #33).
-      [this.nrBackLeftX, this.nrBackRightEdgeX] = newReleasesWallSpan(leftEdge + this.LEFT_SLIVER, rightEdge - 0.2);
+      [this.nrBackLeftX, this.nrBackRightEdgeX] = newReleasesWallSpan(leftEdge + (this.plan.clubhouse ? 18 : this.LEFT_SLIVER), rightEdge - 0.2 - (this.plan.aboveRRoom ? this.plan.aboveRRoom.width + .5 : 0));
       // Stepped-corner footprint comes from the shell spec (T07). Width sets how
       // far left the step begins; depth is clamped to the section width so the
       // NR connector run is never longer than the section it wraps, and stays
@@ -1209,7 +1235,9 @@ export class StoreScene {
       if (corner && corner.corner === 'back-right') {
         const stepW = corner.w;                             // right section width = stepW
         this.stepX = rightEdge - stepW;
-        this.stepDepth = Math.min(corner.d, this.nrBackRightEdgeX - this.stepX);
+        this.stepDepth = fitSteppedCornerDepth(Math.min(corner.d, this.nrBackRightEdgeX - this.stepX),
+          this.stepX, this.backWallZ, this.plan.getUnitFootprints());
+        if (this.stepDepth === 0) this.stepX = this.nrBackRightEdgeX;
       } else {
         // bb_corner === 'none' (or no back-right corner): no forward notch. The
         // back-right wall is a clean flat continuation of the back wall. Collapse
@@ -1222,16 +1250,6 @@ export class StoreScene {
       // Derived flag every step-only site gates on, so nothing floats or leaves a
       // hole when the notch is removed. See the guarded blocks in buildStore().
       this.hasStep = this.stepDepth > 0;
-      const length1 = this.stepX - this.nrBackLeftX;
-      const length2 = this.stepDepth;
-      const length3 = this.nrBackRightEdgeX - this.stepX;
-
-      this.nrBackWallColsRun1 = Math.max(0, Math.floor((length1 - 1.0) / BOX_SPACING));
-      this.nrBackWallColsRun2 = this.hasStep ? Math.max(0, Math.floor((length2 - 1.0) / BOX_SPACING)) : 0;
-      this.nrBackWallColsRun3 = this.hasStep ? Math.max(0, Math.floor((length3 - 1.0) / BOX_SPACING)) : 0;
-
-      this.nrBackWallCols = this.nrBackWallColsRun1 + this.nrBackWallColsRun2 + this.nrBackWallColsRun3;
-
       // Side-window ribbons: both side walls carry
       // the reference building's banded window run toward the FRONT. WINDOWS
       // TAKE PRIORITY (user direction): the ribbon claims its reference span
@@ -1262,20 +1280,13 @@ export class StoreScene {
       this.sideRibbon = ribbonLen >= SIDE_RIBBON_MIN_LEN
         ? { frontZ: SIDE_RIBBON_FRONT_Z, backZ: SIDE_RIBBON_FRONT_Z - ribbonLen }
         : null;
-      // Left wall has no stepped corner: its unit back-aligns to the back wall.
-      const unitBackZ = this.nrLeftWallUnitBackZ();
-      const unitSpace = (this.sideRibbon ? this.sideRibbon.backZ - SIDE_RIBBON_CLEARANCE : 15.0) - unitBackZ;
-      // GH #6: this used to hard-cap at 36 columns regardless of how much wall
-      // was actually available, which left the run stopping visibly short of
-      // the window ribbon on any store wide enough to offer more (the
-      // baseline-width store's ~44 available columns only ever built 36,
-      // an 8-column/~4.6ft gap of bare wall between the last case and the
-      // glass). The whole point of this calc is described right above it as
-      // ADAPTIVE — sized to whatever the ribbon leaves behind it — so let it
-      // actually use the space it computed instead of throwing some away.
-      this.nrLeftWallCols = newReleasesLeftWallCols(unitSpace);
-
-      this.nrTotalCols = this.nrLeftWallCols + this.nrBackWallCols;
+      // Fit the physical bays and stock to the same perimeter runs.
+      this.nrRuns = planNrRuns({ width: sw, backZ: this.backWallZ, backLeftX: this.nrBackLeftX,
+        backRightX: this.nrBackRightEdgeX, stepX: this.stepX, stepDepth: this.stepDepth,
+        sideBackZ: this.sideRibbon ? this.sideRibbon.backZ - SIDE_RIBBON_CLEARANCE : 15,
+        clubhouse: !!this.plan.clubhouse, wall: activeStoreFormat().newReleasesWall });
+      [this.nrLeftWallCols, this.nrBackWallColsRun1, this.nrBackWallColsRun2, this.nrBackWallColsRun3] = this.nrRuns.map(r => r.cols);
+      this.nrTotalCols = this.nrRuns.reduce((n, r) => n + r.cols, 0);
     }
 
     // Gather all unique movies from all libraries for the New Releases back
@@ -1284,6 +1295,7 @@ export class StoreScene {
     // in it is a lie the aisle sticker treatment doesn't excuse.
     const allMoviesMap = new Map<string, Movie>();
     this.libraries.forEach((lib) => {
+      if (lib.id === ABOVE_R_LIBRARY_ID) return;
       lib.movies.forEach((m) => {
         if (m.discovery || m.collectionGap || m.comingSoon) return;
         allMoviesMap.set(m.id, m);
@@ -1311,10 +1323,10 @@ export class StoreScene {
 
     // Sections ARE the physical bays (store-nr-bays.ts): cut per wall run the
     // way the divider panels are, so no title ever spans a divider or the
-    // corner. A trailing partial bay is its own narrower section.
-    const nrBays = nrBaysForRuns([this.nrLeftWallCols, this.nrBackWallColsRun1, this.nrBackWallColsRun2, this.nrBackWallColsRun3]);
+    // corner. Only complete physical bays enter this ribbon.
+    const nrBays = nrBaysForRuns(this.nrRuns.map(r => r.cols));
     const numWallSections = nrBays.length;
-    // A regular wall section faces ONE title out across its whole 6-column row,
+    // A regular wall section faces ONE title out across its whole 8-column row,
     // so the wall wants one candidate per ROW, not per column. Those two counts
     // only coincided while a section happened to be as tall as it is wide
     // (6 tiers x 6 cols); at the measured 8 tiers a column-sized slice starves
@@ -1454,6 +1466,10 @@ export class StoreScene {
     }
     this.setupLighting();
     this.buildStore();
+    const wash = createNrBayWash(this);
+    this.applyNrBayWash = wash.apply;
+    const finishes = installStoreSurfaceFinishes(this.scene, wash.apply);
+    this.disposeSurfaceFinishes = () => { finishes(); wash.dispose(); this.applyNrBayWash = null; };
     this.installMirrorThrottle();
     // Prebaked shadows (shadowMap.autoUpdate = false) only render the sun's shadow
     // map when needsUpdate is set. The reflection-probe and mirror cube renders below
@@ -1483,18 +1499,15 @@ export class StoreScene {
       this.bootstrapRoomEnv = null;
       this.generateReflectionProbes();
     }
-    this.buildAllMovieBoxes();
-    // #60: the poster layer shortfall (if any) is settled the instant
-    // buildAllMovieBoxes() returns (textureArrayManager.init() computes it
-    // straight off the catalog size, not off streaming progress) — but the
-    // counter's idle CRT already painted once, before this, showing no
-    // notice unconditionally. Repaint it now that the real number exists.
+    this.ready = this.finishStockBuild();
+  }
+
+  private async finishStockBuild(): Promise<void> {
+    await this.buildAllMovieBoxes();
+    // Poster capacity is settled after the progressive stock build.
     this.entrance?.refreshIdleTerminal();
     this.rebuildMovieBoxes();
-    // A second bake with STOCKED shelves can't happen here: case instances are
-    // placed asynchronously by animate()'s dirty-slot pass as posters stream in
-    // (right now every instance is still zero-scale). animate() runs the re-bake
-    // once placement has settled — see pendingStockedRebake.
+    // Rebake once progressive instance placement has settled.
     this.pendingStockedRebake = true;
     this.createSelectionArrow();
     // After createSelectionArrow(): the arrow is AO-excluded (it bobs while the
@@ -1566,7 +1579,6 @@ export class StoreScene {
     this.onConsoleLog("[System] 3D Store rendering active in Library Select mode.", "system");
   }
 
-
   // The checkout desk's walk-in gap Z, with the pre-fixture default as fallback.
   public deskApexZ(): number {
     return this.entrance?.deskApexZ ?? 2.0;
@@ -1634,6 +1646,7 @@ export class StoreScene {
   // Everything a swappable fixture (ambient TVs, entrance, ...) needs from the
   // scene, bundled so fixture classes never hold a reference to StoreScene.
   public fixtureContext(): FixtureContext {
+    const roomIds = new Set(this.libraries.find(lib => lib.id === ABOVE_R_LIBRARY_ID)?.movies.map(movie => movie.id));
     return {
       scene: this.scene,
       camera: this.camera,
@@ -1641,11 +1654,11 @@ export class StoreScene {
       backWallZ: this.backWallZ,
       ceilingY: this.ceilingY,
       storefrontSpec: this.storefrontSpec,
-      libraries: this.libraries,
+      libraries: this.libraries.filter(lib => lib.id !== ABOVE_R_LIBRARY_ID),
       jellyfinUrl: this.jellyfinUrl,
       jellyfinToken: this.jellyfinToken,
       gameMovies: this.gameMovies,
-      staffPickMovies: this.staffPickMovies,
+      staffPickMovies: this.staffPickMovies.filter(movie => !roomIds.has(movie.id)),
       log: this.onConsoleLog,
       addCollider: (obj) => this.shelves.push(obj),
       requestShadowRefresh: () => {
@@ -1733,7 +1746,6 @@ export class StoreScene {
   // section divider, so leaned cases (and their jittered stacked copies) never
   // graze the divider panel. Sign convention is for an ASCENDING local axis:
   // the column just after a divider shifts +, the column just before shifts −.
-  private static readonly NR_DIVIDER_CLEARANCE = 0.045;
   // `runStartCol` is the run's first column as a GLOBAL ribbon index: a column
   // adjacent to a divider suppressed inside a double-feature (see
   // nrSuppressedDividerCols) keeps its normal spacing so the doubled section
@@ -1752,98 +1764,10 @@ export class StoreScene {
     return null;
   }
 
-  private nrDividerNudge(colInRun: number, runStartCol = 0): number {
-    if (colInRun > 0 && colInRun % SECTION_COLS === 0 &&
-        !this.nrSuppressedDividerCols.has(runStartCol + colInRun)) return StoreScene.NR_DIVIDER_CLEARANCE;
-    if (colInRun % SECTION_COLS === SECTION_COLS - 1 &&
-        !this.nrSuppressedDividerCols.has(runStartCol + colInRun + 1)) return -StoreScene.NR_DIVIDER_CLEARANCE;
-    return 0;
-  }
-
-  // Center Z of the LEFT-wall New Releases unit. Back-aligned against the
-  // back-left corner (the front stretch of the left wall carries the
-  // side-window ribbon), so the ribbon's col order runs front -> back and
-  // meets the back wall's Run 1 right at the corner — one contiguous wall of
-  // New Releases from the left wall onto the back wall. Single source of
-  // truth for the layout calc, the slot transforms, the built shelf run, and
-  // its signage.
-  public nrLeftWallUnitCenterZ(): number {
-    const unitLen = this.nrLeftWallCols * BOX_SPACING + 1.0;
-    return this.nrLeftWallUnitBackZ() + unitLen / 2;
-  }
-
-  // Back Z of the LEFT-wall unit's shelf boards: exactly the back-wall run's
-  // built depth from the back wall, so the unit's back end panel (which
-  // extends 0.04 ft past the boards, toward the wall) tucks behind Run 1's
-  // front face — the mirror of LEFT_SLIVER in the other axis. Single source
-  // for the layout calc (unitBackZ) and nrLeftWallUnitCenterZ above.
-  private nrLeftWallUnitBackZ(): number {
-    return this.backWallZ + NR_RUN_DEPTH;
-  }
-
-  public getNewReleasesSlotTransform(col: number, _movie?: Movie): { x: number, z: number, rotationY: number } {
-    const leftWallCols = this.nrLeftWallCols;
-    // Flat case standoff off the wall plane. The old per-title depth
-    // (0.20 + extraCopiesCount*0.05) reserved room for the blue backstock
-    // stack, which the NR wall no longer carries (see rebuildExtraCopies) —
-    // the shelf holds exactly the display box + its gold rental copy.
-    const offset = 0.20;
-
-    if (col < leftWallCols) {
-      // Left Wall unit (faces +X into the store interior). Col 0 sits at the
-      // FRONT (just behind the window ribbon), ascending toward the back-left
-      // corner where the back wall's Run 1 picks up — contiguous ribbon.
-      // Case standoff mirrors the back-wall runs: the unit's group origin sits
-      // NR_LEFT_UNIT_STANDOFF off the wall mesh (its own "wall plane"), and the
-      // case hinge goes `offset` in front of that — the same stack-aware offset
-      // every other run uses. The old hardcoded +0.22 ignored both the standoff
-      // and extra-copy stack depth, sinking leaned cases back through the
-      // backing panel into the wall (user-reported back-left clipping).
-      const storeWidth = this.getStoreWidth();
-      const leftWallX = 11.0 - storeWidth / 2 + NR_LEFT_UNIT_STANDOFF + offset;
-      const wallZCenter = this.nrLeftWallUnitCenterZ();
-      // Front to back distribution (descending world Z, so the nudge flips sign)
-      const zPos = wallZCenter + ((leftWallCols - 1) * BOX_SPACING) / 2 - col * BOX_SPACING - this.nrDividerNudge(col);
-      return { x: leftWallX, z: zPos, rotationY: Math.PI / 2 };
-    }
-
-    const colInBack = col - leftWallCols;
-
-    if (colInBack < this.nrBackWallColsRun1) {
-      // Run 1: Far back wall (faces +Z)
-      const length1 = this.stepX - this.nrBackLeftX;
-      const margin1 = (length1 - this.nrBackWallColsRun1 * BOX_SPACING) / 2;
-      const localX = -length1 / 2 + margin1 + (colInBack + 0.5) * BOX_SPACING + this.nrDividerNudge(colInBack, leftWallCols);
-      const centerPos1X = (this.nrBackLeftX + this.stepX) / 2;
-      return { x: centerPos1X + localX, z: this.backWallZ + offset, rotationY: 0 };
-    } else if (colInBack < this.nrBackWallColsRun1 + this.nrBackWallColsRun2) {
-      // Run 2: Connector side wall (faces -X, along Z at stepX)
-      const c = colInBack - this.nrBackWallColsRun1;
-      const length2 = this.stepDepth;
-      const margin2 = (length2 - this.nrBackWallColsRun2 * BOX_SPACING) / 2;
-      const localX = -length2 / 2 + margin2 + (c + 0.5) * BOX_SPACING + this.nrDividerNudge(c, leftWallCols + this.nrBackWallColsRun1);
-      const stepWallZ = this.backWallZ + this.stepDepth;
-      const midStepZ = (this.backWallZ + stepWallZ) / 2;
-      // Since rotationY is -Math.PI/2, local X translates to world Z
-      return { x: this.stepX - offset, z: midStepZ + localX, rotationY: -Math.PI / 2 };
-    } else if (colInBack < this.nrBackWallColsRun1 + this.nrBackWallColsRun2 + this.nrBackWallColsRun3) {
-      // Run 3: Stepped-forward front wall (faces +Z)
-      const c = colInBack - this.nrBackWallColsRun1 - this.nrBackWallColsRun2;
-      const length3 = this.nrBackRightEdgeX - this.stepX;
-      const margin3 = (length3 - this.nrBackWallColsRun3 * BOX_SPACING) / 2;
-      const localX = -length3 / 2 + margin3 + (c + 0.5) * BOX_SPACING + this.nrDividerNudge(c, leftWallCols + this.nrBackWallColsRun1 + this.nrBackWallColsRun2);
-      const centerPos3X = (this.stepX + this.nrBackRightEdgeX) / 2;
-      const stepWallZ = this.backWallZ + this.stepDepth;
-      return { x: centerPos3X + localX, z: stepWallZ + offset, rotationY: 0 };
-    } else {
-      // Defensive fallback (cols beyond the ribbon should not exist): clamp
-      // onto the last Run 1 column so nothing ever lands at the origin.
-      const length1 = this.stepX - this.nrBackLeftX;
-      const margin1 = (length1 - this.nrBackWallColsRun1 * BOX_SPACING) / 2;
-      const lastC = Math.max(0, this.nrBackWallColsRun1 - 1);
-      const localX = -length1 / 2 + margin1 + (lastC + 0.5) * BOX_SPACING;
-      return { x: (this.nrBackLeftX + this.stepX) / 2 + localX, z: this.backWallZ + offset, rotationY: 0 };
-    }
+  public nrLeftWallUnitCenterZ(): number { return this.nrRuns[0]?.z ?? this.nrLeftWallUnitBackZ(); }
+  private nrLeftWallUnitBackZ(): number { return this.backWallZ + (this.plan.clubhouse ? 18 : NR_RUN_DEPTH); }
+  public getNewReleasesSlotTransform(col: number, _movie?: Movie, shelfY = WALL_SHELF_HEIGHTS[0]): { x: number, z: number, rotationY: number } {
+    return nrSlotTransform(this.nrRuns, col, nrWallStockOffset(shelfY));
   }
 
   private initThree() {
@@ -1904,10 +1828,9 @@ export class StoreScene {
     const phoneEntry = usesPhoneQualityDefault();
     const phoneBudget = phoneEntry && !explicitQuality;
     const automaticQuality = calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
-    // A phone viewport can receive a desktop-GPU calibration (or an overly
-    // optimistic mobile result). Keep its first visit within the existing
-    // medium budget; an explicit quality choice remains authoritative.
-    const effectiveQuality = explicitQuality || (phoneEntry && automaticQuality === 'high' ? 'medium' : automaticQuality);
+    // A phone viewport defaults conservatively to low; an explicit quality
+    // choice remains authoritative.
+    const effectiveQuality = explicitQuality || (phoneEntry ? 'low' : automaticQuality);
     this.effectiveQuality = effectiveQuality as 'high' | 'medium' | 'low';
     this.softwareGL = softwareGL;
     // Supersample grant: an AUTO-tiered 'high' only earns the above-native
@@ -2748,7 +2671,7 @@ export class StoreScene {
     this.scene.add(ambient);
     // Low-frequency interior bounce, reflected up from floor and fixtures.
     // Unlike material emission this obeys normals, albedo and light intensity.
-    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 1.25);
+    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 0.30);
     interiorBounce.name = 'interior-diffuse-bounce';
     interiorBounce.userData.interiorBounce = true;
     this.scene.add(interiorBounce);
@@ -2760,7 +2683,10 @@ export class StoreScene {
     const sunIntensity = this.selectedSky ? this.selectedSky.sunIntensity : 3.6;
     const sunLight = new THREE.DirectionalLight(sunColor, sunIntensity);
     const sunTarget = new THREE.Object3D();
-    sunTarget.position.set(14.0, 0.0, this.scaleZ(-12.0));
+    sunTarget.position.set(STORE_CENTER_X, this.ceilingY / 2, (FRONT_GLASS_Z + this.backWallZ) / 2);
+    const sunShadowRadius = Math.hypot(this.getStoreWidth() / 2 + 2,
+      (FRONT_GLASS_Z - this.backWallZ) / 2 + 8, this.ceilingY / 2 + 4);
+    this.outdoor.sunShadowDistance = sunShadowRadius + 20;
     this.scene.add(sunTarget);
     sunLight.target = sunTarget;
     this.outdoor.sunLight = sunLight;
@@ -2773,24 +2699,22 @@ export class StoreScene {
     const sunShadowSize = this.effectiveQuality === 'high' ? 4096 : (this.effectiveQuality === 'medium' ? 2048 : 1024);
     sunLight.shadow.mapSize.width = sunShadowSize;
     sunLight.shadow.mapSize.height = sunShadowSize;
-    sunLight.shadow.camera.left = -55;
-    sunLight.shadow.camera.right = 55;
-    sunLight.shadow.camera.top = 45;
-    sunLight.shadow.camera.bottom = -45;
+    sunLight.shadow.camera.left = -sunShadowRadius;
+    sunLight.shadow.camera.right = sunShadowRadius;
+    sunLight.shadow.camera.top = sunShadowRadius;
+    sunLight.shadow.camera.bottom = -sunShadowRadius;
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 95;
+    sunLight.shadow.camera.far = 2 * sunShadowRadius + 40;
     this.scene.add(sunLight);
     this.scene.add(sunLight.target);
     this.topLights.push(sunLight);
 
-    // Near-zero camera headlight: just a legibility floor for dark-side box titles.
-    // A camera-aligned light flattens whatever it touches, so it stays tiny.
-    this.headlight = new THREE.DirectionalLight('#fff5e6', 0.05);
+    // Keep the camera rig for compatibility, but let scene sources light titles.
+    this.headlight = new THREE.DirectionalLight('#fff5e6', 0);
     this.headlight.castShadow = false;
     this.scene.add(this.headlight);
     this.scene.add(this.headlight.target);
   }
-
 
   public buildStore() { return shell.buildStore(this); }
 
@@ -4179,10 +4103,15 @@ export class StoreScene {
       }
       return true;
     }
-    // T22: leave the checkout counter (keeping the carried tapes) — back to
-    // the overview (or classic library-select). Ignored mid-flourish.
+    // T22: leave the checkout counter (keeping carried physical tapes; dropping streaming) — back to overview.
     if (this.mode === 'checkout') {
       if (this.checkoutRunning) return true;
+      const streamingMovie = getStreamingCheckoutMovie(this);
+      if (streamingMovie) {
+        if (typeof this.carried?.drop === 'function') this.carried.drop(streamingMovie.id);
+        else this.carried?.clearAll(true);
+        clearStreamingCheckoutMovie(this);
+      }
       this.clerk?.releaseFromRegister();
       if (this.overviewStart) {
         this.enterOverview();
@@ -4210,6 +4139,7 @@ export class StoreScene {
       return true;
     }
     if (this.mode === 'inspect') {
+      cancelStreamingServiceChoice(this);
       // Entered by clicking a case in walk mode: Back puts the case down and
       // returns to the exact standing pose. The pose is one-shot — any other
       // way out of this inspect (endcap detour below, playing the movie)
@@ -4218,8 +4148,7 @@ export class StoreScene {
       this.walkReturnPose = null;
       if (walkPose && !this.personEndcap) {
         this.isFlipped = false; this.heroSpine = false;
-        this.selectedBackCoverRegionIdx = -1;
-        this.highlightedBackRegionName = '';
+        this.selectedBackCoverRegionIdx = -1; this.highlightedBackRegionName = '';
         this.resetHeroFace();
         this.teleportWalk(
           walkPose.x, walkPose.z,
@@ -4234,8 +4163,7 @@ export class StoreScene {
         this.mode = 'person-endcap';
         if (this.onModeChange) this.onModeChange(this.mode);
         this.isFlipped = false; this.heroSpine = false;
-        this.selectedBackCoverRegionIdx = -1;
-        this.highlightedBackRegionName = '';
+        this.selectedBackCoverRegionIdx = -1; this.highlightedBackRegionName = '';
         this.resetHeroFace();
         this.updateEndcapSelection();
         this.updateCameraTarget();
@@ -4246,8 +4174,7 @@ export class StoreScene {
       this.mode = 'browse';
       if (this.onModeChange) this.onModeChange(this.mode);
       this.isFlipped = false; this.heroSpine = false;
-      this.selectedBackCoverRegionIdx = -1;
-      this.highlightedBackRegionName = '';
+      this.selectedBackCoverRegionIdx = -1; this.highlightedBackRegionName = '';
       this.resetHeroFace();
       this.updateCameraTarget();
       this.onConsoleLog("[System] Returned to shelf browse.", "system");
@@ -4381,10 +4308,9 @@ export class StoreScene {
   private animate = () => {
     if (!this.isRendering) return;
     
-    requestAnimationFrame(this.animate);
+    this.rafId = requestAnimationFrame(this.animate);
     this.frameCount++;
     updatedMeshes.clear();
-
 
     const time = performance.now();
     perfTrace.frameTick(time);
@@ -4551,6 +4477,7 @@ export class StoreScene {
       this.camera.lookAt(this.currentLookAt);
     }
     mobileArtworkTick(this, time);
+    tickShelfVisibility(this, time);
     if (this.headlight) {
       this._headlightOffset.set(2.0, 1.5, 0);
       this._headlightOffset.applyQuaternion(this.camera.quaternion);
@@ -4854,8 +4781,7 @@ export class StoreScene {
 
     // Persist an already-composited static frame instead of re-drawing it every
     // stay-awake rAF. The sharp settle frame stays on screen at zero GPU.
-    const staticPersist = !this.motionSharpDisabled &&
-      !this.tierIsIdle && !videoPlaying && !sceneChanging && this.staticSettled;
+    const staticPersist = !this.tierIsIdle && !videoPlaying && !sceneChanging && this.staticSettled;
 
     // SETTLE REFINEMENT: once quiet for QUALITY_SETTLE_MS, redraw parked frame SUPERSAMPLED.
     // qualityScale < settleScale tests if there is anything to gain. softwareGL excluded.
@@ -4875,7 +4801,7 @@ export class StoreScene {
     // moved. Idle/video/persist frames keep the last drawn frame's qualityScale,
     // so a parked still never softens under the viewer (no res "pop").
     if (!settleRefine && !staticPersist && !this.tierIsIdle && (sceneChanging || cameraMoving)) {
-      const wantSharp = !this.softwareGL && !this.motionSharpDisabled &&
+      const wantSharp = !this.softwareGL && (this.mode === 'inspect' || !this.motionSharpDisabled) &&
         this.motionScale > 1 &&
         (cameraMoving || this.mode === 'inspect' || (time - this.lastCameraMotionTime) < StoreScene.QUALITY_SETTLE_MS);
       const targetQuality = wantSharp ? this.motionScale : 1.0;
@@ -5052,7 +4978,8 @@ export class StoreScene {
       // Same per-frame fixture upkeep a VIDEO frame does — the gate above has
       // already established none of it changes anything visible except the TV
       // texture upload, which is the entire point of the frame.
-      this.entrance?.update(time);
+      this.nrBayLightingUpdate?.();
+    this.entrance?.update(time);
       this.ambientTvs?.update(time);
       for (const f of this.slottedFixtures) f.update(time);
       perfTrace.end(SP_SIM);
@@ -5125,7 +5052,12 @@ export class StoreScene {
     // in the dirty set, since the selected slot stays dirty (re-added at the top of
     // this function) for as long as it's selected even after its pop settles.
     let movingSlots = 0;
+    const admitPlacement = placementBudget();
     for (const slot of this.dirtySlots) {
+      if (slot.needsInitialMatrixUpdate && slot.key !== activeKey && !admitPlacement()) {
+        this.requestRender(); // Continue the next chunk, even with a stationary camera.
+        continue;
+      }
       if (this.launchAnim && slot === this.launchAnim.slot) continue;
       const isSelected = (slot.key === activeKey) && !(mobileStoreActive() && this.mode === 'browse');
       const isBackSide = slot.side === 'back';
@@ -5405,19 +5337,9 @@ export class StoreScene {
       tempPosition.set(fWorldX, fWorldY, fWorldZ);
       tempRotation.set(slot.currentRotX, slot.frontRotY + theta, leanZ, CASE_EULER_ORDER);
       tempQuaternion.setFromEuler(tempRotation);
-      // Cover box collapses to nothing until its art has streamed in (the
-      // rental clamshell behind it carries the slot on its own meanwhile). The
-      // poster callback re-dirties the slot, so it pops in when the art lands.
-      //
-      // ONLY when that clamshell is actually there, though. A series boxset IS
-      // its own rental copy, so bScale is forced to 0 above (as it is for
-      // noRentalCase bargain stock) — collapsing the cover box as well left the
-      // shelf position EMPTY, and a whole TV/anime library then reads as a bare
-      // fixture rather than a store still putting its sleeves out. Unpainted,
-      // the box wears the house rental wrap, which is exactly how an unpainted
-      // movie already reads. (Reported against v0.7.3: shelves rendering empty
-      // while the same title showed its cover the moment it was selected.)
-      const fs = (textureArrayManager.hasArt(slot.movie.id) || bScale <= 0.0001) ? s : 0;
+      // Keep a placeholder spine until its nearby artwork arrives. Distant
+      // stock uses the cheap silhouette material, without requesting posters.
+      const fs = s; // Unpainted spines remain visible while nearby art streams in.
       tempScale.set(fs, fs, fs * seriesZMult);
       tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
       slot.frontMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
@@ -5462,8 +5384,6 @@ export class StoreScene {
     }
 
     // Real-time reflections are handled automatically by Reflector instances
-
-
 
     // 2.4 One-shot stocked-shelves environment re-bake (see pendingStockedRebake):
     // fires once the initial placement wave has settled — dirty queue empty and
@@ -5532,6 +5452,7 @@ export class StoreScene {
 
     // Fixture upkeep: desk terminal cursor blink; TV audio listener sync +
     // VideoTexture upload.
+    this.nrBayLightingUpdate?.();
     this.entrance?.update(time);
     this.ambientTvs?.update(time);
     this.updateMarqueeBulbs(time); // T13: no-op unless bb_marquee_anim is 'chase'; see its own comment
@@ -5617,6 +5538,10 @@ export class StoreScene {
   // Halt rendering loop to yield system resources during video playback
   public pauseRendering() {
     this.isRendering = false;
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
     this.onConsoleLog("[System] Rendering paused. Resources yielded.", "system");
   }
 
@@ -5889,7 +5814,14 @@ export class StoreScene {
 
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
+    this.disposeSurfaceFinishes?.();
+    this.disposeSurfaceFinishes = null;
     this.isRendering = false;
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    disposeShelfVisibility(this);
     this.bootstrapEnvRT?.dispose();
     this.bootstrapPmremGen?.dispose();
     this.bootstrapRoomEnv?.dispose();
@@ -5982,22 +5914,10 @@ export class StoreScene {
     clearVideoCaseCache(preservePosterCache ? 'rebuild' : 'full');
     this.clearMovieBoxes();
 
-    if (this.nrTextTex) {
-      this.nrTextTex.dispose();
-      this.nrTextTex = null;
-    }
-    if (this.nrLogoBodyTex) {
-      this.nrLogoBodyTex.dispose();
-      this.nrLogoBodyTex = null;
-    }
-    if (this.nrLogoYellowTex) {
-      this.nrLogoYellowTex.dispose();
-      this.nrLogoYellowTex = null;
-    }
-    if (this.entranceLogoYellowTex) {
-      this.entranceLogoYellowTex.dispose();
-      this.entranceLogoYellowTex = null;
-    }
+    if (this.nrTextTex) { this.nrTextTex.dispose(); this.nrTextTex = null; }
+    if (this.nrLogoBodyTex) { this.nrLogoBodyTex.dispose(); this.nrLogoBodyTex = null; }
+    if (this.nrLogoYellowTex) { this.nrLogoYellowTex.dispose(); this.nrLogoYellowTex = null; }
+    if (this.entranceLogoYellowTex) { this.entranceLogoYellowTex.dispose(); this.entranceLogoYellowTex = null; }
     // The 3D storefront sign owns its own textures/materials/geometries (the
     // generic scene traversal below re-disposes the GPU side harmlessly).
     if (this.storefrontLogo3D) {
@@ -6005,38 +5925,23 @@ export class StoreScene {
       this.storefrontLogo3D = null;
     }
 
-    
-    if (this.promoSignTex) {
-      this.promoSignTex.dispose();
-      this.promoSignTex = null;
-    }
-    if (this.promoSignMat) {
-      this.promoSignMat.dispose();
-      this.promoSignMat = null;
-    }
-    if (this.promoSignRedMat) {
-      this.promoSignRedMat.dispose();
-      this.promoSignRedMat = null;
-    }
-    
+    if (this.promoSignTex) { this.promoSignTex.dispose(); this.promoSignTex = null; }
+    if (this.promoSignMat) { this.promoSignMat.dispose(); this.promoSignMat = null; }
+    if (this.promoSignRedMat) { this.promoSignRedMat.dispose(); this.promoSignRedMat = null; }
     disposeWindowAwnings(this.scene);
     disposeFacadeEntry(this.scene);
-    // Traverse and dispose materials/geometries of static shelves
-    this.scene.traverse((object) => {
-      if ((object as any).type === 'Reflector' || (object as any).isReflector) {
-        if (typeof (object as any).dispose === 'function') {
-          (object as any).dispose();
-        }
-      }
-      if (object instanceof THREE.Mesh) {
-        object.geometry.dispose();
-        if (Array.isArray(object.material)) {
-          object.material.forEach(m => m.dispose());
-        } else {
-          object.material.dispose();
-        }
-      }
-    });
+    disposeRooftopHVAC(this.scene);
+    this.scene.getObjectByName('serviceDoor')?.userData.dispose?.();
+    disposeSceneMeshes(this.scene);
+
+    if (this.selectionArrowLabel) {
+      this.selectionArrowLabel.tex.dispose();
+      this.selectionArrowLabel = null;
+    }
+    if (this.selectionArrow) {
+      this.scene.remove(this.selectionArrow);
+      this.selectionArrow = null;
+    }
 
     this.partial?.dispose();
     this.partial = null;
@@ -6073,6 +5978,10 @@ export class StoreScene {
       this.renderer.domElement.removeEventListener('pointercancel', this.onPointerCancel);
       this.renderer.dispose();
       this.renderer.domElement.remove();
+    }
+    if (this.chimeCtx) {
+      this.chimeCtx.close().catch(() => {});
+      this.chimeCtx = null;
     }
     this.libraryEndCaps = [];
   }

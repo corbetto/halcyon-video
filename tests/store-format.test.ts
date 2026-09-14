@@ -175,19 +175,10 @@ test('mom-and-pop shelving does not taper (a 7ft top tier would vanish)', () => 
   assert.ok(taperedDepth < 1.0, 'the taper this format opts out of really would collapse');
 });
 
-test('the back room has floor to stand on', () => {
-  // fixtures/curtained-alcove.ts builds a 5 ft deep room against the back wall,
-  // and backAisleClearance is what holds the shelf runs off that wall. If the
-  // clearance ever drops below the room's depth the runs walk into it, which
-  // the layout validator would only report as an overlap after the fact.
-  const ALCOVE_DEPTH = 5.0;
-  assert.equal(momAndPop.curtainedSection, true);
-  assert.ok(
-    momAndPop.backAisleClearance >= ALCOVE_DEPTH + 2.5,
-    `back clearance ${momAndPop.backAisleClearance}ft must fit a ${ALCOVE_DEPTH}ft room plus a cross-aisle`,
-  );
-  // The corporate box has no such room, so it keeps the plain 8 ft back margin.
-  assert.equal(corporate.curtainedSection, false);
+test('the independent shop removes the unstocked room and retains rear shelf clearance', () => {
+  assert.equal(momAndPop.curtainedSection, false);
+  assert.ok(momAndPop.backAisleClearance >= 6, 'wall shelving plus a clear cross-aisle');
+  assert.ok(momAndPop.backAisleClearance < corporate.backAisleClearance);
 });
 
 test('mom-and-pop mode enables indoor houseplants', () => {
@@ -195,13 +186,13 @@ test('mom-and-pop mode enables indoor houseplants', () => {
   assert.equal(corporate.plants, false);
 });
 
-test('mom-and-pop is a small store that grows deep, not wide', () => {
+test('mom-and-pop keeps a compact envelope with short continuous shelf runs', () => {
   assert.ok(momAndPop.widthCap < corporate.widthCap / 2, 'it must never become a warehouse');
   assert.ok(momAndPop.depthToWidthRatio > corporate.depthToWidthRatio, 'it should run deep and narrow');
   assert.ok(momAndPop.frontPanesBaseline < corporate.frontPanesBaseline);
   assert.ok(momAndPop.sidePanesBaseline < corporate.sidePanesBaseline);
   // Long unbroken runs down the length of the room are the point here.
-  assert.ok(momAndPop.baseRunUnits >= corporate.maxRunUnitsCap);
+  assert.ok(momAndPop.baseRunUnits <= corporate.baseRunUnits);
   assert.ok(momAndPop.maxRunUnitsCap >= momAndPop.baseRunUnits);
 });
 

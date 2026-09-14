@@ -18,6 +18,8 @@ import { onBrandChange } from './brand-live';
 import { parseSharedPlace, type SharedPlace } from './shared-place';
 import type { StoreScene } from './three-scene';
 
+const aisleGlides = new WeakMap<StoreScene, { unit: object; side: string; col: number; direction: number }>();
+
 export function updateLookDownPresent(scene: StoreScene) {
   const fixture = scene.selectedUnitSource === 'fixture' && scene.selectedFixtureId
     ? scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)
@@ -307,7 +309,16 @@ export function updateCameraTarget(scene: StoreScene) {
         scene.cameraWindowMinCol = Math.max(0, Math.min(scene.cameraWindowMinCol, scene.colsCount - windowSize));
       }
 
-      const centerCol = scene.cameraWindowMinCol + (Math.min(scene.colsCount, windowSize) - 1) / 2;
+      const floaty = localStorage.getItem('bb_browse_camera') === 'floaty';
+      const previous = aisleGlides.get(scene);
+      let direction = 0;
+      if (floaty && activeUnit) {
+        const same = previous?.unit === activeUnit && previous.side === scene.selectedSide;
+        direction = same ? Math.sign(scene.selectedCol - previous.col) || previous.direction : 0;
+        aisleGlides.set(scene, { unit: activeUnit, side: scene.selectedSide, col: scene.selectedCol, direction });
+      } else aisleGlides.delete(scene);
+      const centerCol = floaty ? scene.selectedCol
+        : scene.cameraWindowMinCol + (Math.min(scene.colsCount, windowSize) - 1) / 2;
       const cameraZ = activeUnit
         ? scene.aisleColZ(activeUnit, centerCol, scene.selectedSide === 'back' ? 'back' : 'front')
         : FIELD_Z_FRONT + unitZ - 0.5 - centerCol * BOX_SPACING;
@@ -334,7 +345,9 @@ export function updateCameraTarget(scene: StoreScene) {
 
       // Straight view, no Z offset (computed in layout space, then rotated to
       // follow this unit's arrangement yaw).
-      scene.targetCameraPos.set(cameraX, cameraY, cameraZ);
+      const travelZ = activeUnit && direction
+        ? Math.sign(scene.aisleColZ(activeUnit, centerCol + direction, scene.selectedSide === 'back' ? 'back' : 'front') - cameraZ) : 0;
+      scene.targetCameraPos.set(cameraX, cameraY, cameraZ - travelZ * 1.8);
       const activeKey = scene.getActiveSlotKey();
       const activeSlot = scene.slotsByPosition.get(activeKey);
       const offset = activeSlot ? (0.44 + extraCopiesCount(activeSlot.movie) * 0.07) : 0.44;
@@ -357,13 +370,12 @@ export function updateCameraTarget(scene: StoreScene) {
     if (leftCap) {
       const currentPos = pe.moviePositions[pe.selectedIdx];
       const row = currentPos ? currentPos.row : 0;
-      const shelfIdx = (AISLE_SHELF_HEIGHTS.length - 1) - row;
-      const shelfY = AISLE_SHELF_HEIGHTS[shelfIdx] ?? 3.2;
+      const shelfY = [3.0, 2.167, 1.333, 0.5][row] ?? 3.0;
       const caseLocalY = shelfY - UNIT_FRAME_HEIGHT / 2;
 
-      // Frame the endcap display, centered horizontally on the endcap face
-      // Z distance is fixed at 3.8 feet from the endcap face (local Z = 0.05)
-      const localCamPos = new THREE.Vector3(0, caseLocalY + 0.4, 0.05 + 3.8);
+      // Fit the whole 2.1ft header on a portrait phone as well as a wide view.
+      const displayDistance = Math.max(3.8, 2.35 / (2 * Math.tan(THREE.MathUtils.degToRad(scene.camera.fov / 2)) * scene.camera.aspect));
+      const localCamPos = new THREE.Vector3(0, caseLocalY + 0.4, 0.05 + displayDistance);
       const localLookAt = new THREE.Vector3(0, caseLocalY + 0.4, 0.05);
 
       // Convert the local coordinates of the endcap to world space
@@ -648,7 +660,7 @@ export function updateSelectionArrowLabel(scene: StoreScene, text: string) {
 
 export function updateSelectionArrow(scene: StoreScene) {
   if (!scene.selectionArrow) return;
-  if (mobileStoreActive()) { scene.selectionArrow.visible = false; return; }
+  if (mobileStoreActive() && scene.mode !== 'overview' && !scene.subNav) { scene.selectionArrow.visible = false; return; }
   // The ▼ jump index (store-subnav.ts, browse mode) drives this same single
   // big cursor over its focused destination — the owner retired the
   // per-target chevron cloud in feedback/003 and the index follows suit.

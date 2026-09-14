@@ -1,3 +1,4 @@
+import { NR_BAY_WIDTH } from '../nr-run-layout';
 // NEW RELEASES ticket toppers — the section markers on the New Releases wall.
 //
 // The 1990 store paints no lettering on its walls (owner ruling 2026-08-03;
@@ -12,7 +13,7 @@
 import * as THREE from 'three';
 import { getActiveTheme, type StoreTheme } from '../themes';
 import { markSignMesh } from '../sign-builders';
-import { BOX_SPACING, SECTION_COLS } from '../store-layout';
+import { BOX_SPACING, NR_SECTION_COLS } from '../store-layout';
 import {
   createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T,
 } from './ticket-board-sign';
@@ -63,16 +64,17 @@ export function buildNewReleaseToppers(runs: NrTopperRun[]): THREE.Mesh[] {
     // Section math is the run's own (buildShelfRun's dividers and the movie
     // slots derive their columns exactly this way), so a card lands centred on
     // the bay its dividers frame rather than drifting off the run's ends.
-    const runCols = Math.floor((run.length - 1.0) / BOX_SPACING);
+    const runCols = Math.round(run.length / NR_BAY_WIDTH) * NR_SECTION_COLS;
     if (runCols <= 0) continue;
-    const margin = (run.length - runCols * BOX_SPACING) / 2;
-    const sections = Math.ceil(runCols / SECTION_COLS);
+    const sections = Math.ceil(runCols / NR_SECTION_COLS);
 
     for (let s = 0; s < sections; s++) {
-      const startCol = s * SECTION_COLS;
-      const endCol = Math.min(runCols - 1, startCol + SECTION_COLS - 1);
-      const centerCol = (startCol + endCol) / 2;
-      const x = -run.length / 2 + margin + (centerCol + 0.5) * BOX_SPACING;
+      const startCol = s * NR_SECTION_COLS;
+      const endCol = Math.min(runCols - 1, startCol + NR_SECTION_COLS - 1);
+      // A short corner remainder cannot support a full-width topper. Its
+      // neighbour already names the same ribbon; do not crowd the wall turn.
+      if ((endCol - startCol + 1) * BOX_SPACING < TICKET_BOARD_W + .25) continue;
+      const x = -run.length / 2 + (s + .5) * NR_BAY_WIDTH;
       const card = markSignMesh(
         new THREE.Mesh(geo, [
           run.sideMaterial, run.sideMaterial, // ±X edges
@@ -84,7 +86,7 @@ export function buildNewReleaseToppers(runs: NrTopperRun[]): THREE.Mesh[] {
       );
       // Bottom edge flush on the fixture top, set just back from the front lip
       // so the card stands ON the deck instead of overhanging its edge.
-      card.position.set(x, run.topY + TICKET_BOARD_H / 2, run.frontZ - TICKET_BOARD_T);
+      card.position.set(x, run.topY + TICKET_BOARD_H / 2, run.frontZ + TICKET_BOARD_T / 2);
       card.layers.set(1); // mirror-skip, like every other shelf topper
       run.parent.add(card);
       built.push(card);

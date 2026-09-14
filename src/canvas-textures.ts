@@ -523,6 +523,7 @@ export function createCategorySignTexture(
   ribbon = false,
   faceAspect = 4.0,
   blade = false,
+  ink?: string,
 ): THREE.Texture {
   // 1993 ERA ONLY, and ceiling-nav only (`ribbon` is passed solely by the
   // ceiling-nav catalog entry so endcap placards etc. never restyle):
@@ -556,7 +557,7 @@ export function createCategorySignTexture(
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawTicketSign(
       ctx, canvas.width, canvas.height, categoryName,
-      pal.primary, pal.secondary, getActiveLogoSpec().textColor, blade,
+      pal.primary, pal.secondary, ink ?? getActiveLogoSpec().textColor, blade,
     );
   };
   paint();
@@ -1358,7 +1359,7 @@ export function createCarpetTextures(palette = getActiveTheme().palette): {
 // Store walls: deep amber-gold drywall with painted orange-peel relief.
 // Large-scale tonal mottle breaks up the flat colour over big spans; a fine
 // Sobel normal gives the stippled paint micro-relief that catches grazing light.
-export function createWallTextures(palette = getActiveTheme().palette): {
+export function createWallTextures(palette: Partial<{ wall: string }> = getActiveTheme().palette): {
   map: THREE.CanvasTexture;
   normalMap: THREE.CanvasTexture;
   roughnessMap: THREE.CanvasTexture;
@@ -1367,7 +1368,7 @@ export function createWallTextures(palette = getActiveTheme().palette): {
   const wallCanvas = document.createElement('canvas');
   wallCanvas.width = WALLT; wallCanvas.height = WALLT;
   const wallCtx = wallCanvas.getContext('2d')!;
-  wallCtx.fillStyle = palette.wall; // Theme wall
+  wallCtx.fillStyle = palette.wall ?? getActiveTheme().palette.wall; // Theme wall
   wallCtx.fillRect(0, 0, WALLT, WALLT);
   // Large-scale tonal variation (paint unevenness, soft lighting gradients).
   for (let i = 0; i < 30; i++) {
@@ -1570,14 +1571,23 @@ export function createBrickTexture(bond: 'running' | 'soldier' = 'running'): {
 // Full one-texture emblem (body + wordmark on a transparent background) for
 // the protruding entrance sign panel — drawLogo's 'all' layer, same legacy
 // compositions as the split body/yellow boards.
-export function createEntranceTicketLogoTexture(theme = getActiveTheme()): THREE.Texture {
+export function createSlateTexture(): {
+  map: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+} {
+  return createWallTextures({ wall: '#c8d0d6' });
+}
+
+export function createEntranceTicketLogoTexture(theme = getActiveTheme(), secondary = false): THREE.Texture {
   const canvas = document.createElement('canvas');
   canvas.width = 1000;
   canvas.height = 600;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, 1000, 600);
 
-  drawLogo(ctx, getActiveLogoSpec(theme), {
+  const spec = getActiveLogoSpec(theme);
+  drawLogo(ctx, secondary ? { ...spec, bodyColor: theme.palette.secondary, textColor: theme.palette.primary, borderColor: theme.palette.primary } : spec, {
     x: 0, y: 0, w: 1000, h: 600, layer: 'all',
     pinstripeWidth: 5, // this panel always wore the thin interior-style stroke
   });

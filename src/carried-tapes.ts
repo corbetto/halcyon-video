@@ -282,6 +282,30 @@ export class CarriedTapes {
   }
 
   /**
+   * Remove a tape from the stack immediately without a shelf flight (used when
+   * backing out of streaming checkout). If movieId is given, removes that movie;
+   * otherwise removes the top tape. Returns the dropped movie, or null.
+   */
+  drop(movieId?: string): Movie | null {
+    if (this.entries.length === 0) return null;
+    const idx = movieId != null
+      ? this.entries.findIndex((e) => e.movie.id === movieId)
+      : this.entries.length - 1;
+    if (idx === -1) return null;
+    const [entry] = this.entries.splice(idx, 1);
+    this.disposeEntry(entry);
+    if (this.entries.length === 0 && typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CARRY_STORAGE_KEY);
+    } else {
+      this.persist();
+    }
+    this.settleUntil = performance.now() + 600;
+    this.relayout();
+    this.onChange?.();
+    return entry.movie;
+  }
+
+  /**
    * Run the checkout flourish: each case hops from the hand onto a counter
    * spot (staggered), then one by one into the bag. Hooks fire as cases land;
    * onComplete fires once with the item ids — the owner then calls
@@ -611,7 +635,7 @@ export class CarriedTapes {
 let toastEl: HTMLDivElement | null = null;
 let toastTimer: number | null = null;
 
-export function showClerkToast(text: string, ms = 3200): void {
+export function showClerkToast(text: string, ms = 3200, speaker = 'CLERK'): void {
   if (typeof document === 'undefined') return;
   if (!toastEl) {
     toastEl = document.createElement('div');
@@ -624,7 +648,8 @@ export function showClerkToast(text: string, ms = 3200): void {
       'border:2px solid var(--bb-primary, #1560bd);border-radius:8px;padding:12px 18px;max-width:min(720px,90vw);' +
       'box-shadow:0 8px 30px rgba(0,0,0,.55);text-shadow:0 1px 2px #000;';
     const name = document.createElement('span');
-    name.textContent = 'CLERK  ';
+    name.className = 'clerk-toast-speaker';
+    name.textContent = `${speaker}  `;
     name.style.cssText = 'color:var(--bb-secondary, #f2e8c9);letter-spacing:.18em;font-size:20px;font-weight:700;';
     toastEl.appendChild(name);
     const body = document.createElement('span');
@@ -632,6 +657,8 @@ export function showClerkToast(text: string, ms = 3200): void {
     toastEl.appendChild(body);
     document.body.appendChild(toastEl);
   }
+  const speakerEl = toastEl.querySelector('.clerk-toast-speaker') as HTMLSpanElement | null;
+  if (speakerEl) speakerEl.textContent = `${speaker}  `;
   (toastEl.querySelector('.clerk-toast-body') as HTMLSpanElement).textContent = text;
   toastEl.style.opacity = '1';
   toastEl.style.transform = 'translateX(-50%) translateY(0)';

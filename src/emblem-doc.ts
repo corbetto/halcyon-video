@@ -539,10 +539,10 @@ export interface EmblemStarter { label: string; doc: () => EmblemDoc }
 export const EMBLEM_STARTERS: EmblemStarter[] = [
   {
     label: 'House Board',
-    doc: () => ({ ...emptyEmblemDoc(), aspect: 2.4, tilt: 4, layers: [
-      layer('rect', { w: 1, h: 1, detail: 0, ink: 'body' }),
-      layer('rect', { w: 0.94, h: 0.86, detail: 0, ink: 'border', role: 'ink' }),
-      layer('rect', { w: 0.92, h: 0.82, detail: 0, ink: 'body', role: 'ink' }),
+    doc: () => ({ ...emptyEmblemDoc(), aspect: 2.4, tilt: 0, layers: [
+      layer('rect', { w: 1, h: 1, detail: 0.09, ink: 'body' }),
+      layer('rect', { w: 0.94, h: 0.86, detail: 0.09, ink: 'border', role: 'ink' }),
+      layer('rect', { w: 0.92, h: 0.82, detail: 0.09, ink: 'body', role: 'ink' }),
     ] }),
   },
   {
