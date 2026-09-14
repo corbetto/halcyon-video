@@ -31,7 +31,10 @@ export function buildWallLibraryUnit(
   const layout = deps.plan.layoutFor(unit.libraryIdx);
   const label = layout.sectionLabels.get(String(block)) ?? deps.libraries[unit.libraryIdx].name;
   if (layout.entries.slice(block * UNIT_SIDE_CAPACITY, (block + 1) * UNIT_SIDE_CAPACITY).some(Boolean)) {
-    const card = new THREE.Mesh(new THREE.BoxGeometry(.04, .20, 1.45), labelMaterial(label));
+    const card = new THREE.Mesh(new THREE.BoxGeometry(.04, .20, 1.45), [
+      labelMaterial(label), labelMaterial(label),
+      deps.materials.signSide, deps.materials.signSide, deps.materials.signSide, deps.materials.signSide,
+    ]);
     card.position.set(x + sign * (depth + .04), 4.795, z);
     card.name = 'eye-level wall library clasp';
     parent.add(card);

@@ -143,10 +143,13 @@ export function buildShopfrontFacade(params: ShopFacadeBuildParams): StorefrontF
   // facade) so any brand LogoSpec that asks for freestanding 3D letters —
   // logo-storefront.ts reads anchor.gable/anchor.fascia interchangeably —
   // still resolves to sane geometry instead of dividing by a zero height. ────
-  // A modest sign, centred within the fascia above the entrance.
+  // A readable sign, centered within the fascia above the entrance.
   const fasciaWidth = storeWidth + 0.6;
-  const logoHeight = Math.min(fasciaH * 0.34, 1.2);
-  const logoWidth = Math.min(fasciaWidth * 0.4, logoHeight * 1.8);
+  // The renderer uses a 1000 x 600 artwork frame with transparent padding.
+  // Size that whole frame uniformly; stretching it to the fascia distorts text.
+  const frameAspect = 1000 / 600;
+  const logoWidth = Math.min(fasciaWidth * 0.65, fasciaH * 1.35 * frameAspect);
+  const logoHeight = logoWidth / frameAspect;
   const logoAnchor: FacadeLogoAnchor = {
     x: CX,
     // Centre the existing brand artwork in the board above the entrance.

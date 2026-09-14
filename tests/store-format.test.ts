@@ -186,13 +186,13 @@ test('mom-and-pop mode enables indoor houseplants', () => {
   assert.equal(corporate.plants, false);
 });
 
-test('mom-and-pop is a small store that grows deep, not wide', () => {
+test('mom-and-pop keeps a compact envelope with short continuous shelf runs', () => {
   assert.ok(momAndPop.widthCap < corporate.widthCap / 2, 'it must never become a warehouse');
   assert.ok(momAndPop.depthToWidthRatio > corporate.depthToWidthRatio, 'it should run deep and narrow');
   assert.ok(momAndPop.frontPanesBaseline < corporate.frontPanesBaseline);
   assert.ok(momAndPop.sidePanesBaseline < corporate.sidePanesBaseline);
   // Long unbroken runs down the length of the room are the point here.
-  assert.ok(momAndPop.baseRunUnits >= corporate.maxRunUnitsCap);
+  assert.ok(momAndPop.baseRunUnits <= corporate.baseRunUnits);
   assert.ok(momAndPop.maxRunUnitsCap >= momAndPop.baseRunUnits);
 });
 

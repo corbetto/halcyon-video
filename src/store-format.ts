@@ -493,10 +493,10 @@ const MOM_AND_POP: StoreFormatSpec = {
   fieldZFront: -6.4,
   // No unused curtained room: retain a clear rear cross-aisle.
   backAisleClearance: 6.0,
-  // Long runs are the POINT here ("one long shelf run down the middle"), so the
-  // run length starts where the chain's tops out and climbs from there.
-  baseRunUnits: 6,
-  maxRunUnitsCap: 10,
+  // Short runs use the available aisles. The same small-store limit bounds
+  // wall shelving so it cannot leave an isolated tail at the rear.
+  baseRunUnits: 3,
+  maxRunUnitsCap: 6,
   runGrowthPerUnits: 20,
   // A mom-and-pop never becomes a warehouse. Past 44 ft it only gets deeper —
   // which is exactly how a strip-mall unit grows.

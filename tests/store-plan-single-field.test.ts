@@ -81,8 +81,15 @@ for (const counts of [[1500, 400], [3000, 900, 200], [400, 120]]) {
       assert.deepEqual(floor.slice(lo, hi + 1), mine,
         `library ${li} is split across the floor: uses ${mine.join(',')} of ${floor.join(',')}`);
     });
-    // Freestanding libraries retain queue order; the wall library has its own run.
-    const leftmost = counts.map((_, li) => Math.min(...libUnits(li).filter(u => !u.singleSided).map((u) => runX(u.anchorX)))).filter(Number.isFinite);
+    // Wall overflow continues next to its wall; other libraries retain their
+    // relative queue order. The contiguity assertions above include the wall.
+    const wallLibrary = plan.shelvingUnits.find(unit => unit.singleSided)?.libraryIdx;
+    const order = counts.map((_, i) => i);
+    if (wallLibrary !== undefined) {
+      order.splice(order.indexOf(wallLibrary), 1);
+      order.unshift(wallLibrary);
+    }
+    const leftmost = order.map(li => Math.min(...libUnits(li).filter(u => !u.singleSided).map((u) => runX(u.anchorX)))).filter(Number.isFinite);
     for (let li = 1; li < leftmost.length; li++) {
       assert.ok(leftmost[li] >= leftmost[li - 1], `library ${li} starts left of library ${li - 1}`);
     }
@@ -112,3 +119,34 @@ test('the browse walker hops rows by rowGroupId, never by lineId chunk', () => {
   assert.doesNotMatch(src, /(prevUnit|nextUnit)\.lineId === currentUnit\.lineId/);
   assert.doesNotMatch(src, /u\.lineId !== currentUnit\.lineId/);
 });
+
+for (const { counts, maximumDepth, minimumColumns } of [
+  { counts: [500], maximumDepth: 40, minimumColumns: 3 },
+  { counts: [3000, 900, 200], maximumDepth: 65, minimumColumns: 5 },
+]) {
+  test(`stock uses the shop width before extending an isolated rear aisle (${counts})`, () => {
+    const libraries = counts.map((count, index) => mkLibrary(index, count));
+    const plan = new StorePlan(libraries);
+    plan.plan();
+    assert.ok(15 - plan.backWallZ <= maximumDepth, 'compact catalog must not produce a long empty-sided room');
+    assert.ok(plan.getStoreWidth() <= 44, 'the shop remains within its width envelope');
+    const columns = new Set(plan.shelvingUnits.filter(unit => !unit.singleSided).map(unit => unit.anchorX));
+    assert.ok(columns.size >= minimumColumns, 'stock occupies the available parallel aisles');
+    for (let i = 0; i < libraries.length; i++) {
+      const expected = new Set(libraries[i].movies.map(movie => movie.id));
+      const stocked = new Set(plan.layoutFor(i).entries.filter(Boolean).map(movie => movie!.id));
+      assert.deepEqual(stocked, expected, 'shortening the shop preserves every title');
+    }
+    const footprints = plan.getUnitFootprints();
+    for (const footprint of footprints) {
+      assert.ok(footprint.cz - footprint.d / 2 - plan.backWallZ >= 6 - 1e-6,
+        'the rear cross-aisle remains clear');
+    }
+    for (let i = 0; i < footprints.length; i++) for (let j = i + 1; j < footprints.length; j++) {
+      const a = footprints[i], b = footprints[j];
+      if (Math.abs(a.cx - b.cx) < 1e-6 || Math.abs(a.cz - b.cz) >= (a.d + b.d) / 2) continue;
+      assert.ok(Math.abs(a.cx - b.cx) - (a.w + b.w) / 2 >= 3,
+        'parallel shelves preserve a usable walking aisle');
+    }
+  });
+}

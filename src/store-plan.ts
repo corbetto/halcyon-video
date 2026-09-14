@@ -222,9 +222,8 @@ export class StorePlan {
     // Longer continuous runs for bigger stores. On the corporate box: ~20+
     // units -> 5, ~32+ -> 6, with MAX_RUN_UNITS (4) the small-store floor and 6
     // the ceiling. All three numbers are format data now, because a format's
-    // run length is a statement about its floor: a mom-and-pop starts at 6 and
-    // climbs to 10, since long unbroken runs down a narrow room are the whole
-    // idea there, not a concession to a big store.
+    // run length is a statement about its floor: a mom-and-pop starts at 3 and
+    // climbs to 6, retaining short cross-aisle breaks in its compact room.
     this.maxRunUnits = Math.min(
       FORMAT.maxRunUnitsCap,
       Math.max(MAX_RUN_UNITS, MAX_RUN_UNITS + Math.floor(totalUnits / FORMAT.runGrowthPerUnits)),
@@ -530,15 +529,22 @@ export class StorePlan {
   // placement AND orientation is decided.
   private planRuns() {
     const N = this.libraries.length;
-    // Put a small library (or its first twelve face blocks) along the left
-    // side wall. The rest retains the ordinary double-sided floor plan.
+    // Keep a short library run along the left wall. Remaining stock goes
+    // onto the double-sided floor instead of extending an isolated rear tail.
     const wallLibrary = FORMAT.singleField ? this.libraries.map((_, i) => i)
       .filter(i => i !== this.aboveRRoom?.libraryIdx && this.layoutFor(i).entries.some(Boolean))
       .sort((a, b) => this.layoutFor(a).entries.length - this.layoutFor(b).entries.length)[0] : undefined;
     const wallBlocks = wallLibrary === undefined ? 0
-      : Math.min(12, Math.ceil(this.layoutFor(wallLibrary).entries.length / UNIT_SIDE_CAPACITY));
+      : Math.min(FORMAT.baseRunUnits, Math.ceil(this.layoutFor(wallLibrary).entries.length / UNIT_SIDE_CAPACITY));
     const queue: { lib: number; u: number }[] = [];
-    for (let i = 0; i < N; i++) {
+    // A wall library that spills onto the floor continues in the adjacent
+    // leftmost aisle, before the other libraries. Keep that collection together.
+    const floorOrder = Array.from({ length: N }, (_, i) => i);
+    if (wallLibrary !== undefined) {
+      floorOrder.splice(floorOrder.indexOf(wallLibrary), 1);
+      floorOrder.unshift(wallLibrary);
+    }
+    for (const i of floorOrder) {
       if (i === this.aboveRRoom?.libraryIdx) continue;
       // Padded layout length (not raw movie count): category padding claims
       // whole sections, so the units must be sized for the padded shelf order.
@@ -845,8 +851,10 @@ export class StorePlan {
     };
     const canFitAll = (currentRuns: { cap: number }[]) => pourInto(currentRuns).qi >= slice.length;
 
-    // Deepen the field until the hatched runs can hold the whole slice.
-    let Zb = Zf - Math.max(12, slice.length * 2);
+    // Use the available parallel aisles before extending a single-field shop.
+    // A demand-sized starting depth left an isolated long row beside empty floor.
+    // The existing capacity check still grows the room until every unit fits.
+    let Zb = Zf - (FORMAT.singleField ? 12 : Math.max(12, slice.length * 2));
     let runs = runsFor(Zb);
     let guard = 0;
     while (!canFitAll(runs) && guard++ < 400) {

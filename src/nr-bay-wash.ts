@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
 import { NR_BAY_WIDTH } from './nr-run-layout';
+import { activeStoreFormat } from './store-format';
 
 /** Static, unshadowed bay illumination. Only nearby shelf surfaces evaluate the
  * two neighboring fittings, regardless of camera distance or perimeter length.
@@ -8,7 +9,7 @@ import { NR_BAY_WIDTH } from './nr-run-layout';
  */
 export function createNrBayWash(scene: StoreScene) {
   const originals = new Map<THREE.Material, { compile: THREE.Material['onBeforeCompile']; key: THREE.Material['customProgramCacheKey']; release: () => void }>();
-  const runs = scene.activeTheme.id === 'bb-1990' ? scene.nrRuns : [];
+  const runs = scene.activeTheme.id === 'bb-1990' && activeStoreFormat().newReleasesWall ? scene.nrRuns : [];
   const layout = runs.map(r => new THREE.Vector4(r.x, r.z, r.yaw, r.length));
   const apply = (object: THREE.Mesh) => {
     if (!runs.length) return;

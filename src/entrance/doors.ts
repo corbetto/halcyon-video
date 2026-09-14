@@ -114,7 +114,7 @@ export function buildVestibuleDoor(
   const frameShrink = isSingle ? 0.12 : 0.2;
   const localOffset = isSliding ? 0 : (alongX ? (hingeOnLeftOrInner ? w / 2 : -w / 2) : (hingeOnLeftOrInner ? w / 2 : -w / 2));
 
-  const leafFrame = new THREE.Mesh(createDoorLeafFrame(w, doorH), frameMat);
+  const leafFrame = new THREE.Mesh(createDoorLeafFrame(w, doorH, isSingle), frameMat);
   leafFrame.name = 'movingDoorLeafFrame';
   if (alongX) leafFrame.position.x = localOffset;
   else { leafFrame.rotation.y = Math.PI / 2; leafFrame.position.z = localOffset; }
@@ -134,12 +134,15 @@ export function buildVestibuleDoor(
     addGlassReflectionPane(glassMesh, doorGroup, { side: THREE.FrontSide });
 
     if (isSingle) {
-      // Vertical pull handle near the leaf's free edge instead of a push bar.
-      const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.08), chrome);
-      handleMesh.position.set(localOffset + (hingeOnLeftOrInner ? 0.55 : -0.55), barY, -0.14);
-      handleMesh.castShadow = true;
-      handleMesh.receiveShadow = true;
-      addToDoorGroup(handleMesh);
+      // Vertical pull handles on both interior and exterior near the leaf's free edge (latch stile).
+      const latchOffset = hingeOnLeftOrInner ? (w / 2 - 0.22) : -(w / 2 - 0.22);
+      for (const zSide of [-0.09, 0.09]) {
+        const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.08), chrome);
+        handleMesh.position.set(localOffset + latchOffset, barY, zSide);
+        handleMesh.castShadow = true;
+        handleMesh.receiveShadow = true;
+        addToDoorGroup(handleMesh);
+      }
     } else {
       const pushBarGeo = createDoorPushBarGeometry(w);
       const pushBar = new THREE.Mesh(pushBarGeo, frameMat);
@@ -169,11 +172,14 @@ export function buildVestibuleDoor(
     addGlassReflectionPane(glassMesh, doorGroup, { side: THREE.FrontSide });
 
     if (isSingle) {
-      const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.06), chrome);
-      handleMesh.position.set(-0.14, barY, localOffset + (hingeOnLeftOrInner ? 0.55 : -0.55));
-      handleMesh.castShadow = true;
-      handleMesh.receiveShadow = true;
-      addToDoorGroup(handleMesh);
+      const latchOffset = hingeOnLeftOrInner ? (w / 2 - 0.22) : -(w / 2 - 0.22);
+      for (const xSide of [-0.09, 0.09]) {
+        const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.06), chrome);
+        handleMesh.position.set(xSide, barY, localOffset + latchOffset);
+        handleMesh.castShadow = true;
+        handleMesh.receiveShadow = true;
+        addToDoorGroup(handleMesh);
+      }
     } else {
       const pushBarGeo = createDoorPushBarGeometry(w);
       const pushBar = new THREE.Mesh(pushBarGeo, frameMat);
@@ -195,22 +201,25 @@ export function buildVestibuleDoor(
   // Static frame: header + jambs (any of them suppressible via `frame`, see
   // DoorFrameOpts). The sliding variant also gets a shallow pocket panel
   // beside the opening the leaf disappears behind when open.
-  const frameT = isSingle ? 0.1 : 0.16;
+  const frameT = isSingle ? 0.08 : 0.16;
+  const frameD = isSingle ? 0.38 : 0.30;
+  const headerW = isSingle ? w + frameT * 2 : w + 0.3;
+  const headerH = isSingle ? 0.20 : 0.25;
   const wantHeader = frame?.header !== false;
   const wantJambLeft = frame?.jambLeft !== false;
   const wantJambRight = frame?.jambRight !== false;
   if (alongX) {
-    if (wantHeader) box(w + 0.3, 0.25, 0.3, frameMat, doorX, doorH + 0.1, doorZ);
-    if (wantJambLeft) box(frameT, doorH, 0.3, frameMat, doorX - w / 2, doorH / 2, doorZ);
-    if (wantJambRight) box(frameT, doorH, 0.3, frameMat, doorX + w / 2, doorH / 2, doorZ);
+    if (wantHeader) box(headerW, headerH, frameD, frameMat, doorX, doorH + 0.10, doorZ);
+    if (wantJambLeft) box(frameT, doorH, frameD, frameMat, doorX - w / 2, doorH / 2, doorZ);
+    if (wantJambRight) box(frameT, doorH, frameD, frameMat, doorX + w / 2, doorH / 2, doorZ);
     if (isSliding) {
       const pocketX = doorX + (hingeOnLeftOrInner ? w : -w);
       box(w, 0.06, 0.28, frameMat, pocketX, doorH + 0.02, doorZ);
     }
   } else {
-    if (wantHeader) box(0.3, 0.25, w + 0.3, frameMat, doorX, doorH + 0.1, doorZ);
-    if (wantJambLeft) box(0.3, doorH, frameT, frameMat, doorX, doorH / 2, doorZ - w / 2);
-    if (wantJambRight) box(0.3, doorH, frameT, frameMat, doorX, doorH / 2, doorZ + w / 2);
+    if (wantHeader) box(frameD, headerH, headerW, frameMat, doorX, doorH + 0.10, doorZ);
+    if (wantJambLeft) box(frameD, doorH, frameT, frameMat, doorX, doorH / 2, doorZ - w / 2);
+    if (wantJambRight) box(frameD, doorH, frameT, frameMat, doorX, doorH / 2, doorZ + w / 2);
     if (isSliding) {
       const pocketZ = doorZ + (hingeOnLeftOrInner ? w : -w);
       box(0.28, 0.06, w, frameMat, doorX, doorH + 0.02, pocketZ);

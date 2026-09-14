@@ -20,7 +20,7 @@ import {
 import { StorePlan } from './store-plan';
 import { createFlushTopperLabelTexture, paintFlushTopperLabel, createArchedTopperLabelTexture, BB2000_PLAQUE_RED } from './canvas-textures';
 import {
-  createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T,
+  createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T, MOM_POP_CLASP_ASPECT,
 } from './fixtures/ticket-board-sign';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from './sign-builders';
 import { createFasciaBladeFactory, FASCIA_BLADE_H } from './fixtures/genre-fascia';
@@ -208,7 +208,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       // toppers wear, cut and finished in fixtures/ticket-board-sign.ts. The
       // brand torn-ticket emblem it replaced still serves the library
       // ENTRANCE labels via createLibraryLabelTexture.
-      mat = createTicketBoardLabelMaterial(label);
+      mat = createTicketBoardLabelMaterial(label, activeStoreFormat().overheadSignage ? undefined : MOM_POP_CLASP_ASPECT);
       sectionLabelMats.set(label, mat);
     }
     return mat;

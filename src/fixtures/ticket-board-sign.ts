@@ -28,15 +28,16 @@ export const TICKET_BOARD_H = 8.5 / 12;
 export const TICKET_BOARD_T = 0.06;
 /** The aspect the ticket art is cut to, so the print never stretches. */
 export const TICKET_BOARD_ASPECT = 14 / 8.5;
+export const MOM_POP_CLASP_ASPECT = 1.45 / 0.20;
 
 /**
  * Printed face of a ticket signboard carrying `label`. Callers cache per
  * label — one material serves every card printed with the same copy.
  */
-export function createTicketBoardLabelMaterial(label: string): THREE.MeshPhysicalMaterial {
+export function createTicketBoardLabelMaterial(label: string, aspect = TICKET_BOARD_ASPECT): THREE.MeshPhysicalMaterial {
   const isWood = !!formatShelfWood();
   return new THREE.MeshPhysicalMaterial({
-    map: createCategorySignTexture(label, undefined, false, TICKET_BOARD_ASPECT),
+    map: createCategorySignTexture(label, undefined, false, aspect),
     // Laminated print in corporate; matte card stock in mom-and-pop.
     roughness: isWood ? 0.8 : 0.35,
     metalness: isWood ? 0.0 : 0.05,
