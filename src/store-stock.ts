@@ -975,10 +975,11 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // 7. Build static extra-copy cases for high-rated films.
   scene.rebuildExtraCopies();
 
-  // Reveal after a small entrance preview, never after a catalog-wide queue.
-  // Other artwork is demand-loaded as the camera approaches a shelf.
+  // Preload a small entrance preview; other artwork loads near its shelf.
+  // Public streaming covers consume the early prefetch here without gating
+  // entry. Local boots retain their non-streaming texture readiness gate.
   const allSlots = Array.from(scene.slotsByPosition.values());
-  const gatedSlots = allSlots.filter(slot => !slot.movie.streaming &&
+  const gatedSlots = allSlots.filter(slot => (isPublicDemo || !slot.movie.streaming) &&
     (slot.restingX - OVERVIEW_POS.x) ** 2 + (slot.restingZ - OVERVIEW_POS.z) ** 2 < 400).slice(0, 96);
   // Nearby shelf faces lead the download queue. Copies share one decode.
   if (mobileStoreActive()) {
