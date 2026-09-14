@@ -1,4 +1,4 @@
-import { mobileStoreActive } from './mobile-store';
+import { mobileStoreActive } from './mobile-store.ts';
 // The JUMP INDEX — the store's ONE navigation layer, and what you are in the
 // moment the doors close behind you.
 //
