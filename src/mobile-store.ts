@@ -320,7 +320,7 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
         // Shallow magnetic well provides guidance across destinations
         const a = angles[nearest] ?? raw;
         scene.overviewYaw = raw + (a - raw) * 0.24 * Math.exp(-gap * gap / 0.003);
-        scene.overviewPitch = THREE.MathUtils.clamp(pitch - effDy * 0.001, -0.35, 0.4);
+        scene.overviewPitch = THREE.MathUtils.clamp(pitch + effDy * 0.001, -0.35, 0.4);
         if (scene.subNav && items.length) {
           const prevNearest = scene.subNav.sel[0];
           scene.subNav.row = 0;
@@ -336,7 +336,7 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
           Math.sin(scene.overviewPitch), -Math.cos(scene.overviewYaw) * cp).multiplyScalar(20));
       } else {
         const dx = THREE.MathUtils.clamp(effDx * colSensitivity, minX - 0.5, maxX + 0.5);
-        const dy = THREE.MathUtils.clamp(-effDy * rowSensitivity, minY - 0.5, maxY + 0.5);
+        const dy = THREE.MathUtils.clamp(effDy * rowSensitivity, minY - 0.5, maxY + 0.5);
         scene.targetCameraPos.copy(pos).addScaledVector(right, dx).addScaledVector(up, dy);
         scene.targetLookAt.copy(look).addScaledVector(right, dx).addScaledVector(up, dy);
         let nearest: MovieSlot | undefined, best = Infinity;
@@ -410,7 +410,7 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
           }
         } else if (absVy > 0.35 && absVy > absVx) {
           // Row flick: advance 1 or 2 shelves
-          const shelfStep = -Math.sign(velY) * (absVy > 0.8 ? 2 : 1);
+          const shelfStep = Math.sign(velY) * (absVy > 0.8 ? 2 : 1);
           const targetShelf = scene.selectedShelf + shelfStep;
           const candidate = face.find(s => s.shelfIdx === targetShelf && s.col === scene.selectedCol)
             || face.find(s => s.shelfIdx === targetShelf);

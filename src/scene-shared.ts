@@ -3,9 +3,9 @@
 // and the extracted scene modules (store-stock.ts, ...). Single-threaded
 // use only — every consumer fully writes a temp before reading it back.
 import * as THREE from 'three';
-import { Movie } from './jellyfin';
-import { STORE_CENTER_X } from './store-layout';
-import { perfSlot } from './perf-trace';
+import { Movie } from './jellyfin.ts';
+import { STORE_CENTER_X } from './store-layout.ts';
+import { perfSlot } from './perf-trace.ts';
 
 // Euler order for every movie-case transform (slot instances, hero cases, the
 // stacked extra copies). YXZ, not three.js's default XYZ, because a slot's

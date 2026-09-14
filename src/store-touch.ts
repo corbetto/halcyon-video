@@ -1,8 +1,8 @@
 // Touch controls share the host overlay callbacks. Hosted mobile browsing
 // uses direct camera manipulation; other touch installs retain arrow swipes.
-import type { InputCallbacks } from './input';
-import type { StoreScene } from './three-scene';
-import { beginMobileDrag, mobileStoreActive, markMobileDragged } from './mobile-store';
+import type { InputCallbacks } from './input.ts';
+import type { StoreScene } from './three-scene.ts';
+import { beginMobileDrag, mobileStoreActive, markMobileDragged } from './mobile-store.ts';
 
 /**
  * A finger with no hover is the only signal this acts on. Unlike the
@@ -18,10 +18,8 @@ export function isTouchInputActive(): boolean {
       && window.matchMedia('(hover: none)').matches;
 }
 
-// Below this, a touchend belongs to the existing tap-to-select raycast path
-// (three-scene.ts requires dist<10 there); above it, a swipe. The gap
-// between the two thresholds is a small dead zone rather than a contested one.
-const SWIPE_MIN_PX = 44;
+import { SWIPE_MIN_PX, resolveSwipeDirection } from './swipe-direction.ts';
+export { SWIPE_MIN_PX, resolveSwipeDirection };
 
 /**
  * Touch-primary copy for main.ts's updateHUDForMode — same vocabulary
@@ -264,16 +262,13 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
       if (!t) return;
       const dx = t.clientX - startX;
       const dy = t.clientY - startY;
-      const adx = Math.abs(dx), ady = Math.abs(dy);
-      // A short touch belongs to the existing raycast tap-to-select path
-      // (three-scene.ts onPointerUp) — leave it alone.
-      if (Math.max(adx, ady) < SWIPE_MIN_PX) return;
+      const dir = resolveSwipeDirection(dx, dy);
+      if (!dir) return;
       poke();
-      if (adx > ady) {
-        if (dx < 0) callbacks.onLeft(); else callbacks.onRight();
-      } else {
-        if (dy < 0) callbacks.onUp(); else callbacks.onDown();
-      }
+      if (dir === 'left') callbacks.onLeft();
+      else if (dir === 'right') callbacks.onRight();
+      else if (dir === 'down') callbacks.onDown();
+      else if (dir === 'up') callbacks.onUp();
     }, { passive: true });
     stage.addEventListener('touchcancel', () => {
       tracking = false;
