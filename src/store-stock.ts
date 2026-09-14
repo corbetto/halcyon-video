@@ -1054,6 +1054,10 @@ export function warmupRuntimePrograms(scene: StoreScene) {
     const movie = firstWithPoster ?? scene.libraries[0]?.movies[0];
     if (!movie) { geo.dispose(); return; }
     const warm = createProgramWarmupMaterials(movie, firstAnimated, firstSeries);
+    scene.disposeWarmedPrograms = warm.dispose;
+    const directPrograms = warm.unmodifiedMaterials.map(material => ({
+      material, compile: material.onBeforeCompile, key: material.customProgramCacheKey,
+    }));
     // NOT renderer.compile()/compileAsync(): those compile against the
     // CANVAS output (srgb) with whatever clipping state is current, while
     // the scene actually renders into the composer's linear target
@@ -1078,6 +1082,14 @@ export function warmupRuntimePrograms(scene: StoreScene) {
     }
     warmScene.position.set(11, -60, 0);
     scene.scene.add(warmScene);
+    // Scene-add decoration applies bay lighting to the probes. The asynchronous
+    // high-detail poster swap uses undecorated materials, so warm that exact
+    // variant too; factory-owned hero materials retain their normal decoration.
+    for (const { material, compile, key } of directPrograms) {
+      material.onBeforeCompile = compile;
+      material.customProgramCacheKey = key;
+      material.needsUpdate = true;
+    }
     const t0 = performance.now();
     if (scene.composer) {
       if (scene.bokehPass) scene.bokehPass.enabled = true; // DOF programs compile on first inspect otherwise
@@ -1088,7 +1100,8 @@ export function warmupRuntimePrograms(scene: StoreScene) {
     }
     scene.scene.remove(warmScene);
     geo.dispose();
-    warm.dispose();
+    // Retain the dummy materials: disposing their last reference deletes the
+    // warmed GL programs and makes the first detailed inspection compile again.
     retailAudio.prewarm(); // first sound otherwise pays AudioContext setup mid-keypress
     // First-bind AND first-swap dry runs: the first real selection *change*
     // pays hero mesh creation, a second title's four cover-canvas draws +

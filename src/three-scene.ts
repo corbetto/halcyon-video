@@ -2943,6 +2943,7 @@ export class StoreScene {
   // The BokehPass gets one throwaway composited frame for the same reason: its
   // depth + bokeh programs otherwise compile on the first inspect.
   public warmedPrograms = false;
+  public disposeWarmedPrograms: (() => void) | null = null;
   public warmupRuntimePrograms() { return stock.warmupRuntimePrograms(this); }
   public setGradeWarmth(v: number) { grade.setGradeWarmth(this, v); }
   public setGradeLut(on: boolean) { grade.setGradeLut(this, on); }
@@ -5823,6 +5824,8 @@ export class StoreScene {
 
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
+    this.disposeWarmedPrograms?.();
+    this.disposeWarmedPrograms = null;
     this.disposeSurfaceFinishes?.();
     this.disposeSurfaceFinishes = null;
     this.isRendering = false;

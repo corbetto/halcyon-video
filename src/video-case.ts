@@ -5875,14 +5875,15 @@ export function createHeroSeriesBoxsetMaterials(movie: Movie, _highlightedName?:
 // exact entries the first real selection will hit); the DataTexture poster
 // flavors — which only exist after full-res pixels stream in, hence can't come
 // from the factories at boot — are built directly with dummy pixels and MUST
-// be disposed by the caller once compiled (via the returned dispose()).
+// be retained until scene teardown, then released through the returned dispose().
 export function createProgramWarmupMaterials(
   regular: Movie,
   animated: Movie | null,
   series: Movie | null,
   probeIdx = 0,
-): { materialSets: THREE.Material[][]; dispose(): void } {
+): { materialSets: THREE.Material[][]; unmodifiedMaterials: THREE.Material[]; dispose(): void } {
   const materialSets: THREE.Material[][] = [];
+  const unmodifiedMaterials: THREE.Material[] = [];
   const owned: { dispose(): void }[] = [];
 
   // PASS probeIdx. The reflection probe IS the material's envMap, and envMap
@@ -5915,10 +5916,14 @@ export function createProgramWarmupMaterials(
     owned.push(tex);
     const map = (skipCrop || animatedFlavor) ? tex : cropFrontTextureForMedium(tex);
     if (map !== tex) owned.push(map);
-    const mat = makePlasticMaterial({ map, finish });
-    if (animatedFlavor) applyWhiteBorderShader(mat, skipCrop ? 0 : POSTER_CROP_X);
-    owned.push(mat);
-    materialSets.push([mat]);
+    // High-detail fronts use an explicit cube probe, unlike the scene's IBL.
+    for (const envMap of reflectionProbes[probeIdx] ? [null, reflectionProbes[probeIdx]] : [null]) {
+      const mat = makePlasticMaterial({ map, finish, envMap });
+      if (animatedFlavor) applyWhiteBorderShader(mat, skipCrop ? 0 : POSTER_CROP_X);
+      owned.push(mat);
+      unmodifiedMaterials.push(mat);
+      materialSets.push([mat]);
+    }
   };
   mkPosterFlavor(false);                    // movie front
   mkPosterFlavor(false, 'shrinkwrap');      // series boxset front
@@ -5926,7 +5931,7 @@ export function createProgramWarmupMaterials(
   mkPosterFlavor(false, undefined, true);   // game-box front (skipCrop)
 
   return {
-    materialSets,
+    materialSets, unmodifiedMaterials,
     dispose() {
       for (const o of owned) o.dispose();
     },
