@@ -1758,7 +1758,7 @@ window.addEventListener('halcyon:tv-status', () => {
 // middleware in vite.config.ts, which writes it to feedback/NNN/.
 const FEEDBACK_CONFIG_KEYS = [
   'bb_theme', 'bb_medium', 'bb_arrangement', 'bb_outside', 'bb_corner',
-  'bb_ceiling', 'bb_ceiling_structure', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_walldecor',
+  'bb_ceiling', 'bb_ceiling_structure', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_reflections', 'bb_walldecor',
 ] as const;
 
 let feedbackOverlayEl: HTMLDivElement | null = null;

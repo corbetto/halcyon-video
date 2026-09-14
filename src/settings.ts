@@ -1001,6 +1001,21 @@ export function registerCoreSettings(): void {
   });
 
   registerSetting({
+    key: 'bb_reflections',
+    label: 'Mirror Reflections',
+    kind: 'cycle',
+    group: 'Performance',
+    values: [
+      { id: 'auto', label: 'Auto' },
+      { id: 'cubemap', label: 'Cubemap (fast)' },
+      { id: 'smooth', label: 'Planar (frequent)' },
+    ],
+    default: 'auto',
+    applyMode: 'rebuild-scene',
+    hint: 'Cubemap: smooth room reflections with approximate perspective; moving objects are not live. Planar: more frequent accurate updates on High quality, at extra rendering cost.',
+  });
+
+  registerSetting({
     key: 'bb_ao',
     label: 'Ambient Occlusion Engine',
     kind: 'cycle',

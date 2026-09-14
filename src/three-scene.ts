@@ -5439,7 +5439,7 @@ export class StoreScene {
 
     // Mirrors: refresh reflections only when the camera moved or the scene
     // structurally changed (rebuild, shelf pop, end-cap/clerk motion),
-    // ≤1 mirror render per frame — see updateMirrorThrottle(). Unlike the
+    // A bounded mirror budget — see store-mirrors.ts. Unlike the
     // shadow map, a case-pop lerp IS visibly reflected on every frame it's
     // moving, so mirrors key off updatedMeshes.size (per-frame instance
     // matrix changes) rather than settledThisFrame. clerkWalking stays
