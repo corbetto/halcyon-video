@@ -6,15 +6,15 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-6a737d)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/halcyon-video/halcyon-video?color=6a737d)](https://github.com/halcyon-video/halcyon-video/stargazers)
 
-**A walkable 3D video store for Jellyfin, Plex, Emby, streaming services, and RomM.**
+**The video store you remember, stocked with what you can watch.**
 
-Halcyon turns a media catalog into a place. Walk in from the parking lot,
-browse physical aisles, pull a case from the shelf, read the back, ask the
-clerk for a recommendation, and carry your picks to the counter. Then watch
-in the built-in player, hand the file to mpv, or take the rental home to a
-virtual living room.
+Halcyon Video turns movie night into a visit to the video store. Glide down
+real 3D aisles, pick up a VHS or DVD case, flip it to read the back, and take
+your choice to the counter — right down to the glossy rental bag.
 
-It is not a grid menu wearing a nostalgic skin. It is a store.
+Start with streaming services, or bring your own Jellyfin, Plex, or Emby
+library. Add RomM for a games department. Halcyon gives those catalogs a
+place you can explore with a keyboard, gamepad, TV remote, or phone.
 
 ![Halcyon Video at sunset](docs/screenshots/facade-sunset.jpg)
 
@@ -40,6 +40,22 @@ storefronts without changing the library underneath.
 Halcyon is meant to be used from the couch. A keyboard, gamepad, TV remote,
 or phone can drive the same remote-first interface. First-person walk mode
 adds mouse look and WebXR when a headset is available.
+
+## A store worth spending time in
+
+**Let it take you on a tour.** Attract mode moves from the storefront into
+the aisles, past the counter, and across the sales floor. Touch a control to
+return to browsing. The store remains a working place throughout the tour.
+
+**Choose the store you remember.** Build a spacious chain-style store or a
+compact independent shop with wood shelves and a lower ceiling. Switch
+between modeled building facades, and see the windows and exterior in
+daylight, at sunset, or after dark.
+
+**Choose when it is.** The manager terminal's media release-date pin limits
+the shelves to titles released by your chosen store date. That date advances
+with real time; an optional setting also matches the store's era to it. Your
+underlying media library stays intact.
 
 ## The parts that make it feel like a store
 
@@ -108,14 +124,16 @@ into a commit.
 | **Jellyfin** | Movies, series, art, versions, playback, resume points, and watch history |
 | **Plex** | The same core store through Plex code sign-in and server discovery |
 | **Emby** | Direct server sign-in, member cards, movies, series, artwork, playback, resume points, and saved store settings |
-| **Streaming services** | Zero-setup browsable aisles that link out to the selected service |
+| **Streaming services** | Zero-setup browsing, service choice at checkout, and a link to that service |
 | **Jellyseerr / Overseerr** | Collection gaps, discovery stock, requests, and staff picks |
 | **RomM** | Platform bays, game packaging, cover scans, and optional emulator launch |
 | **Nothing yet** | A working opening-day store locally, or the stocked hosted demo |
 
 Streaming aisles do not require Jellyfin, Plex, Jellyseerr, or a TMDB key.
-The setup terminal asks which services you use and stocks them from a bundled
-snapshot. A configured TMDB or Jellyseerr source can refresh that data later.
+The setup terminal asks which services you use and stocks the store from a bundled
+snapshot. Browse the films first; checkout reveals the available services so
+you can choose one before the handoff. A configured TMDB or Jellyseerr source
+can refresh that data later.
 There is no built-in folder scanner; shelving personal files requires Jellyfin, Plex,
 or Emby.
 
