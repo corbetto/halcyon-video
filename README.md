@@ -106,11 +106,16 @@ an emulator.
 
 ![A store in custom livery](docs/screenshots/brand-store-banana.jpg)
 
-The fictional Halcyon identity is data, not hard-coded scenery. Change the
-name, colors, emblem, and typeface in the live Brand Editor and the storefront,
-cases, aisle signs, counters, bags, and clerk livery repaint together. The
-Emblem Studio builds a mark from editable shapes; an SVG or transparent PNG
-can replace it entirely.
+The fictional Halcyon identity is data, not hard-coded scenery. Build an
+emblem from editable layers in Emblem Studio, then see that same mark on
+the storefront, cases, aisle signs, counters, and checkout bags. Change the
+name, colors, and typeface in the live Brand Editor to repaint the store's
+livery together — from burgundy and cream to green and gold. The carpet can
+follow either brand color through Store Look's Carpet Colour setting.
+
+An SVG or transparent PNG can replace the emblem entirely. The store name
+and subtitle are editable too: make it your video shop, entertainment store,
+or games destination.
 
 For a larger conversion, a brand pack can supply per-era palettes, fonts,
 surfaces, and scanned wraps. Local assets live in the git-ignored
