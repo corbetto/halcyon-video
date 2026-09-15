@@ -1,12 +1,12 @@
 // Planar mirrors share a render workspace. Cubemap mode reuses the room's
-// existing case probes: camera motion is free, moving objects are not live.
+// elevated room panorama: camera motion is free, moving objects are not live.
 // Box projection was rejected in an earlier trial because interior furniture
 // stretched onto the room shell. This option deliberately uses plain probes.
 import * as THREE from 'three';
 import { coplanarMirrorGroups } from './mirror-view';
 import { MirrorRenderTarget } from './mirror-render-target';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
-import { reflectionProbes } from './case-env-probes';
+import { mirrorPanoramaRotation } from './mirror-panorama';
 import { markMirrorVisibility, pickMirror, type MirrorScheduleEntry } from './mirror-schedule';
 import { perfTrace } from './perf-trace';
 import { SP_MIRROR, CT_MIRROR, MIRROR_REFRESH_HZ } from './scene-shared';
@@ -17,11 +17,11 @@ function reflectionMode(): ReflectionMode {
   const value = localStorage.getItem('bb_reflections');
   return value === 'cubemap' || value === 'smooth' ? value : 'auto';
 }
-type CubeMirror = { material: THREE.MeshStandardMaterial; probe: number };
+type CubeMirror = { material: THREE.MeshBasicMaterial };
 type MirrorState = {
   targets: MirrorRenderTarget; mode: ReflectionMode; frame: number;
   camera: THREE.PerspectiveCamera; cubes: CubeMirror[];
-  probes: THREE.Texture[] | null;
+  probe: THREE.Texture | null;
 };
 let reflectorRendering = false;
 const states = new WeakMap<StoreScene, MirrorState>();
@@ -164,15 +164,13 @@ export function renderMirrorsAhead(scene: StoreScene) {
   }
 }
 
-function updateCubeProbes(state: MirrorState) {
-  if (state.probes === reflectionProbes) return;
-  state.probes = reflectionProbes;
+function updateCubeProbes(scene: StoreScene, state: MirrorState) {
+  const next = scene.mirrorRoomProbe;
+  if (state.probe === next) return;
+  state.probe = next;
   for (const cube of state.cubes) {
-    const next = reflectionProbes[cube.probe] ?? null;
-    if (cube.material.envMap !== next) {
-      cube.material.envMap = next;
-      cube.material.needsUpdate = true;
-    }
+    cube.material.envMap = next;
+    cube.material.needsUpdate = true;
   }
 }
 
@@ -180,35 +178,28 @@ export function installMirrorThrottle(scene: StoreScene) {
   disposeMirrorTargets(scene);
   const state: MirrorState = {
     targets: new MirrorRenderTarget(), mode: reflectionMode(), frame: 0,
-    camera: new THREE.PerspectiveCamera(), cubes: [], probes: null,
+    camera: new THREE.PerspectiveCamera(), cubes: [], probe: null,
   };
   states.set(scene, state);
   scene.mirrors.length = 0;
   scene.mirrorCursor = 0;
   scene.scene.updateMatrixWorld(true);
-  const positions = [
-    [-2, scene.scaleZ(-15)], [6, scene.scaleZ(-15)], [14, scene.scaleZ(-15)],
-    [22, scene.scaleZ(-15)], [11, scene.backWallZ + 10],
-  ];
   scene.scene.traverse(obj => {
     if (!(obj instanceof Reflector)) return;
     const original = obj.onBeforeRender.bind(obj);
     obj.onBeforeRender = () => {};
     if (state.mode === 'cubemap') {
-      centre.setFromMatrixPosition(obj.matrixWorld);
-      let nearest = 0, distance = Infinity;
-      positions.forEach(([x, z], i) => {
-        const d = (x - centre.x) ** 2 + (z - centre.z) ** 2;
-        if (d < distance) { nearest = i; distance = d; }
-      });
       for (const material of Array.isArray(obj.material) ? obj.material : [obj.material]) material.dispose();
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xd6dbe2, metalness: 1, roughness: .06, envMapIntensity: 1,
+      // Direct cube sampling keeps the captured detail. StandardMaterial clamps
+      // roughness to a 256-face blur floor even when its input is larger.
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xd6dbe2, reflectivity: 1,
+        envMapRotation: mirrorPanoramaRotation(normal.set(0, 0, 1).transformDirection(obj.matrixWorld)),
       });
       // Reflector is still a mesh; its unrendered target allocates no GPU storage.
       // Its normal disposal path owns the replacement material.
       (obj as THREE.Mesh).material = material;
-      state.cubes.push({ material, probe: nearest });
+      state.cubes.push({ material });
     } else {
       state.targets.prepare(obj.getRenderTarget());
       scene.mirrors.push({
@@ -223,12 +214,12 @@ export function installMirrorThrottle(scene: StoreScene) {
   }
   // Start against this scene's live environment. Probes are assigned on its
   // first update after its own bake, never from the previous scene's targets.
-  state.probes = reflectionProbes;
+  updateCubeProbes(scene, state);
 }
 
 export function updateMirrorThrottle(scene: StoreScene, forceAll: boolean) {
   const state = states.get(scene);
-  if (state?.mode === 'cubemap') { updateCubeProbes(state); return; }
+  if (state?.mode === 'cubemap') { updateCubeProbes(scene, state); return; }
   const moved =
     scene.camera.position.distanceToSquared(scene.lastMirrorCamPos) > 1e-6 ||
     Math.abs(1 - Math.abs(scene.camera.quaternion.dot(scene.lastMirrorCamQuat))) > 1e-7;

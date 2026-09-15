@@ -1012,7 +1012,7 @@ export function registerCoreSettings(): void {
     ],
     default: 'auto',
     applyMode: 'rebuild-scene',
-    hint: 'Cubemap: smooth room reflections with approximate perspective; moving objects are not live. Planar: more frequent accurate updates on High quality, at extra rendering cost.',
+    hint: 'Cubemap: sharp, wide views across the room with approximate perspective; moving objects are not live. Planar: more frequent accurate updates on High quality, at extra rendering cost.',
   });
 
   registerSetting({

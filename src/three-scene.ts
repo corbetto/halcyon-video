@@ -2882,6 +2882,7 @@ export class StoreScene {
   // Cube render targets behind the current reflection probes, kept so a re-bake
   // (outside-mode change) can dispose them instead of leaking GPU memory.
   private probeRenderTargets: THREE.WebGLCubeRenderTarget[] = [];
+  public mirrorRoomProbe: THREE.Texture | null = null;
 
   private generateReflectionProbes() {
     for (const capture of this.reflectionProbeSteps()) capture();
@@ -2917,11 +2918,12 @@ export class StoreScene {
     // Re-bake path: release the previous generation of probes first.
     this.probeRenderTargets.forEach((rt) => rt.dispose());
     this.probeRenderTargets = [];
+    this.mirrorRoomProbe = null;
 
     // Software GL: the probes' cost is dominated by the 30 full draw-call
     // replays (5 probes x 6 faces), but shrinking the target still trims the
     // per-face raster + mip chain to near-nothing on CPU.
-    const probeRes = this.softwareGL ? 64 : 256;
+    const probeRes = this.softwareGL ? 64 : 512;
     try {
       for (let i = 0; i < 5; i++) {
         const pos = probePositions[i];
@@ -2936,6 +2938,23 @@ export class StoreScene {
         try {
           yield () => camera.update(this.renderer, this.scene);
           textures.push(renderTarget.texture as any);
+        } finally {
+          this.scene.remove(camera);
+        }
+      }
+      // Mirrors need a room vista, not a case-height close-up of one aisle.
+      // One shared, elevated entrance capture adds only six scene passes per rebake.
+      if (localStorage.getItem('bb_reflections') === 'cubemap' && mirrors.liveMirrorsAllowed(this)) {
+        const target = new THREE.WebGLCubeRenderTarget(1024, {
+          generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter,
+        });
+        const camera = new THREE.CubeCamera(0.1, 1000, target);
+        camera.position.set(STORE_CENTER_X, Math.min(9, this.ceilingY - 1.5), FRONT_GLASS_Z - 15);
+        this.scene.add(camera);
+        this.probeRenderTargets.push(target);
+        try {
+          yield () => camera.update(this.renderer, this.scene);
+          this.mirrorRoomProbe = target.texture;
         } finally {
           this.scene.remove(camera);
         }
@@ -6007,6 +6026,7 @@ export class StoreScene {
     // 3D→flat/library-switch teardown leaked 5 cube RTs until context GC.
     this.probeRenderTargets.forEach((rt) => rt.dispose());
     this.probeRenderTargets = [];
+    this.mirrorRoomProbe = null;
     this.aoPass = null;
     this.floorAOTex?.dispose();
     this.floorAOTex = null;
