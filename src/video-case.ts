@@ -4395,7 +4395,7 @@ function drawJellyfinBackImpl(
   // above it: credits need 79px below their header baseline (genres line +
   // clearance), the actor list costs 14px after its header plus 46 per row
   // plus a 20px gap.
-  const specTop = h - 18 - TECH_SPECS_TABLE_H;
+  const specTop = h - 18 - (movie.streaming ? 0 : TECH_SPECS_TABLE_H);
   const maxActorRows = Math.floor((specTop - 79 - (h / 2 + 30) - 34) / 46);
   const actors = (movie.actors || []).slice(0, Math.max(0, Math.min(5, maxActorRows)));
   let cy = h / 2 + 30; // Starts at Y = 510

@@ -402,6 +402,8 @@ export function drawTechSpecsTable(
   movie: Movie,
   opts: TechSpecTableOptions,
 ): number {
+  // A streaming catalog has no optical disc, region, or guaranteed audio tracks.
+  if (movie.streaming) return 0;
   const spec = buildTechSpecs(movie);
   const P = 14;
   const headH = HEAD_H;
