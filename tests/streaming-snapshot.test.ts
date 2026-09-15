@@ -74,7 +74,7 @@ test('fetchStreamingMoviesFromSnapshot: one chosen service returns only its stoc
       assert.equal(m.streamingServiceName, 'NETFLIX');
       assert.ok(m.posterUrl === undefined || m.posterUrl!.startsWith('https://image.tmdb.org/'));
       assert.notEqual(m.duration, 'N/A');
-      assert.notEqual(m.rating, 'NR');
+      assert.equal(m.rating, netflixSnapshot.titles.find((t: any) => t.tmdbId === m.tmdbId).rating);
       assert.notEqual(m.director, 'Unknown Director');
       assert.ok(m.actors && m.actors.length > 0);
       assert.ok(m.genres && m.genres.length > 0);

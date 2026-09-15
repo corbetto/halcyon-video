@@ -118,55 +118,17 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // period hosts the kit — so on the 2008-fabric bb-2010 theme it stands, and
   // a 2012 period (or a theme with no period at all) simply doesn't get one.
   //
-  // MOVED 2026-08-06 (feedback/055): used to stand at (7.9, -10.4), mid-store
-  // beside the SUMMER SMASH HITS promo stand and the bargain bin — the owner
-  // called it out as buried and crowded, and asked for it "closer to the
-  // front of the store, say, near the register."
-  //
-  // FIRST ATTEMPT (superseded, keeping the note as a trap for the next
-  // agent): the pocket flanking the entrance vestibule (x~19-30, z 8.6..15)
-  // looked free on a pure footprint check, but a SlottedFixture's browse
-  // camera backs off `distance = 1.25 + 2.2 = 3.45` ft from whichever face is
-  // selected (store-camera.ts updateCameraTarget's isDisplay branch) — and
-  // that check never ran against anything but the static footprint rect. At
-  // yaw=0 that means the camera needs 3.45 ft clear in front of BOTH the +Z
-  // face and the -Z face, i.e. 6.9 ft of straight-line depth centred on the
-  // table, and the vestibule pocket only has 6.4 ft of depth end to end
-  // (backZ 8.6 to frontZ 15) — there is no z that clears both. Confirmed by
-  // shooting `--state subnav --flip 1`: it glides to this fixture (the DISPLAYS
-  // row's other "PREVIOUSLY VIEWED" entry) and the front-face camera lands at
-  // z ≈ fz+3.45, past the glass — the shot showed the camera standing on the
-  // exterior sidewalk looking back in through the storefront window.
-  //
-  // New spot: (27.0, 3.0), yaw=0, to the RIGHT of the checkout counter
-  // entirely — not squeezed into a pocket at all. The shield counter's
-  // widest point is x=20.8 (at z=2.26; store-fixtures-config.ts's own
-  // counter-band-front-right/-side-right structure-footprints top out
-  // there), so x=27 clears the counter in X at EVERY z, which means both
-  // camera standoff points (fz±3.45 = -0.45 and 6.45) are automatically
-  // clear of the counter too, not just the table's own footprint — no
-  // z-budget fight like the vestibule pocket had. It also clears the
-  // vestibule (xL/xR 3.3/18.7) by a wide margin in X, so z=3 (deep inside the
-  // counter's own -5.5..8.5 span — i.e. genuinely BESIDE the register, not
-  // fronting the glass) is safe without going anywhere near the vestibule
-  // chamber. Table footprint (w=6.0+2*0.08+0.04=6.2, d=2.5+2*0.08+0.04=2.7)
-  // spans x 23.9..30.1 (3.9 ft clear of the store's floor-width minimum of 46
-  // ft, i.e. the right wall never sits closer than x=34) and z 1.65..4.35 —
-  // both comfortably clear of the counter's max 20.8 reach and short of
-  // FIELD_Z_FRONT (world front edge of the shelf field is ~z=-7, so nothing
-  // this far forward at any x is ever inside a shelf run, at any catalog
-  // scale). corner=wide only reshapes the BACK-right corner (steppedCorner in
-  // store-layout.ts), nowhere near z~3, so it doesn't touch this spot either.
-  // Verified: the layout validator (no overlap — 'structure' vs 'fixture'
-  // pairs aren't walkway-checked, and nothing else is placed out here
-  // anyway), the clerk-nav grid (`--state clerkpath`, default + --full sizes,
-  // plus --arrangement diagonal --corner wide: 0 footprint intrusions in
-  // every run), and the subnav camera glide (`--state subnav --flip 1`
-  // lands inside the store, framing the table, not through the glass).
+  // Pin 152 places it on the EXIT (-X) side at (-5,9), out of the entrance and
+  // register flow. The table footprint spans x -8.1..-1.9 and z 7.65..10.35:
+  // 3.9 ft from the minimum-width store wall, 4.65 ft behind the front glass,
+  // and 3.7 ft edge-to-edge from the release cart at (-5,3).
+  // The counter's mirrored outer reach is x=1.2, so x=-5 clears it in X at
+  // every z; its two browse-camera standoffs, z=5.55 and 12.45, remain inside
+  // the open front floor. The vestibule begins more than five feet to its +X.
   {
     id: 'pv-drape-table-front',
     kind: 'pv-drape-table',
-    position: { x: 27.0, z: 3.0 },
+    position: { x: -5.0, z: 9.0 },
     yaw: 0,
     options: {
       popKit: PV_DRAPE_TABLE_POP_KIT,

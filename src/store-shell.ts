@@ -1161,28 +1161,28 @@ export function buildStore(scene: StoreScene) {
     // walk naturally staggers the rows it takes from each column) — an even
     // scatter keeps the store's grounding uniform instead of leaving one
     // half of the floor shadowless.
-    const trofferTotal = cols * rows;
+    const counterLights = soffitPoly.length ? soffitTrofferCenters() : [];
     const shadowPicks = new Set<number>();
     if (trofferShadows) {
-      if (spotShadowBudget >= trofferTotal) {
-        for (let i = 0; i < trofferTotal; i++) shadowPicks.add(i);
-      } else if (spotShadowBudget === 1) {
-        shadowPicks.add((trofferTotal - 1) >> 1); // one caster: take the middle
-      } else {
-        for (let k = 0; k < spotShadowBudget; k++) {
-          shadowPicks.add(Math.round((k * (trofferTotal - 1)) / (spotShadowBudget - 1)));
-        }
+      // The counter always receives its two real fittings first. Spend only
+      // the remaining sampler allowance on the wider room grid.
+      const counterCasters = Math.min(counterLights.length, spotShadowBudget);
+      for (let i = 0; i < counterCasters; i++) shadowPicks.add(cols * rows + i);
+      const gridCasters = Math.min(cols * rows, spotShadowBudget - counterCasters);
+      for (let i = 0; i < gridCasters; i++) {
+        shadowPicks.add(gridCasters === 1 ? Math.floor(cols * rows / 2)
+          : Math.round(i * (cols * rows - 1) / (gridCasters - 1)));
       }
     }
-    let trofferIndex = 0;
-    for (let c = 0; c < cols; c++) {
-      for (let r = 0; r < rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      const counterKey = c === cols;
+      for (let r = 0; r < (counterKey ? counterLights.length : rows); r++) {
         // The corner's first key belongs to the actual lower diffuser.
         // The room grid can otherwise fall outside the enclosed nook, leaving
         // its fascia to block every direct light reaching the interior.
-        const clubhouseKey = !!scene.plan.clubhouse && c === 0 && r === 0;
-        const kx = clubhouseKey ? leftEdge + 5 : leftEdge + storeWidth * ((c + 0.5) / cols);
-        const kz = clubhouseKey ? backWallZ + 5 : backWallZ + floorCeilLen * ((r + 0.5) / rows);
+        const clubhouseKey = !counterKey && !!scene.plan.clubhouse && c === 0 && r === 0;
+        const kx = counterKey ? counterLights[r].x : clubhouseKey ? leftEdge + 5 : leftEdge + storeWidth * ((c + 0.5) / cols);
+        const kz = counterKey ? counterLights[r].z : clubhouseKey ? backWallZ + 5 : backWallZ + floorCeilLen * ((r + 0.5) / rows);
         // A key that lands over the checkout zone belongs to the soffit's
         // troffers, not the deck's: left at deck height its cone would start
         // ABOVE the lid and be clipped by the fascia, leaving the counter —
@@ -1192,6 +1192,7 @@ export function buildStore(scene: StoreScene) {
         const overKeySoffit = exposed
           ? tileOverlapsSoffit(kx, kz, .8, .8, soffitPoly)
           : pointInSoffit(kx, kz, soffitPoly);
+        if (overKeySoffit && !counterKey) continue;
         const ky = pointInSoffit(kx,kz,clubSoffitPoly) ? CLUBHOUSE.height-.2 :
           overKeySoffit ? frontSoffitY(ceilingY) - 0.2 : keyY;
         // Physical units (candela, decay 2), and NO distance cutoff. The
@@ -1209,6 +1210,9 @@ export function buildStore(scene: StoreScene) {
         // shadow camera's far plane still clips the depth pass at the floor.
         const key = new THREE.SpotLight(
           0xf3f6ff, (scene.outdoor.outsideMode === 'night' ? 120 : 105) * 1.56 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
+        key.name = counterKey ? 'Counter ceiling illumination' : 'Store ceiling illumination';
+        key.userData.intensityScale = activeStoreFormat().keyLightIntensityScale * (counterKey ? 1.5 : 1);
+        key.intensity *= counterKey ? 1.5 : 1;
         key.position.set(kx, ky, kz);
         // A hair off vertical: a perfectly straight-down lookAt runs
         // parallel to the shadow camera's up vector. Same offset on every
@@ -1234,7 +1238,7 @@ export function buildStore(scene: StoreScene) {
           luminaireAnchors.push(anchor); aimLuminaire(key, anchor);
           scene.troffers.push({x:kx,z:kz});
         }
-        key.castShadow = shadowPicks.has(trofferIndex++);
+        key.castShadow = shadowPicks.has(counterKey ? cols * rows + r : c * rows + r);
         key.shadow.mapSize.width = trofferMapSize;
         key.shadow.mapSize.height = trofferMapSize;
         key.shadow.bias = -0.0004;

@@ -67,7 +67,7 @@ import type { Movie } from '../jellyfin';
 import { counterCrtPalette } from '../crt-theme';
 import { brandString } from '../brand-pack';
 import { textureArrayManager } from '../poster-textures';
-import { counterMonitorAsset, fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
+import { counterMonitorAsset, counterMonitorUsesTubeEffects, fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
 
 export class EntranceCheckout implements StoreFixture {
   // The counter's store-facing point Z (used by StoreScene to frame the checkout camera move).
@@ -193,6 +193,8 @@ export class EntranceCheckout implements StoreFixture {
   private group: THREE.Group | null = null;
   private terminalCanvas: HTMLCanvasElement | null = null;
   private terminalTex: THREE.CanvasTexture | null = null;
+  private terminalLcdCanvas: HTMLCanvasElement | null = null;
+  private terminalLcdTex: THREE.CanvasTexture | null = null;
   private terminalLines: string[] | null = null; // null = idle screen
   private terminalCursorOn = true;
   private terminalLastBlink = 0;
@@ -408,7 +410,10 @@ export class EntranceCheckout implements StoreFixture {
         const geo = new THREE.BoxGeometry(hi - lo, top - bottom, .16);
         mapWallSegmentUV(geo, hi - lo, top - bottom, bottom, surface.storeWidth, surface.roomHeight);
         const mesh = new THREE.Mesh(geo, surface.material);
-        mesh.name = 'vestibule-interior-masonry'; mesh.position.set((lo + hi) / 2, (bottom + top) / 2, frontZ - .24);
+        // Match the room-facing plane of the rotated front-window wall at
+        // z=frontZ.  Centering this liner inside the room made the jamb project
+        // through the vestibule frame by almost four inches.
+        mesh.name = 'vestibule-interior-masonry'; mesh.position.set((lo + hi) / 2, (bottom + top) / 2, frontZ + .08);
         mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
       };
       const glazing = facadeEntryGlazing(doorW, facadeStyle());
@@ -911,18 +916,36 @@ export class EntranceCheckout implements StoreFixture {
     // Shared terminal screen texture (one canvas drives every desk CRT).
     // Sized generously (2x the old 512x384) so the diegetic search terminal
     // reads crisply once the camera docks close in front of it.
+    const monitorAssets = stations.map((_, i) => counterMonitorAsset(this.ctx.activeTheme.id, i, stations.length));
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 768;
     this.terminalCanvas = canvas;
+    const hasLcd = monitorAssets.some((asset) => !counterMonitorUsesTubeEffects(asset));
+    const lcdCanvas = hasLcd ? document.createElement('canvas') : null;
+    if (lcdCanvas) {
+      lcdCanvas.width = canvas.width;
+      lcdCanvas.height = canvas.height;
+    }
+    this.terminalLcdCanvas = lcdCanvas;
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
     this.terminalTex = tex;
+    const lcdTex = lcdCanvas ? new THREE.CanvasTexture(lcdCanvas) : null;
+    if (lcdTex) {
+      lcdTex.colorSpace = THREE.SRGBColorSpace;
+      lcdTex.minFilter = THREE.LinearFilter;
+      lcdTex.magFilter = THREE.LinearFilter;
+    }
+    this.terminalLcdTex = lcdTex;
     this.drawTerminal();
 
     const screenMat = selfLit(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }), 'light-source');
+    const lcdScreenMat = lcdTex
+      ? selfLit(new THREE.MeshBasicMaterial({ map: lcdTex, toneMapped: false }), 'light-source')
+      : null;
     const beige = new THREE.MeshStandardMaterial({ color: 0xd9cdb2, roughness: 0.62, metalness: 0.03 });
     const beigeDark = new THREE.MeshStandardMaterial({ color: 0xc4b89e, roughness: 0.68, metalness: 0.03 });
     // Dark tube face for the model's own screen primitives — beige-tinting
@@ -1058,7 +1081,9 @@ export class EntranceCheckout implements StoreFixture {
 
     let retired = false;
     let screenTextureDisposed = false;
+    let lcdTextureDisposed = false;
     tex.addEventListener('dispose', () => { retired = true; screenTextureDisposed = true; });
+    lcdTex?.addEventListener('dispose', () => { lcdTextureDisposed = true; });
     // Entrance.dispose removes its entire group before the store's scene-wide
     // disposal (same boundary counter-model.ts releases at). The loaded
     // terminals own their geometry, retinted materials and the baked maps
@@ -1074,16 +1099,18 @@ export class EntranceCheckout implements StoreFixture {
         }
       });
       disposeDetachedModel(terminalRoot);
-      for (const m of [screenMat, beige, beigeDark, crtFaceMat]) {
+      for (const m of [screenMat, lcdScreenMat, beige, beigeDark, crtFaceMat]) {
+        if (!m) continue;
         if (!usedMaterials.has(m)) m.dispose();
       }
       if (!screenTextureDisposed) tex.dispose();
+      if (lcdTex && !lcdTextureDisposed) lcdTex.dispose();
       if (this.terminalTex === tex) this.terminalTex = null;
+      if (this.terminalLcdTex === lcdTex) this.terminalLcdTex = null;
       terminalRoot.removeFromParent();
     };
     parent.addEventListener('removed', disposeTerminals);
     const MON_H = 1.55;
-    const monitorAssets = stationGroups.map((_, i) => counterMonitorAsset(getActiveTheme().id, i, stations.length));
     for (const modelPath of new Set(monitorAssets)) {
       loader.load(assetUrl(modelPath), (gltf) => {
         if (retired) { disposeDetachedModel(gltf.scene); return; }
@@ -1192,7 +1219,9 @@ export class EntranceCheckout implements StoreFixture {
               ? Math.max(glassBox.min.z - 0.004, tubeBox ? tubeBox.max.z + 0.003 : -Infinity)
               : fitBox.max.z + 0.008;
           }
-          const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), screenMat);
+          const liveScreenMat = counterMonitorUsesTubeEffects(modelPath)
+            ? screenMat : (lcdScreenMat ?? screenMat);
+          const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), liveScreenMat);
           screen.position.set(sx, sy, sz);
           screen.name = 'counter-terminal-live-screen';
           g.add(screen);
@@ -1216,14 +1245,18 @@ export class EntranceCheckout implements StoreFixture {
           body.position.y = 0.7;
           body.castShadow = true;
           g.add(body);
-          const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), screenMat);
+          const usesTubeEffects = counterMonitorUsesTubeEffects(modelPath);
+          const liveScreenMat = usesTubeEffects ? screenMat : (lcdScreenMat ?? screenMat);
+          const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), liveScreenMat);
           screen.name = 'counter-terminal-live-screen';
           screen.position.set(0, 0.72, 0.615);
           g.add(screen);
-          const gloss = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), makeCrtGlassMaterial());
-          gloss.position.set(0, 0.72, 0.619);
-          gloss.renderOrder = 1;
-          g.add(gloss);
+          if (usesTubeEffects) {
+            const gloss = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.72), makeCrtGlassMaterial());
+            gloss.position.set(0, 0.72, 0.619);
+            gloss.renderOrder = 1;
+            g.add(gloss);
+          }
           if (idx === 0) this.searchScreenMesh = screen;
         });
         this.ctx.requestShadowRefresh();
@@ -1273,11 +1306,11 @@ export class EntranceCheckout implements StoreFixture {
   // scanlines, blinking block cursor. Content is either the idle rental screen
   // or whatever setTerminalText mirrored from the search overlay.
   private drawTerminal() {
-    const canvas = this.terminalCanvas;
+    const canvas = this.terminalLcdCanvas ?? this.terminalCanvas;
     if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
     const W = canvas.width, H = canvas.height;
-    const palette = counterCrtPalette(getActiveTheme().id);
+    const palette = counterCrtPalette(this.ctx.activeTheme.id);
     ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, W, H);
 
@@ -1381,7 +1414,8 @@ export class EntranceCheckout implements StoreFixture {
     const rightText = 'PLEASE REWIND';
     ctx.fillText(rightText, PAD_X + SAFE_W - ctx.measureText(rightText).width, footY);
 
-    // Scanlines at the canvas's native pitch, then the shared curved-tube mask
+    // LCD stations keep this clean raster. CRT stations copy it, then receive
+    // scanlines at the canvas's native pitch and the shared curved-tube mask
     // (crt-tube.ts: rounded corners falling off dark, edge vignette). Nothing
     // here paints a highlight: the room reflection is a separate additive
     // glass pane on the monitor's own dome (glass-reflection.ts), so it moves
@@ -1390,12 +1424,20 @@ export class EntranceCheckout implements StoreFixture {
     // note above), so the rounded tube corners land where the glass meets
     // the bezel. One cached drawImage; the cursor-blink redraw cost is
     // unchanged.
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    for (let y = 0; y < H; y += 8) ctx.fillRect(0, y, W, 4);
-    const mx = 0, my = 0;
-    ctx.drawImage(getTubeMaskCanvas(), mx, my, W - mx * 2, H - my * 2);
+    const crtCanvas = this.terminalCanvas;
+    const crtCtx = crtCanvas?.getContext('2d') ?? null;
+    if (crtCtx) {
+      if (crtCanvas !== canvas) {
+        crtCtx.clearRect(0, 0, W, H);
+        crtCtx.drawImage(canvas, 0, 0);
+      }
+      crtCtx.fillStyle = 'rgba(0,0,0,0.22)';
+      for (let y = 0; y < H; y += 8) crtCtx.fillRect(0, y, W, 4);
+      crtCtx.drawImage(getTubeMaskCanvas(), 0, 0, W, H);
+    }
 
     if (this.terminalTex) this.terminalTex.needsUpdate = true;
+    if (this.terminalLcdTex) this.terminalLcdTex.needsUpdate = true;
   }
 
   // Mirror arbitrary text onto the desk CRTs (the diegetic search terminal
@@ -1644,8 +1686,11 @@ export class EntranceCheckout implements StoreFixture {
       this.group = null;
     }
     this.terminalTex?.dispose();
+    this.terminalLcdTex?.dispose();
     this.terminalTex = null;
+    this.terminalLcdTex = null;
     this.terminalCanvas = null;
+    this.terminalLcdCanvas = null;
     this.searchScreenMesh = null;
     this.bagMouthWorld = null;
     this.bag?.dispose(); // dropped items' geometry/materials are caller-owned — only refs drop

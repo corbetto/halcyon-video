@@ -559,7 +559,7 @@ export class StoreScene {
     // floor (normal up, integrating exactly that hemisphere) has no other
     // source. Real troffers are what light a store floor; give them the energy.
     const spotIntensity = (mode === 'night' ? 120 : 105) * 1.56; // candela — see trofferKeyLights
-    for (const key of this.trofferKeyLights ?? []) key.intensity = spotIntensity;
+    for (const key of this.trofferKeyLights ?? []) key.intensity = spotIntensity * (key.userData.intensityScale ?? 1);
     this.requestRender();
   }
   // T15: sidewalk/curb/lamps/cars/strip-mall backdrop beyond the glass — built
@@ -1217,7 +1217,7 @@ export class StoreScene {
     // Plan the whole floor before anything derives from it: category shelf order
     // per library, unit placement in hatched runs for the active arrangement, and
     // the room bounds (backWallZ, aisle pivot). See store-plan.ts.
-    this.plan = new StorePlan(this.libraries, mobileStoreActive());
+    this.plan = new StorePlan(this.libraries, isPublicDemo || mobileStoreActive());
     this.plan.plan(getActiveTheme().id, this.ceilingY);
 
     // Derive the New Releases wall layout from the store width. The back-wall
@@ -1613,6 +1613,11 @@ export class StoreScene {
     if (this.mode === 'backroom') return; // T23: the desk terminal is back at the store
     this.requestRender();
     if (this.searchPreCameraPos) return; // already docked
+    // The dock occupies the clerk's workstation camera volume. Hide her for
+    // the entire terminal/search session so roaming cannot put the camera
+    // inside her billboard; setSuppressed preserves her current sleep fade.
+    this.clerk?.setSuppressed(true);
+    this.clerkMirrorRefresh = true;
     // T21: the overview's floating cursors would hover in the desk-CRT search
     // framing — hide them while docked (restored in exitSearchMode).
     if (this.mode === 'overview') this.hideOverviewVisuals();
@@ -1627,6 +1632,8 @@ export class StoreScene {
 
   public exitSearchMode(): void {
     this.requestRender();
+    this.clerk?.setSuppressed(false);
+    this.clerkMirrorRefresh = true;
     if (this.searchPreCameraPos && this.searchPreLookAt) {
       this.targetCameraPos.copy(this.searchPreCameraPos);
       this.targetLookAt.copy(this.searchPreLookAt);
@@ -1648,6 +1655,8 @@ export class StoreScene {
   public releaseSearchDock(): void {
     this.searchPreCameraPos = null;
     this.searchPreLookAt = null;
+    this.clerk?.setSuppressed(false);
+    this.clerkMirrorRefresh = true;
   }
 
   // Everything a swappable fixture (ambient TVs, entrance, ...) needs from the

@@ -121,3 +121,8 @@ export function counterMonitorAsset(themeId: string, stationIndex: number, stati
     ? 'models/flat-panel-terminal.glb'
     : 'models/rental-terminal.glb';
 }
+
+/** LCD panels show the clean raster; only tube monitors receive CRT effects. */
+export function counterMonitorUsesTubeEffects(assetPath: string): boolean {
+  return !assetPath.includes('flat-panel-terminal');
+}

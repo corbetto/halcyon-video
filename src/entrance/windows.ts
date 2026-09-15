@@ -99,11 +99,10 @@ export function buildWindowBays(
   });
   const kneeTrimMat = new THREE.MeshStandardMaterial({ color: 0x001030, roughness: 0.55, metalness: 0.05 });
   wings.forEach(({ lo, hi }) => {
-    const innerLo = kneeGap && Math.abs(lo - kneeGap.center - kneeGap.halfWidth) < .01;
-    const innerHi = kneeGap && Math.abs(hi - kneeGap.center + kneeGap.halfWidth) < .01;
-    const a = lo - (innerLo ? .4 : 0), b = hi + (innerHi ? .4 : 0);
-    const segW = b - a;
-    const cxSeg = (a + b) / 2;
+    // Stop exactly at the entrance opening.  The former 0.4-ft extension
+    // overlapped the vestibule's own jamb liner instead of meeting it.
+    const segW = hi - lo;
+    const cxSeg = (lo + hi) / 2;
     const kneeGeo = new THREE.BoxGeometry(segW, KNEE_H, 0.3);
     // Floor-mounted, so vBottom 0 — samples the wall texture's bottom rows
     // just like the full-height corner margins flanking this run.

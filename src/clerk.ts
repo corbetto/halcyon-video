@@ -13,6 +13,7 @@ import { BOX_SPACING, UNIT_DEPTH, UNIT_SECTIONS } from './store-layout';
 import { getActiveTheme } from './themes';
 import { tryLoadUserAssetTexture } from './user-assets';
 import { loadRenderedClerkAtlas } from './clerk-rendered-atlas';
+import { clerkShouldRender } from './clerk-visibility';
 
 /**
  * StoreClerk — a Doom-style directional 2D billboard clerk.
@@ -101,6 +102,7 @@ export class StoreClerk {
   private shadowMesh!: THREE.Mesh;
   private shadowMat!: THREE.MeshBasicMaterial; // blob shadow — fades with the sprite
   private fade = 1; // sleep fade level last applied via setFade()
+  private suppressed = false; // camera-docked terminal/search temporarily hides her
   private disposed = false;
 
   // Animation + facing state
@@ -285,11 +287,19 @@ export class StoreClerk {
     mat.opacity = f;
     mat.alphaTest = Math.max(0.01, 0.5 * f);
     this.shadowMat.opacity = 0.34 * f;
-    this.group.visible = f > 0;
+    this.group.visible = clerkShouldRender(f, this.suppressed);
     // Fully asleep: retract the "Press E to talk" prompt — update() (which
     // owns setNear) is paused while she's hidden, so it would linger over an
     // empty floor if the player happened to be standing next to her.
     if (f === 0) this.interaction?.setNear(false);
+  }
+
+  /** Keep the clerk out of the camera while it is docked at her workstation. */
+  public setSuppressed(suppressed: boolean): void {
+    if (this.suppressed === suppressed) return;
+    this.suppressed = suppressed;
+    this.group.visible = clerkShouldRender(this.fade, suppressed);
+    if (suppressed) this.interaction?.setNear(false);
   }
 
   public dispose() {

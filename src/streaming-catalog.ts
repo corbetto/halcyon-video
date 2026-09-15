@@ -289,10 +289,8 @@ export function synthesizeStreamingMovie(item: RawDiscoverItem, def: StreamingSe
   };
 }
 
-/** Poster-budget cap per service (design brief: "~24") -- one TMDB discover
- *  page (20 results) comfortably fits under it, so a single-page fetch per
- *  service never needs a second round trip to reach it. */
-export const STREAMING_CAP_PER_SERVICE = 24;
+/** Bound live and bundled catalogues while giving the demo several full shelf units per service. */
+export const STREAMING_CAP_PER_SERVICE = 120;
 
 /**
  * Raw discover results for one service -> shelvable Movies: skips malformed

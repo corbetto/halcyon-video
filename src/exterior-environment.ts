@@ -1,3 +1,4 @@
+import { makeSpotlightDiffuseOnly } from './diffuse-spotlight';
 import { buildEntranceBollards } from './entrance-bollards';
 import { selfLit } from './material-lighting';
 // T15 exterior/environment pass: everything beyond the storefront glass that
@@ -207,6 +208,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     // Sodium spill enters through glazing; static shadows keep it off solid walls.
     const light = new THREE.SpotLight('#ffb454', 0, 0, Math.PI / 3, .6, 2);
     light.name = 'parking-window-source';
+    makeSpotlightDiffuseOnly(light);
     light.position.set(lx, 13.1, lz);
     light.target.position.set(lx, 0, frontZ - 6);
     light.castShadow = true;

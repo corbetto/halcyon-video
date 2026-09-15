@@ -361,7 +361,7 @@ export class ReturnSlot {
       depthWrite: false, opacity: 0.85,
     });
     const screwMat = new THREE.MeshStandardMaterial({ color: 0xc9c9c9, roughness: 0.3, metalness: 0.9 });
-    const textMat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.35, metalness: 0.03 });
+    const textMat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: .08, roughness: 0.35, metalness: 0.03 });
     this.ownedMats.push(plateMat, glossMat, screwMat, textMat);
     const plateG = new THREE.PlaneGeometry(stripW, stripH);
     const textG = new THREE.PlaneGeometry(stripW, stripH);
@@ -384,7 +384,8 @@ export class ReturnSlot {
     plane.position.set(0, stripY, zFace + 0.016);
     plane.castShadow = false;
     plane.receiveShadow = true;
-    plane.renderOrder = 2;
+    plane.name = 'Return chute lettering';
+    plane.renderOrder = 0;
     this.group.add(plane);
     const gloss = new THREE.Mesh(glossG, glossMat);
     gloss.position.set(0, stripY, zFace + 0.02);

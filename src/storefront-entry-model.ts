@@ -21,6 +21,7 @@ import { createBrickTexture } from './canvas-textures';
 import { createFacadeSlateMaterial } from './facade-slate-material';
 import { buildConeCanopyFallback } from './storefront-cone-canopy';
 import { addStorefrontParkingPlaques } from './storefront-parking-plaques';
+import { DOWNLIGHT_APERTURE_RADIUS, installDownlightModels } from './downlight-model';
 
 interface EntryParams {
   style: FacadeStyle;
@@ -71,6 +72,65 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   const releases: (() => void)[] = [];
   const fallback = new THREE.Group();
   const m = d.massHalf, o = p.openingHalfWidth;
+
+  // The deep masonry portals shelter the two door passages and their central
+  // brick pier. Recessed cans in the soffit make that architecture legible
+  // after dark; three fixtures align with exit, divider and entrance rather
+  // than washing the whole facade indiscriminately. Cone-canopy already owns
+  // its dedicated fittings in the authored model.
+  const parapetSpots: THREE.SpotLight[] = [];
+  const lightContext = ctx as FixtureContext & { effectiveQuality?: 'high' | 'medium' | 'low'; softwareGL?: boolean };
+  const parapetShadows = lightContext.effectiveQuality !== 'low' && !lightContext.softwareGL;
+  const parapetRoot = new THREE.Group();
+  parapetRoot.name = 'parapet recessed downlights';
+  group.add(parapetRoot);
+  if (p.style !== 'cone-canopy') {
+    const passageOffset = o * .38;
+    const lightZ = d.frontProjection * .54;
+    const positions = [-passageOffset, 0, passageOffset].map(x => ({
+      x, y: d.headerBottom, z: lightZ,
+    }));
+    const trimGeo = new THREE.RingGeometry(DOWNLIGHT_APERTURE_RADIUS, DOWNLIGHT_APERTURE_RADIUS + .09, 28);
+    const lensGeo = new THREE.CircleGeometry(DOWNLIGHT_APERTURE_RADIUS, 28);
+    const hardwareFallback = new THREE.Group();
+    hardwareFallback.name = 'parapet downlight fallback';
+    for (const position of positions) {
+      const ring = new THREE.Mesh(trimGeo, trim);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(position.x, position.y - .005, position.z);
+      hardwareFallback.add(ring);
+      const lens = new THREE.Mesh(lensGeo, downlight);
+      lens.rotation.x = Math.PI / 2;
+      lens.position.set(position.x, position.y - .02, position.z);
+      hardwareFallback.add(lens);
+
+      const spot = new THREE.SpotLight(0xffdfab, 0, 15, Math.PI / 4, .72, 2);
+      spot.name = 'parapet jamb illumination';
+      spot.position.set(position.x, position.y - .18, position.z);
+      spot.target.position.set(position.x, 2.8, .25);
+      spot.castShadow = parapetShadows;
+      spot.shadow.mapSize.set(512, 512);
+      spot.shadow.camera.near = .25;
+      spot.shadow.camera.far = 16;
+      spot.shadow.normalBias = .025;
+      spot.shadow.bias = -.0002;
+      spot.shadow.autoUpdate = false;
+      spot.shadow.needsUpdate = true;
+      parapetRoot.add(spot, spot.target);
+      parapetSpots.push(spot);
+    }
+    parapetRoot.add(hardwareFallback);
+    releases.push(installDownlightModels(parapetRoot, positions, hardwareFallback, () => {
+      group.userData.setOutsideMode?.(group.userData.outsideMode ?? 'day');
+      ctx.requestShadowRefresh();
+      ctx.requestRender();
+    }));
+    releases.push(() => {
+      trimGeo.dispose();
+      lensGeo.dispose();
+      parapetSpots.forEach(light => light.shadow.dispose());
+    });
+  }
   if (p.style === 'cone-canopy') {
     buildConeCanopyFallback(fallback, finishes, ctx.ceilingY, p.entryHalfWidth, p.openingHalfWidth);
   } else {
@@ -185,8 +245,19 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     canopy.emissive.copy(accent);
   });
   group.userData.setOutsideMode = (mode: OutsideMode) => {
+    group.userData.outsideMode = mode;
     downlight.emissiveIntensity = mode === 'night' ? 3 : mode === 'sunset' ? .7 : 0;
     canopy.emissiveIntensity = mode === 'night' ? .65 : mode === 'sunset' ? .15 : 0;
+    const parapetLevel = mode === 'night' ? 1 : mode === 'sunset' ? .3 : 0;
+    parapetSpots.forEach(light => { light.intensity = 95 * parapetLevel; });
+    parapetRoot.getObjectByName('recessed-downlights')?.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+        material.userData.parapetNightEmissive ??= material.emissiveIntensity;
+        material.emissiveIntensity = material.userData.parapetNightEmissive * parapetLevel;
+      }
+    });
   };
   const dispose = () => {
     if (disposed) return;

@@ -358,7 +358,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const frameCenterY = UNIT_FRAME_HEIGHT / 2;
   const dividerTemplate: THREE.BufferGeometry = wireBlackFrame
     ? getBoxTemplate(0.8, UNIT_FRAME_HEIGHT, 0.04)
-    : createTrapezoidGeometry(UNIT_FRAME_HEIGHT, UNIT_DEPTH - 0.05, frameTopDepth - 0.05, 0.04);
+    : createTrapezoidGeometry(UNIT_FRAME_HEIGHT, UNIT_DEPTH, frameTopDepth, 0.04);
   const capTopDepth = wireBlackFrame ? UNIT_DEPTH : frameTopDepth;
   const capTrapezoidGeo = createTrapezoidGeometry(UNIT_FRAME_HEIGHT, UNIT_DEPTH, capTopDepth, 0.1);
   splitTrapezoidGroups(capTrapezoidGeo);
@@ -447,11 +447,15 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // Finished laminate closes the base below the lowest deck on each face.
     if (!wireFrame) {
       const baseH = AISLE_SHELF_HEIGHTS[0] - .0425;
-      const faceX = unitDepthAtHeight(AISLE_SHELF_HEIGHTS[0]) / 2 - .05;
+      // The plinth, divider feet and end caps share one full-depth face at
+      // floor level.  Solving this from the lowest shelf's tapered depth left
+      // the plinth recessed, so each divider and cap visibly poked past it.
+      const baseDepth = .0625;
+      const faceX = UNIT_DEPTH / 2 - baseDepth / 2;
       for (const side of [-1, 1]) {
-        stamp(structureParts, getBoxTemplate(.0625, baseH, shelfLength - .04),
+        stamp(structureParts, getBoxTemplate(baseDepth, baseH, shelfLength - .04),
           xCenter + side * faceX, baseH / 2, zCenter);
-        structureModels.push({ kind: 'spine', depth: .0625, height: baseH,
+        structureModels.push({ kind: 'spine', depth: baseDepth, height: baseH,
           length: shelfLength - .04, x: xCenter + side * faceX, z: zCenter });
       }
     }
@@ -468,7 +472,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         deps.shelfModels.add(div, [{ kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY }, { kind: 'foot', depth: UNIT_DEPTH - .12, length: .14, y: -frameCenterY }], materials.strip);
       } else {
         stamp(structureParts, dividerTemplate, xCenter, frameCenterY, zDiv);
-        structureModels.push({ kind: 'upright', depth: UNIT_DEPTH - .05, topDepth: frameTopDepth - .05,
+        structureModels.push({ kind: 'upright', depth: UNIT_DEPTH, topDepth: frameTopDepth,
           height: UNIT_FRAME_HEIGHT, length: .04, x: xCenter, z: zDiv });
       }
     };

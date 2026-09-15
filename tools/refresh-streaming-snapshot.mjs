@@ -15,8 +15,8 @@
 //     node tools/refresh-streaming-snapshot.mjs
 //
 // Pulls Jellyseerr's proxied TMDB endpoints -- the watch-provider list, then
-// one /discover page per matched default service -- and keeps only
-// tmdbId/title/year/posterPath per title: text and a poster PATH STRING,
+// paged discover results plus factual detail for each matched default service.
+// Retains text metadata and poster PATH STRINGS,
 // never an image or a service logo (committed fallbacks stay brand-free;
 // posters resolve at render time from image.tmdb.org, which needs no key --
 // verified with a plain `curl`, no auth header, against a real poster path).
@@ -29,7 +29,7 @@ import fs from 'node:fs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_PATH = path.join(root, 'src/data/streaming-snapshot.json');
 const WATCH_REGION = 'US';
-const TITLES_PER_SERVICE = 24;
+const MAX_PAGES = 12;
 
 const jellyseerrUrl = (process.env.JELLYSEERR_URL || '').replace(/\/+$/, '');
 const apiKey = process.env.JELLYSEERR_API_KEY || '';
@@ -60,9 +60,11 @@ async function bundleImport(entrySource) {
   return import('data:text/javascript;base64,' + Buffer.from(code.text).toString('base64'));
 }
 
-const { DEFAULT_STREAMING_SERVICES, matchProviderId } = await bundleImport(`
-  export { DEFAULT_STREAMING_SERVICES, matchProviderId } from './src/streaming-catalog';
+const { DEFAULT_STREAMING_SERVICES, matchProviderId, STREAMING_CAP_PER_SERVICE } = await bundleImport(`
+  export { DEFAULT_STREAMING_SERVICES, matchProviderId, STREAMING_CAP_PER_SERVICE } from './src/streaming-catalog';
 `);
+
+const TITLES_PER_SERVICE = STREAMING_CAP_PER_SERVICE;
 
 async function jellyseerrGet(reqPath) {
   const res = await fetch(`${jellyseerrUrl}${reqPath}`, {
@@ -72,10 +74,16 @@ async function jellyseerrGet(reqPath) {
   return res.json();
 }
 
-console.log(`Fetching watch-provider list from ${jellyseerrUrl} (region ${WATCH_REGION})...`);
+console.log(`Fetching watch-provider list (region ${WATCH_REGION})...`);
 const providersRaw = await jellyseerrGet(`/api/v1/watchproviders/movies?watchRegion=${WATCH_REGION}`);
 const providers = Array.isArray(providersRaw) ? providersRaw : [];
 
+// Reuse details when a title is available through multiple services.
+const details = new Map();
+async function movieDetail(id) {
+  if (!details.has(id)) details.set(id, jellyseerrGet(`/api/v1/movie/${id}`));
+  return details.get(id);
+}
 const services = [];
 for (const def of DEFAULT_STREAMING_SERVICES) {
   const providerId = matchProviderId(def, providers);
@@ -84,34 +92,43 @@ for (const def of DEFAULT_STREAMING_SERVICES) {
     continue;
   }
   console.log(`  Fetching ${def.name} (provider ${providerId})...`);
-  const data = await jellyseerrGet(
-    `/api/v1/discover/movies?watchProviders=${providerId}&watchRegion=${WATCH_REGION}&page=1`
-  );
-  const results = Array.isArray(data?.results) ? data.results : [];
   const seen = new Set();
   const titles = [];
-  for (const item of results) {
-    if (titles.length >= TITLES_PER_SERVICE) break;
-    const tmdbId = item?.id;
-    const title = item?.title || item?.name;
-    if (typeof tmdbId !== 'number' || !title || seen.has(tmdbId)) continue;
-    seen.add(tmdbId);
-    const year = item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined;
-    titles.push({
-      tmdbId,
-      title,
-      year: Number.isFinite(year) ? year : new Date().getFullYear(),
-      ...(item.posterPath ? { posterPath: item.posterPath } : {}),
-      ...(item.overview ? { overview: item.overview } : {}),
-      ...(item.backdropPath ? { backdropPath: item.backdropPath } : {}),
-      ...(item.duration ? { duration: item.duration } : {}),
-      ...(item.rating ? { rating: item.rating } : {}),
-      ...(item.director ? { director: item.director } : {}),
-      ...(Array.isArray(item.actors) ? { actors: item.actors } : {}),
-      ...(typeof item.voteAverage === 'number' ? { voteAverage: item.voteAverage } : {}),
-      ...(Array.isArray(item.genres) ? { genres: item.genres } : {}),
-      ...(Array.isArray(item.genreIds) ? { genreIds: item.genreIds } : {}),
-    });
+  for (let page = 1; page <= MAX_PAGES && titles.length < TITLES_PER_SERVICE; page++) {
+    const data = await jellyseerrGet(
+      `/api/v1/discover/movies?watchProviders=${providerId}&watchRegion=${WATCH_REGION}&page=${page}`
+    );
+    const results = Array.isArray(data?.results) ? data.results : [];
+    if (!results.length) break;
+    for (const item of results) {
+      if (titles.length >= TITLES_PER_SERVICE) break;
+      if (typeof item?.id !== 'number' || seen.has(item.id) || item.adult || !item.posterPath) continue;
+      seen.add(item.id);
+      let detail;
+      try {
+        detail = await movieDetail(item.id);
+      } catch {
+        console.warn(`    Skipping unavailable metadata for movie ${item.id}`);
+        continue;
+      }
+      const regional = detail.watchProviders?.find(p => p.iso_3166_1 === WATCH_REGION);
+      if (!regional?.flatrate?.some(p => p.id === providerId)) continue;
+      const year = Number((detail.releaseDate || '').slice(0, 4));
+      const director = detail.credits?.crew?.find(p => p.job === 'Director')?.name;
+      const actors = (detail.credits?.cast || []).slice(0, 8).map(p => p.name).filter(Boolean);
+      const genres = (detail.genres || []).map(g => g.name).filter(Boolean);
+      const rating = detail.releases?.results?.find(r => r.iso_3166_1 === WATCH_REGION)
+        ?.release_dates?.find(r => r.certification)?.certification || 'Not rated';
+      if (!detail.title || !detail.posterPath || !detail.overview || !detail.runtime ||
+          !director || !actors.length || !genres.length || !year) continue;
+      titles.push({
+        tmdbId: detail.id, title: detail.title, year,
+        posterPath: detail.posterPath, backdropPath: detail.backdropPath,
+        overview: detail.overview, duration: `${detail.runtime} min`, rating, director, actors, genres,
+        voteAverage: detail.voteAverage,
+      });
+    }
+    if (page >= (data.totalPages || page)) break;
   }
   console.log(`    ${titles.length} title(s).`);
   services.push({ id: def.id, name: def.name, titles });
@@ -125,6 +142,9 @@ const snapshot = {
   services,
 };
 
+if (services.length !== DEFAULT_STREAMING_SERVICES.length || services.some(s => s.titles.length === 0)) {
+  throw new Error('Incomplete service catalogue; previous snapshot preserved');
+}
 fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
 fs.writeFileSync(OUT_PATH, JSON.stringify(snapshot, null, 2) + '\n');
 

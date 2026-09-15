@@ -491,10 +491,14 @@ export class GameSection implements SlottedFixture {
       const TOP_SHELF_TIP = SHELF_HEIGHTS[SHELF_HEIGHTS.length - 1] + 0.02;
       const CARD_Y = TOP_SHELF_TIP - CARD_H / 2;
       const cardGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
-      // Divider front-edge half-depth at the card's TOP (the narrowest point of
-      // the tapered edge): mount the card's aisle-side edge flush there so an
-      // upright card never pokes proud of the leaning divider face below.
+      // Follow the divider's tapered outer edge over the card's whole height.
+      // This gives the marker a continuous mounting edge without burying any
+      // part of its face through the shelf decks below.
+      const cardBottom = TOP_SHELF_TIP - CARD_H;
       const edgeHalfTop = (unitDepth - (unitDepth - unitTopDepth) * (TOP_SHELF_TIP / 5.1)) / 2;
+      const edgeHalfBottom = (unitDepth - (unitDepth - unitTopDepth) * (cardBottom / 5.1)) / 2;
+      const edgeHalfMid = (edgeHalfTop + edgeHalfBottom) / 2;
+      const edgeAngle = Math.atan((edgeHalfBottom - edgeHalfTop) / CARD_H);
       const cardSides: ('front' | 'back')[] = this.faces === 'front' ? ['front'] : ['front', 'back'];
       for (const side of cardSides) {
         const platforms = side === 'front' ? this.frontPlatforms : this.backPlatforms;
@@ -515,6 +519,9 @@ export class GameSection implements SlottedFixture {
           const faceMat = new THREE.MeshStandardMaterial({
             map: tex, roughness: 0.45, metalness: 0.05, alphaTest: 0.5
           });
+          const mountMat = new THREE.MeshStandardMaterial({
+            color: PLATFORM_BRAND[platform]?.color ?? '#f2a900', roughness: 0.5, metalness: 0.08,
+          });
 
           // A plane pair instead of a box: the curved silhouette comes from
           // the texture's alpha, and a box's rim would draw a rectangular
@@ -531,8 +538,21 @@ export class GameSection implements SlottedFixture {
             p.layers.set(1);
             holder.add(p);
           });
-          // Flush on the divider face (aisle-side edge at edgeHalfTop), upright.
-          holder.position.set(dir * (edgeHalfTop - CARD_W / 2), CARD_Y, zCard);
+          // A narrow, flat-backed mounting strip keeps the pill-shaped print
+          // physically seated against the divider without changing its art.
+          const mount = new THREE.Mesh(new THREE.BoxGeometry(.08, CARD_H - .12, .06), mountMat);
+          mount.position.x = -dir * (CARD_W / 2 - .04);
+          mount.castShadow = mount.receiveShadow = true;
+          holder.add(mount);
+          // Mount the flat inner edge against the sloping divider and let the
+          // full card project into the aisle. Centering it inward from the edge
+          // buried the platform marker through every shelf deck below the top.
+          holder.rotation.z = dir * edgeAngle;
+          holder.position.set(
+            dir * (edgeHalfMid + CARD_W / 2 * Math.cos(edgeAngle)),
+            CARD_Y + CARD_W / 2 * Math.sin(edgeAngle),
+            zCard,
+          );
           this.group!.add(holder);
           this.ctx.addCollider(holder);
         }

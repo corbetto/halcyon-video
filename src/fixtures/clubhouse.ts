@@ -9,7 +9,7 @@ import { CASE_HEIGHT, CASE_DEPTH } from '../video-case';
 import { CLUBHOUSE, childrenChairPlacements, clubhouseFeet, clubhouseHost, familyStock } from './clubhouse-layout';
 import { installDisplayModel } from './display-model';
 import { finishEquipmentSurfaces } from './equipment-surfaces';
-import { createCategorySignTexture, createEntranceTicketLogoTexture } from '../canvas-textures';
+import { createSignTextTexture, createEntranceTicketLogoTexture } from '../canvas-textures';
 import { markSignMesh } from '../sign-builders';
 import { tryLoadUserSignArtTexture } from '../user-assets';
 import { makeCurvedScreenGeometry } from '../crt-tube';
@@ -92,7 +92,7 @@ export class Clubhouse implements SlottedFixture {
     // The continuous store floor supplies the nook's exact carpet maps, weave,
     // world UVs, normal scale, roughness and baked contact AO. No overlay rug.
     this.sign('clubhouse-header',createEntranceTicketLogoTexture(this.ctx.activeTheme,true),4.6,2.76,4.14,8.98,4.14,Math.PI/4);
-    this.sign('clubhouse-plaque',createCategorySignTexture('KIDS CLUBHOUSE',pal,false,6.4/.65,false,pal.secondary),6.4,.65,4.15,7.47,4.15,Math.PI/4);
+    this.sign('clubhouse-plaque',createSignTextTexture('KIDS CLUBHOUSE',undefined,'standard',6.4/.65),6.4,.65,4.15,7.47,4.15,Math.PI/4);
     // Existing modeled television, sitting on the console at its floor datum.
     const tv=new THREE.Group();tv.name='clubhouse-tv';tv.position.set(-4.9,2.3,-4.9);tv.rotation.y=-3*Math.PI/4;root.add(tv);
     const tvFallback=new THREE.Group();tv.add(tvFallback);box(tvFallback,0,.93,0,2.2,1.86,1.85,finishes.CabinetLaminate);

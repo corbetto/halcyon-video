@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { counterMonitorAsset } from '../src/counter-terminal.ts';
+import { counterMonitorAsset, counterMonitorUsesTubeEffects } from '../src/counter-terminal.ts';
 
 const bytes = readFileSync(new URL('../public/models/flat-panel-terminal.glb', import.meta.url));
 const gltf = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
@@ -13,6 +13,11 @@ test('late-era chain desk mixes an LCD and CRT while earlier/single desks retain
     for (const station of [0, 1]) assert.equal(counterMonitorAsset(theme, station, 2), 'models/rental-terminal.glb');
   }
   assert.equal(counterMonitorAsset('bb-2010', 0, 1), 'models/rental-terminal.glb');
+});
+
+test('LCD raster omits tube scanlines, vignette, and curved-edge mask', () => {
+  assert.equal(counterMonitorUsesTubeEffects('models/flat-panel-terminal.glb'), false);
+  assert.equal(counterMonitorUsesTubeEffects('models/rental-terminal.glb'), true);
 });
 
 test('LCD export carries UVs, live 4:3 face, physical finishes and bounded resource cost', () => {
