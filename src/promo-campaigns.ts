@@ -529,6 +529,41 @@ function seasonal(libs: JellyfinLibrary[], rows: number, cols: number, band: 'fa
   return faces ? { id: `seasonal:${season.id}:${band}`, topper: season.labels[band], faces } : null;
 }
 
+/** Floor promotions use existing catalog metadata and cover art. A featured
+ * film deliberately repeats on every facing; it is not a claim about stock
+ * quantity, sale price, or a home-video release date the catalog does not have. */
+function floorFeature(libs: JellyfinLibrary[], rows: number, cols: number,
+  kind: string, pick: number): PromoCampaign | null {
+  const films = [...new Map(dedupedMovies(libs).filter(m => !m.isSeries && !m.game && !m.comingSoon)
+    .map(m => [m.tmdbId ? `tmdb:${m.tmdbId}` : `${m.title.trim().toLowerCase()}:${m.year}`, m])).values()]
+    .sort(byPromoOrder);
+  let label: string, stock: Movie[];
+  if (kind === 'feature-title') {
+    const film = films[pick];
+    if (!film) return null;
+    label = film.title.toUpperCase();
+    stock = Array.from({ length: rows * cols }, () => film);
+  } else {
+    const groups = new Map<string, { label: string; movies: Movie[] }>();
+    for (const film of films) {
+      const names = kind === 'actor-spotlight' ? film.actors : film.studios;
+      for (const name of new Set((names || []).map(n => n.trim().toUpperCase()).filter(Boolean))) {
+        const group = groups.get(name) ?? { label: name, movies: [] };
+        group.movies.push(film); groups.set(name, group);
+      }
+    }
+    const group = [...groups.values()].filter(g => g.movies.length >= rows * cols)
+      .sort((a, b) => b.movies.length - a.movies.length || a.label.localeCompare(b.label))[pick];
+    if (!group) return null;
+    label = group.label;
+    stock = group.movies.slice(0, rows * cols);
+  }
+  return { id: `${kind}:${pick}`, topper: label,
+    faces: Array.from({ length: PROMO_FACE_COUNT }, () => ({ label,
+      source: kind === 'feature-title' ? 'FEATURE PRESENTATION' : kind === 'actor-spotlight' ? 'ACTOR SPOTLIGHT' : 'STUDIO SPOTLIGHT',
+      movies: stock.slice() })) };
+}
+
 /**
  * Resolve a stand's campaign chain: the first viable campaign wins. Returns
  * null when none is — a stand with nothing honest to sell builds no meshes at
@@ -539,6 +574,7 @@ function seasonal(libs: JellyfinLibrary[], rows: number, cols: number, band: 'fa
  *   recently-played
  *   studio-spotlight:<n>     n = Nth-best studio (default 0)
  *   seasonal:<family|adult>
+ *   feature-title:<n> | actor-spotlight:<n> | studio-feature:<n>
  */
 export function buildPromoCampaign(
   chain: string[],
@@ -549,7 +585,11 @@ export function buildPromoCampaign(
   for (const spec of chain) {
     const [kind, arg] = spec.split(':');
     let campaign: PromoCampaign | null = null;
-    if (kind === 'recently-played') campaign = recentlyPlayed(libs, rows, cols);
+    if (['feature-title', 'actor-spotlight', 'studio-feature'].includes(kind)) {
+      const pick = Number(arg ?? 0);
+      if (Number.isSafeInteger(pick) && pick >= 0) campaign = floorFeature(libs, rows, cols, kind, pick);
+    }
+    else if (kind === 'recently-played') campaign = recentlyPlayed(libs, rows, cols);
     else if (kind === 'studio-spotlight') campaign = studioSpotlight(libs, rows, cols, Number(arg) || 0);
     else if (kind === 'seasonal') campaign = seasonal(libs, rows, cols, arg === 'adult' ? 'adult' : 'family');
     if (campaign) return campaign;

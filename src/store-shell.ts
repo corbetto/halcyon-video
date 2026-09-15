@@ -1,3 +1,4 @@
+import { floorPromotionPlacements } from './floor-merchandising';
 import { placeStockCart } from './fixtures/stock-cart-layout';
 import { buildNrBayLighting } from './nr-bay-lighting';
 import { NR_BAY_WIDTH, nrColumnX } from './nr-run-layout';
@@ -2378,7 +2379,7 @@ export function buildStore(scene: StoreScene) {
     });
   };
   fixturePlacements.sort((a, b) => Number(a.kind === 'release-cart') - Number(b.kind === 'release-cart'));
-  fixturePlacements.forEach(placement => {
+  const buildFixture = (placement: typeof fixturePlacements[number]) => {
     if (placement.kind === 'release-cart') {
       const chosen = placeStockCart([...scene.plan.getUnitFootprints(), ...fixtureFootprints,
         { label: 'counter and entrance', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
@@ -2419,7 +2420,19 @@ export function buildStore(scene: StoreScene) {
     if (fixture instanceof TipJar && fixture.hasArt()) {
       scene.tipJars.push(fixture);
     }
-  });
+  };
+  fixturePlacements.forEach(buildFixture);
+  if (activeStoreFormat().floorDisplays) {
+    const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
+    const reserved: Footprint[] = [
+      { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
+      ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
+        cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
+    ];
+    floorPromotionPlacements(scene.fixtureContext().libraries, [...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
+      { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
+        minZ: backWallZ, maxZ: FRONT_GLASS_Z }, existing).forEach(buildFixture);
+  }
   const archPlacements = departmentArchPlacements({
     format: activeStoreFormat().id, ceiling: ceilingY, exposed,
     bay: { wallX: STORE_CENTER_X - storeWidth / 2,
