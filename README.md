@@ -312,7 +312,12 @@ older-browser route, not a separate catalog.
 Upgrade to **v0.19.2 or later** and restart the server or recreate the container.
 The integration proxy now accepts only operator-configured service URLs. Shared
 Jellyseerr credentials provide read-only catalog access; creating a movie request
-requires the visitor's own upstream credentials. Connection checks and request
+uses the signed-in Jellyfin user's linked Jellyseerr account, with that account's
+permissions, request limits, and approval policy. Sign in to Jellyseerr with the
+same Jellyfin account once (or have the host import it) before requesting.
+Halcyon verifies the session against Jellyseerr's configured Jellyfin server;
+anonymous visitors cannot submit requests. Visitors supplying their own
+request-service credentials keep using those credentials. Connection checks and request
 acknowledgments do not return account details, and catalog responses omit private
 upstream fields. Redirects are refused; configure the final service URL directly.
 

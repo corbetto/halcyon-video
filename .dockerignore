@@ -17,6 +17,7 @@
 !tools/list-slots.mjs
 !tools/remote-play-server.mjs
 !tools/integration-proxy.mjs
+!tools/seerr-user-auth.mjs
 
 # Local-only dev rigs that may sit inside the re-included dirs on a dev
 # checkout (absent from a clean clone; vite.config treats their entry pages

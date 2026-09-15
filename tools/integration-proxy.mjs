@@ -2,6 +2,8 @@
 // browser CORS and Host checks are not authentication or proxy authorization.
 import { operatorServiceForTarget, operatorRequestAllowed, operatorAuthHeaders, targetBelongsTo } from '../src/operator-defaults.ts';
 
+import { SeerrIdentityError, seerrUserHeaders } from './seerr-user-auth.mjs';
+
 const MAX_BODY = 64 * 1024;
 const MAX_RESPONSE = 8 * 1024 * 1024;
 const CATALOG_KEYS = new Set(('id title name originalTitle overview posterPath backdropPath releaseDate firstAirDate runtime voteAverage voteCount genreIds genres mediaType mediaInfo status status4k tmdbId credits cast crew job character productionCompanies collection parts results page totalPages totalResults pageInfo pages pageSize media total items limit offset slug romCount rom_count platform platform_id platforms summary rating fs_name fs_name_no_ext file_name first_release_date release_date metadatum igdb_metadata ss_metadata sibling_roms path_cover_l path_cover_large path_cover_s url_cover box2d_side_path box2d_side_url box2d_back_path box2d_back_url physical_path physical_url').split(' '));
@@ -58,8 +60,11 @@ export function createIntegrationProxy(config, { fetchImpl = fetch, env = proces
     const ownAuth = !!(req.headers['x-api-key'] || req.headers.authorization);
     const kind = service || (u.pathname.includes('/api/v1/') ? 'jellyseerr' : 'romm');
     const relativePath = u.pathname.slice(new URL(base).pathname.replace(/\/+$/, '').length);
-    const ownRequest = ownAuth && kind === 'jellyseerr' && method === 'POST' && relativePath === '/api/v1/request' && !u.search;
-    if ((!service && !ownAuth) || (!ownRequest && !operatorRequestAllowed(kind, method, target, base))) {
+    const movieRequest = kind === 'jellyseerr' && method === 'POST' && relativePath === '/api/v1/request' && !u.search;
+    const ownRequest = ownAuth && movieRequest;
+    const userRequest = !ownAuth && service === 'jellyseerr' && movieRequest && !!req.headers['x-halcyon-jellyfin-token'];
+    const writeRequest = ownRequest || userRequest;
+    if ((!service && !ownAuth) || (!writeRequest && !operatorRequestAllowed(kind, method, target, base))) {
       return json(res, 403, { error: 'This operation requires your own service credentials; shared credentials are read-only' });
     }
     if (active >= 16) return json(res, 503, { error: 'Integration busy; retry later' });
@@ -69,25 +74,28 @@ export function createIntegrationProxy(config, { fetchImpl = fetch, env = proces
       let body;
       try { body = await readBounded(req, MAX_BODY); }
       catch { return json(res, 413, { error: 'Payload too large' }); }
-      if (ownRequest) {
+      if (writeRequest) {
         let data;
         try { data = JSON.parse(body.toString()); } catch { return json(res, 400, { error: 'Invalid request' }); }
         if (data?.mediaType !== 'movie' || !Number.isSafeInteger(data.mediaId) || data.mediaId <= 0) return json(res, 400, { error: 'Invalid movie request' });
         body = Buffer.from(JSON.stringify({ mediaType: 'movie', mediaId: data.mediaId }));
       } else if (body.length) return json(res, 400, { error: 'Read requests cannot carry a body' });
+      const signal = AbortSignal.timeout(20000);
       const headers = { accept: 'application/json', 'content-type': 'application/json' };
-      if (ownAuth) {
+      if (userRequest) {
+        Object.assign(headers, await seerrUserHeaders(config.jellyseerr, req.headers['x-halcyon-jellyfin-token'], fetchImpl, signal));
+      } else if (ownAuth) {
         for (const key of ['x-api-key', 'authorization']) if (req.headers[key]) headers[key] = String(req.headers[key]);
       } else Object.assign(headers, operatorAuthHeaders(service, config[service]));
       // Never follow redirects with secrets (including X-Api-Key), even within
       // one origin: each permitted route has to pass the policy itself.
-      const r = await fetchImpl(target, { method, headers, body: ownRequest ? body : undefined,
-        redirect: 'manual', signal: AbortSignal.timeout(20000) });
+      const r = await fetchImpl(target, { method, headers, body: writeRequest ? body : undefined,
+        redirect: 'manual', signal });
       if (r.status >= 300 && r.status < 400) {
         await r.body?.cancel();
         return json(res, 502, { error: 'Integration redirects are disabled' });
       }
-      if (!r.ok || ownRequest || method === 'HEAD' || relativePath === '/api/v1/auth/me') {
+      if (!r.ok || writeRequest || method === 'HEAD' || relativePath === '/api/v1/auth/me') {
         await r.body?.cancel();
         return json(res, r.status, r.ok ? { ok: true } : { error: 'Integration request failed', status: r.status });
       }
@@ -105,7 +113,8 @@ export function createIntegrationProxy(config, { fetchImpl = fetch, env = proces
       }
       if (!contentType.includes('json')) return json(res, 502, { error: 'Invalid integration response' });
       return json(res, r.status, publicCatalog(JSON.parse(bytes.toString())));
-    } catch {
+    } catch (error) {
+      if (error instanceof SeerrIdentityError) return json(res, error.status, { error: error.message });
       // Upstream URLs, bodies and exception messages can contain credentials.
       return json(res, 502, { error: 'Integration unavailable' });
     } finally { active--; }

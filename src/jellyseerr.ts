@@ -135,6 +135,11 @@ async function jellyseerrRequest(
     // (vite.config.ts) instead, which forwards to the real URL host-side.
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
+    // The host validates this session against the request service's Jellyfin.
+    // No user id or API key is trusted as proof of this visitor's identity.
+    const requestToken = config.viaOperator && method === 'POST' && path === '/api/v1/request'
+      && (localStorage.getItem('provider_kind') || 'jellyfin') === 'jellyfin'
+      ? localStorage.getItem('jellyfin_token') : null;
     try {
       const response = await fetch('/dev-proxy', {
         method,
@@ -143,6 +148,7 @@ async function jellyseerrRequest(
           // Operator-managed: no X-Api-Key at all, and the proxy supplies the
           // operator's (GH #129).
           ...(config.viaOperator ? {} : { 'X-Api-Key': config.apiKey }),
+          ...(requestToken ? { 'X-Halcyon-Jellyfin-Token': requestToken } : {}),
           'Content-Type': 'application/json',
         },
         body: bodyStr,

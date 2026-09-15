@@ -156,8 +156,9 @@ export function operatorServiceForTarget(
 // user list, approve requests. These are the endpoints the store itself calls,
 // and nothing else; a store feature that needs a new endpoint adds it here
 // deliberately.
-// Shared credentials are strictly read-only. Visitors must authenticate to their
-// own service to submit requests; a browser session is not upstream permission.
+// This catalog policy never authorizes writes. The integration proxy separately
+// verifies a personal service credential or a Jellyfin session linked to a Seerr
+// user before submitting a movie request under that user's upstream permissions.
 const OPERATOR_ALLOWED: Record<OperatorServiceId, RegExp> = {
   romm: /^\/(?:api\/(?:platforms|roms|collections|stats)(?:\/\d+)?|assets\/romm\/resources\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp))$/,
   jellyseerr: /^\/api\/v1\/(?:auth\/me|request|movie\/\d+(?:\/(?:recommendations|similar|watchproviders))?|collection\/\d+|discover\/(?:movies|trending)|watchproviders\/movies)$/,
