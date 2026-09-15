@@ -1,6 +1,7 @@
 // Direct manipulation for the hosted touch store. Desktop input stays in its
 // existing keyboard/mouse state machine.
 import * as THREE from 'three';
+import { mobileFlickTarget } from './mobile-flick.ts';
 import { OVERVIEW_POS } from './scene-shared.ts';
 import { BACK_WALL_UNIT_IDX, BROWSE_WINDOW_SIZE, type MovieSlot } from './store-layout.ts';
 import { handleStreamingBackTap, cancelStreamingServiceChoice } from './streaming-checkout.ts';
@@ -182,7 +183,8 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
   }
 
   if (scene.mode === 'overview') {
-    if (!picked) return false;
+    // Consume empty taps before the desktop fallback confirms the focused shelf.
+    if (!picked) return true;
 
     // Preserve spatial destination focus when entering shelf directly by tapping
     const row0 = scene.subNav?.rows[0] ?? [];
@@ -401,9 +403,9 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
         if (absVx > 0.35 && absVx > absVy) {
           // Column flick: advance 1 to 3 columns
           const colStep = Math.sign(velX) * Math.min(3, Math.max(1, Math.round(absVx * 1.6)));
-          const targetCol = scene.selectedCol + colStep;
-          const candidate = face.find(s => s.col === targetCol && s.shelfIdx === scene.selectedShelf)
-            || face.find(s => s.col === targetCol);
+          const current = face.find(s => s.col === scene.selectedCol && s.shelfIdx === scene.selectedShelf
+            && (isFixture || s.unitIdx === scene.selectedUnitIdx));
+          const candidate = current && mobileFlickTarget(face, current, colStep, 0, scene.selectedSide === 'back');
           if (candidate) {
             selectSlot(scene, candidate);
             scene.onSelectionChange?.(candidate.movie);
@@ -411,9 +413,9 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
         } else if (absVy > 0.35 && absVy > absVx) {
           // Row flick: advance 1 or 2 shelves
           const shelfStep = Math.sign(velY) * (absVy > 0.8 ? 2 : 1);
-          const targetShelf = scene.selectedShelf + shelfStep;
-          const candidate = face.find(s => s.shelfIdx === targetShelf && s.col === scene.selectedCol)
-            || face.find(s => s.shelfIdx === targetShelf);
+          const current = face.find(s => s.col === scene.selectedCol && s.shelfIdx === scene.selectedShelf
+            && (isFixture || s.unitIdx === scene.selectedUnitIdx));
+          const candidate = current && mobileFlickTarget(face, current, 0, shelfStep);
           if (candidate) {
             selectSlot(scene, candidate);
             scene.onSelectionChange?.(candidate.movie);
