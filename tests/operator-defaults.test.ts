@@ -83,7 +83,7 @@ test('only the endpoints the store itself calls may spend the operator credentia
 
   assert.ok(allowed('jellyseerr', 'GET', 'http://seerr:5055/api/v1/discover/trending?page=1'));
   assert.ok(allowed('jellyseerr', 'GET', 'http://seerr:5055/api/v1/movie/603'));
-  assert.ok(allowed('jellyseerr', 'POST', 'http://seerr:5055/api/v1/request'), '"Order it for me"');
+  assert.ok(!allowed('jellyseerr', 'POST', 'http://seerr:5055/api/v1/request'), 'shared credentials never create requests');
   assert.ok(!allowed('jellyseerr', 'POST', 'http://seerr:5055/api/v1/request/7/approve'), 'not approval');
   assert.ok(!allowed('jellyseerr', 'GET', 'http://seerr:5055/api/v1/user'), 'not the user list');
   assert.ok(!allowed('jellyseerr', 'GET', 'http://seerr:5055/api/v1/settings/main'));

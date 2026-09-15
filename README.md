@@ -271,6 +271,33 @@ For hardware that should not render the 3D room, **2.5D mode** presents the
 same libraries and cases as HTML and CSS. It is the practical Raspberry Pi and
 older-browser route, not a separate catalog.
 
+## Hosting security
+
+Upgrade to **v0.19.1 or later** and restart the server or recreate the container.
+The integration proxy now accepts only operator-configured service URLs. Shared
+Jellyseerr credentials provide read-only catalog access; creating a movie request
+requires the visitor's own upstream credentials. Connection checks and request
+acknowledgments do not return account details, and catalog responses omit private
+upstream fields. Redirects are refused; configure the final service URL directly.
+
+For a browser connection using your own credentials, the server operator must
+allow its base URL in `HALCYON_PROXY_ALLOWED_URLS` (comma-separated absolute
+HTTP/HTTPS URLs, optionally including a base path). This does not supply any
+credentials or grant write access with the shared server key. Native desktop
+connections continue to use their existing direct transport.
+
+Playback controls, F8 feedback storage, and Remote Play endpoints now default to
+direct loopback access. `HALCYON_TRUSTED_NETWORK_CONTROLS=1` restores network
+access **only for a trusted private installation**. These controls have no
+application login: never enable that setting on a publicly reachable instance.
+Public reverse proxies must block these endpoints and must replace incoming
+`Forwarded`/`X-Forwarded-*` headers with their own forwarding metadata. Keep
+server credentials in `HALCYON_*` runtime settings, never public `VITE_*` bundles.
+
+Thank you to [Gibbeth (t-nician)](https://github.com/t-nician) for privately
+reporting the unauthenticated requests, response-data exposure, and unrestricted
+proxy destination issues that led to this security update.
+
 ## Updating
 
 | Installation | Update command |

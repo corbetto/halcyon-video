@@ -90,10 +90,9 @@ export function readOperatorEnv(env: Record<string, string | undefined>): Operat
   const out: OperatorEnvConfig = {};
   for (const id of Object.keys(ENV_PREFIXES) as OperatorServiceId[]) {
     for (const prefix of ENV_PREFIXES[id]) {
-      const url = (env[`${prefix}_URL`] || '').trim();
+      const url = publicServerUrl(env[`${prefix}_URL`]);
       const apiKey = (env[`${prefix}_APIKEY`] || env[`${prefix}_API_KEY`] || '').trim();
       if (!url || !apiKey) continue;
-      if (!/^https?:\/\//i.test(url)) continue; // a bare host can't be a proxy target
       out[id] = { url: url.replace(/\/+$/, ''), apiKey };
       break;
     }
@@ -131,6 +130,7 @@ export function targetBelongsTo(target: string, baseUrl: string): boolean {
   } catch {
     return false;
   }
+  if (t.username || t.password || t.hash || /[%\\]/.test(t.pathname)) return false;
   if (t.protocol !== b.protocol || t.host !== b.host) return false;
   const basePath = b.pathname.replace(/\/+$/, '');
   if (!basePath) return true;
@@ -156,41 +156,25 @@ export function operatorServiceForTarget(
 // user list, approve requests. These are the endpoints the store itself calls,
 // and nothing else; a store feature that needs a new endpoint adds it here
 // deliberately.
-const OPERATOR_ALLOWED: Record<OperatorServiceId, { GET: RegExp; POST?: RegExp }> = {
-  // Reads of the game catalog and its artwork. Not /api/users, /api/config, …
-  romm: { GET: /^\/(?:api\/(?:platforms|roms|collections|stats)(?:\/|$|\?)|assets\/)/ },
-  jellyseerr: {
-    GET: /^\/api\/v1\/(?:auth\/me(?:\?|$)|request(?:\/|\?|$)|movie\/|collection\/|discover\/|watchproviders\/)/,
-    // "Order it for me" — the clerk's whole reason for existing on a hosted
-    // store. Creating a request is the one thing a visitor may WRITE, and it
-    // is the COLLECTION endpoint exactly: /api/v1/request/<id>/approve is a
-    // POST too, and letting a visitor approve their own order (or anyone
-    // else's) on the operator's server is not the same favour at all.
-    POST: /^\/api\/v1\/request(?:\?|$)/,
-  },
+// Shared credentials are strictly read-only. Visitors must authenticate to their
+// own service to submit requests; a browser session is not upstream permission.
+const OPERATOR_ALLOWED: Record<OperatorServiceId, RegExp> = {
+  romm: /^\/(?:api\/(?:platforms|roms|collections|stats)(?:\/\d+)?|assets\/romm\/resources\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp))$/,
+  jellyseerr: /^\/api\/v1\/(?:auth\/me|request|movie\/\d+(?:\/(?:recommendations|similar|watchproviders))?|collection\/\d+|discover\/(?:movies|trending)|watchproviders\/movies)$/,
 };
 
-/**
- * May this request ride the operator's credential? `target` is the full URL;
- * only its path + query are matched, so a query string can't smuggle a path.
- */
+/** Match the canonical path relative to the configured service base. */
 export function operatorRequestAllowed(
-  service: OperatorServiceId,
-  method: string,
-  target: string
+  service: OperatorServiceId, method: string, target: string, baseUrl?: string
 ): boolean {
-  let pathAndQuery: string;
+  if (!['GET', 'HEAD'].includes(method.toUpperCase())) return false;
   try {
     const u = new URL(target);
-    pathAndQuery = `${u.pathname}${u.search}`;
-  } catch {
-    return false;
-  }
-  const rules = OPERATOR_ALLOWED[service];
-  const verb = String(method || 'GET').toUpperCase();
-  if (verb === 'GET' || verb === 'HEAD') return rules.GET.test(pathAndQuery);
-  if (verb === 'POST' && rules.POST) return rules.POST.test(pathAndQuery);
-  return false;
+    if (u.username || u.password || u.hash || /[%\\]/.test(u.pathname)) return false;
+    if (baseUrl && !targetBelongsTo(target, baseUrl)) return false;
+    const basePath = baseUrl ? new URL(baseUrl).pathname.replace(/\/+$/, '') : '';
+    return OPERATOR_ALLOWED[service].test(u.pathname.slice(basePath.length));
+  } catch { return false; }
 }
 
 /**
