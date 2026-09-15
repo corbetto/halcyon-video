@@ -185,6 +185,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   // and centered on its stall. A box fallback keeps a stall from going empty
   // if a model ever fails to fetch.
   const carGroup = new THREE.Group();
+  carGroup.name = 'parked-cars';
   group.add(carGroup);
   // Keep five vehicles, distributed across actual front and side spaces.
   const farSpaces = plan.spaces.filter(s => s.z > plan.farRowZ);
@@ -192,8 +193,13 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   const carSpaces = [farSpaces[1], farSpaces[farSpaces.length - 2],
     plan.spaces[0], sideSpaces[0], sideSpaces[3]].filter(Boolean);
   const carYaws = [0.03, -0.02, 0.015, -0.035, 0.01]; // barely-there parking-job imperfection
-  const CAR_MODELS = ['models/car_sedan.glb', 'models/car_hatchback.glb', 'models/car_sports.glb'].map(assetUrl);
-  const CAR_LEN = 9.0; // target bounding-box length (longer horizontal axis) in scene units
+  // World units are feet, like the 9-by-18-foot bays. Keep the compact
+  // hatchback shorter than the sedan, with each model's proportions intact.
+  const CAR_MODELS = [
+    { url: assetUrl('models/car_sedan.glb'), length: 16 },
+    { url: assetUrl('models/car_hatchback.glb'), length: 14 },
+    { url: assetUrl('models/car_sports.glb'), length: 15.5 },
+  ];
   const carLoader = new GLTFLoader();
 
   // Shared soft contact-shadow under each car: the sun shadow alone left the
@@ -206,32 +212,36 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   }), 'shadow'));
 
   carSpaces.forEach((space, i) => {
+    const { url, length: carLength } = CAR_MODELS[i % CAR_MODELS.length];
     const stall = new THREE.Group();
+    stall.name = `parked-car-${i}`;
     stall.position.set(space.x, -.09, space.z);
     stall.rotation.y = space.yaw + carYaws[i % carYaws.length];
     carGroup.add(stall);
 
-    const carShadow = new THREE.Mesh(new THREE.PlaneGeometry(5.2, CAR_LEN * 1.02), carShadowMat);
+    const carShadow = new THREE.Mesh(track(new THREE.PlaneGeometry(1, 1)), carShadowMat);
+    carShadow.scale.set(carLength * .43 + .6, carLength + .4, 1);
     carShadow.rotation.x = -Math.PI / 2;
     carShadow.position.y = 0.01; // just proud of the asphalt plane
     stall.add(carShadow);
 
-    const url = CAR_MODELS[i % CAR_MODELS.length];
     carLoader.load(
       url,
       (gltf) => {
         const model = gltf.scene;
-        // Normalize scale: fit the longer horizontal axis to CAR_LEN, and rotate
+        // Normalize scale: fit the longer horizontal axis to its target length, and rotate
         // so that length runs along Z (nose pointing toward/away from the store).
         let box = new THREE.Box3().setFromObject(model);
         const size = new THREE.Vector3();
         box.getSize(size);
         const longAxisIsX = size.x >= size.z;
         const currentLen = Math.max(size.x, size.z) || 1;
-        model.scale.setScalar(CAR_LEN / currentLen);
+        model.scale.setScalar(carLength / currentLen);
         if (longAxisIsX) model.rotation.y = Math.PI / 2;
         // Re-measure post-transform to seat on the ground and center on the stall.
         box = new THREE.Box3().setFromObject(model);
+        box.getSize(size);
+        carShadow.scale.set(size.x + .6, size.z + .4, 1);
         const center = new THREE.Vector3();
         box.getCenter(center);
         model.position.x -= center.x;
@@ -275,8 +285,8 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
           color: CAR_COLORS[i % CAR_COLORS.length], roughness: 0.5, metalness: 0.3,
           envMapIntensity: 0.22, // async fallback — same exterior clamp as the GLB path
         }));
-        const body = new THREE.Mesh(track(new THREE.BoxGeometry(4.0, 2.2, CAR_LEN)), mat);
-        body.position.y = 1.1;
+        const body = new THREE.Mesh(track(new THREE.BoxGeometry(carLength * .43, carLength * .3, carLength)), mat);
+        body.position.y = carLength * .15;
         body.castShadow = true;
         body.receiveShadow = true;
         stall.add(body);

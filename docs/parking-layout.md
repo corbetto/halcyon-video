@@ -11,6 +11,9 @@ choices, not a surveyed property or a claim of accessibility compliance.
 - A rounded grass verge separates the outer row from a five-foot public sidewalk.
 - A 24-foot driveway at the right reaches the street without a raised curb across it.
 - Five existing cars occupy actual spaces, and the two lamps stand in the verge.
+  Cars use real-world lengths: 16 feet for the sedan, 14 for the hatchback and
+  15.5 for the sports car. Models retain their proportions; contact shadows
+  follow their measured footprints, and loading fallbacks use the same lengths.
 
 `parking-layout.ts` is the shared dimension and placement source;
 `parking-lot.ts` batches static surfaces by material. No per-frame work or new
