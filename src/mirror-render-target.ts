@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mirrorViewport, cropMirrorProjection } from './mirror-view.ts';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 
 /**
@@ -20,6 +21,10 @@ export class MirrorRenderTarget {
   private adapter: THREE.WebGLRenderer | null = null;
   private destination: THREE.WebGLRenderTarget | null = null;
   private didRender = false;
+  private panels: readonly THREE.Mesh[] = [];
+  private readonly viewport = new THREE.Vector4();
+  private readonly projection = new THREE.Matrix4();
+  private readonly projectionInverse = new THREE.Matrix4();
   private readonly targets = new Set<THREE.WebGLRenderTarget>();
   private targetsNeedInit = true;
   private readonly contextRestored = () => { this.targetsNeedInit = true; };
@@ -39,7 +44,8 @@ export class MirrorRenderTarget {
 
   render(renderer: THREE.WebGLRenderer, target: THREE.WebGLRenderTarget,
          draw: (...args: any[]) => void,
-         scene: THREE.Scene, camera: THREE.Camera): void {
+         scene: THREE.Scene, camera: THREE.Camera, panels: readonly THREE.Mesh[] = []): void {
+    this.panels = panels;
     this.prepare(target);
     const samples = this.samples.get(target)!;
     if (!this.scratch || this.scratch.samples !== samples ||
@@ -60,6 +66,26 @@ export class MirrorRenderTarget {
       // Only Reflector's explicit target selection is redirected. Renderer
       // internals and other effects keep the real renderer and its state.
       this.adapter = Object.create(renderer) as THREE.WebGLRenderer;
+      this.adapter.render = (world, reflected) => {
+        const scratch = this.scratch!;
+        if (!this.panels.length) { renderer.render(world, reflected); return; }
+        mirrorViewport(this.panels, reflected, scratch.width, scratch.height, this.viewport);
+        if (this.viewport.z === 0 || this.viewport.w === 0) { this.didRender = false; return; }
+        this.projection.copy(reflected.projectionMatrix);
+        this.projectionInverse.copy(reflected.projectionMatrixInverse);
+        cropMirrorProjection(reflected.projectionMatrix, this.viewport, scratch.width, scratch.height);
+        reflected.projectionMatrixInverse.copy(reflected.projectionMatrix).invert();
+        scratch.viewport.copy(this.viewport);
+        scratch.scissor.copy(this.viewport); scratch.scissorTest = true;
+        renderer.setRenderTarget(scratch);
+        try { renderer.render(world, reflected); }
+        finally {
+          reflected.projectionMatrix.copy(this.projection);
+          reflected.projectionMatrixInverse.copy(this.projectionInverse);
+          scratch.viewport.set(0, 0, scratch.width, scratch.height);
+          scratch.scissorTest = false;
+        }
+      };
       this.adapter.setRenderTarget = (next, face, level) => {
         if (next === this.destination) {
           this.didRender = true;
@@ -85,6 +111,9 @@ export class MirrorRenderTarget {
         // Leaving the workspace resolves MSAA, then the GPU copies the same
         // HDR texels into this mirror's persistent texture. No CPU readback.
         this.copyMaterial.uniforms.source.value = this.scratch.texture;
+        if (this.panels.length) {
+          target.scissor.copy(this.viewport); target.scissorTest = true;
+        }
         renderer.setRenderTarget(target);
         // texelFetch preserves exact half-float pixels. Unlike r184's
         // copyTextureToTexture helper, this path also survives context restore:
@@ -92,6 +121,7 @@ export class MirrorRenderTarget {
         this.copyQuad.render(renderer);
       }
     } finally {
+      target.scissorTest = false;
       this.destination = null;
       renderer.xr.enabled = xr;
       renderer.shadowMap.autoUpdate = shadowUpdate;
