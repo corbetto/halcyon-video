@@ -5,6 +5,15 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.20.1] — 2026-09-15
+
+### CHANGELOG
+- V0.20.0
+
+### General
+- Fix movie requests for signed-in Jellyfin users
+- Ci: stop generating Reddit release drafts
+
 ## [v0.20.0] — 2026-09-15
 
 ### CHANGELOG
