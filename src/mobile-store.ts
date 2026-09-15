@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { mobileFlickTarget } from './mobile-flick.ts';
 import { OVERVIEW_POS } from './scene-shared.ts';
 import { BACK_WALL_UNIT_IDX, BROWSE_WINDOW_SIZE, type MovieSlot } from './store-layout.ts';
-import { handleStreamingBackTap, cancelStreamingServiceChoice } from './streaming-checkout.ts';
+import { handleStreamingCaseHit, cancelStreamingServiceChoice } from './streaming-checkout.ts';
 import { subNavSelect } from './store-subnav.ts';
 import type { StoreScene } from './three-scene.ts';
 
@@ -158,7 +158,7 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
   for (const hit of hits) {
     if (!hit.object.visible) continue;
     if (scene.mode === 'inspect' && (hit.object === scene.heroFrontMesh || hit.object === scene.heroBackMesh)) {
-      if (scene.heroBackMesh && hit.object === scene.heroBackMesh && hit.uv && handleStreamingBackTap(scene, hit.uv)) {
+      if (handleStreamingCaseHit(scene, hit)) {
         return true;
       }
       return false;

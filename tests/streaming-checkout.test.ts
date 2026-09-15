@@ -11,6 +11,8 @@ import {
   confirmStreamingServiceChoice,
   cancelStreamingServiceChoice,
   drawStreamingChoiceOverlays,
+  drawStreamingChoiceBack,
+  handleStreamingCaseHit,
   getStreamingCheckoutMovie,
   clearStreamingCheckoutMovie,
   setStreamingStockResolver,
@@ -485,3 +487,70 @@ test('mobileStoreTap: switching slots or touching outside cancels active streami
   assert.equal(scene.mode, 'browse');
 });
 
+
+
+test('retail service face shares its scaled row coordinates with pointer selection', () => {
+  const scene = createMockScene();
+  const movie = createMockMovie();
+  const texts: string[] = [];
+  const scales: number[][] = [];
+  const fills: any[] = [];
+  const ctx: any = { save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
+    scale: (...v: number[]) => scales.push(v),
+    fillRect: (...v: number[]) => fills.push([ctx.fillStyle, ...v]),
+    fillText: (text: string) => texts.push(text) };
+  assert.equal(drawStreamingChoiceBack(ctx, 640, 960, movie), false);
+  assert.deepEqual(texts, [], 'ordinary inspection keeps service names hidden');
+  startStreamingServiceChoice(scene, movie);
+  getStreamingChoiceState(scene)!.services.push({ id: 'prime', name: 'AMAZON PRIME VIDEO' });
+  assert.equal(drawStreamingChoiceBack(ctx, 640, 960, movie), true);
+  assert.deepEqual(scales, [[640 / 480, 960 / 768]]);
+  assert.deepEqual(fills, [['#f3eadb', 0, 0, 640, 960]]);
+  assert.ok(texts.includes('CHECKOUT — SELECT SERVICE'));
+  assert.ok(texts.some(text => text.includes('AMAZON PRIME VIDEO')));
+  const front: any = { visible: true }, rental: any = { visible: true };
+  scene.heroFrontMesh = front; scene.heroBackMesh = rental;
+  const hit: any = { object: front, face: { materialIndex: 5 }, uv: { x: .5, y: 1 - 250 / 768 } };
+  assert.equal(handleStreamingCaseHit(scene, hit), true);
+  assert.equal(getStreamingChoiceState(scene)!.selectedIndex, 1);
+  assert.equal(handleStreamingCaseHit(scene, { ...hit, uv: { x: .5, y: .99 } }), true,
+    'blank back space is consumed before actor handling');
+  for (const invalid of [
+    { ...hit, face: { materialIndex: 4 } }, { ...hit, uv: undefined },
+    { ...hit, object: { visible: true } },
+  ]) assert.equal(handleStreamingCaseHit(scene, invalid), false);
+  front.visible = false;
+  assert.equal(handleStreamingCaseHit(scene, hit), false);
+  front.visible = true;
+  scene.isFlipped = false;
+  assert.equal(handleStreamingCaseHit(scene, hit), false);
+  scene.isFlipped = true;
+  assert.equal(handleStreamingCaseHit(scene, { ...hit, object: rental }), true);
+  assert.equal(scene.mode, 'checkout');
+  assert.equal(movie.streamingServiceId, 'prime');
+});
+
+test('cancel removes the service face and prevents stale case taps', () => {
+  const scene = createMockScene(), movie = createMockMovie();
+  startStreamingServiceChoice(scene, movie);
+  cancelStreamingServiceChoice(scene);
+  assert.equal(drawStreamingChoiceBack({} as any, 640, 960, movie), false);
+  assert.equal(handleStreamingCaseHit(scene, { object: {} } as any), false);
+});
+
+
+test('settled service faces repaint on start, arrow selection, row selection and cancel', () => {
+  const paints: (number | null)[] = [];
+  const scene = createMockScene();
+  scene.updateBackCoverHighlight = () => paints.push(getStreamingChoiceState(scene)?.selectedIndex ?? null);
+  const movie = createMockMovie({ streamingServices: [
+    { id: 'netflix', name: 'NETFLIX' }, { id: 'prime', name: 'PRIME' },
+  ] });
+  startStreamingServiceChoice(scene, movie);
+  stepStreamingServiceChoice(scene, 1);
+  const ctx: any = {save(){},restore(){},fillRect(){},scale(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},fillText(){}};
+  drawStreamingChoiceBack(ctx, 640, 960, movie);
+  handleStreamingBackTap(scene, { x: .5, y: 1-220/768 } as any);
+  cancelStreamingServiceChoice(scene);
+  assert.deepEqual(paints, [0, 1, 0, null]);
+});

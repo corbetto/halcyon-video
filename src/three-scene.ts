@@ -144,7 +144,7 @@ import { StorefrontLogo3D } from './logo-storefront';
 import { retailAudio } from './audio';
 import { clearActiveSignage } from './fixtures/signage';
 import { CarriedTapes, CarryPose, showClerkToast, disposeClerkToast } from './carried-tapes';
-import { getStreamingCheckoutMovie, clearStreamingCheckoutMovie, cancelStreamingServiceChoice } from './streaming-checkout';
+import { getStreamingCheckoutMovie, clearStreamingCheckoutMovie, cancelStreamingServiceChoice, handleStreamingCaseHit } from './streaming-checkout';
 import { BackRoom, disposeBackRoomFade } from './back-room';
 import { RentalRecord, loadRentalRecord, clearRentalRecord, isLockedOut, formatUnlockLabel } from './rental-clock';
 import { perfTrace, perfSlot } from './perf-trace';
@@ -5678,6 +5678,12 @@ export class StoreScene {
     const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
     this._raycaster.setFromCamera(this._mouse.set(x, y), this.camera);
+
+    if (this.mode === 'inspect' && this.isFlipped) {
+      const meshes = [this.heroFrontMesh, this.heroBackMesh].filter((m): m is THREE.Mesh => !!m && m.visible);
+      const hit = this._raycaster.intersectObjects(meshes, false)[0];
+      if (hit && handleStreamingCaseHit(this, hit)) return;
+    }
 
     // 0a. Cast/crew name taps on the inspected retail case's back cover: the
     // hero front mesh carries the movie's real back artwork whose clickable

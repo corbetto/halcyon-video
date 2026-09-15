@@ -132,6 +132,7 @@ export function startStreamingServiceChoice(scene: StoreScene, movie: Movie): bo
 
   try { retailAudio.playBoxFlip(); } catch {}
   scene.onConsoleLog(`[System] Checkout: select a streaming service for "${movie.title}".`, 'system');
+  scene.updateBackCoverHighlight?.();
   scene.requestRender();
   return true;
 }
@@ -142,6 +143,7 @@ export function stepStreamingServiceChoice(scene: StoreScene, dir: number): bool
 
   state.selectedIndex = (state.selectedIndex + dir + state.services.length) % state.services.length;
   try { retailAudio.playKeyClick(); } catch {}
+  scene.updateBackCoverHighlight?.();
   scene.requestRender();
   return true;
 }
@@ -191,6 +193,7 @@ export function cancelStreamingServiceChoice(scene: StoreScene): boolean {
   scene.isFlipped = false;
   scene.heroFace = 0;
   scene.heroSpine = false;
+  scene.updateBackCoverHighlight?.();
   scene.requestRender();
   return true;
 }
@@ -278,6 +281,27 @@ export function drawStreamingChoiceOverlays(
   ctx.restore();
 }
 
+/** Paint the visible retail face using the same 768-high coordinates as taps. */
+export function drawStreamingChoiceBack(ctx: CanvasRenderingContext2D, w: number, h: number, movie: Movie): boolean {
+  if (!isStreamingChoiceActive(movie)) return false;
+  ctx.save();
+  ctx.fillStyle = '#f3eadb';
+  ctx.fillRect(0, 0, w, h);
+  ctx.scale(w / 480, h / 768);
+  drawStreamingChoiceOverlays(ctx, { dvd2003: true }, movie);
+  ctx.restore();
+  return true;
+}
+
+/** Both pointer paths must hit the actual back face, never a hidden shell. */
+export function handleStreamingCaseHit(scene: StoreScene, hit: Pick<THREE.Intersection, 'object' | 'face' | 'uv'>): boolean {
+  if (scene.mode !== 'inspect' || !scene.isFlipped || !activeChoices.has(scene)
+    || !hit.object.visible || hit.face?.materialIndex !== 5 || !hit.uv
+    || (hit.object !== scene.heroFrontMesh && hit.object !== scene.heroBackMesh)) return false;
+  handleStreamingBackTap(scene, hit.uv);
+  return true; // Consume blank space too; it must never activate cast underneath.
+}
+
 /**
  * Hit test a pointer click/tap on the back cover against the service rows.
  */
@@ -299,6 +323,7 @@ export function handleStreamingBackTap(scene: StoreScene, uv: THREE.Vector2): bo
     } else {
       state.selectedIndex = hitRow.index;
       try { retailAudio.playKeyClick(); } catch {}
+      scene.updateBackCoverHighlight?.();
       scene.requestRender();
     }
     return true;
