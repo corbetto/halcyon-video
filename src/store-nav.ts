@@ -269,6 +269,11 @@ export function moveLeftInternal(scene: StoreScene) {
     scene.moveEndcapSelection(-1, 0);
   } else if (scene.mode === 'browse') {
     if (scene.selectedUnitSource === 'fixture') {
+      if (scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind === 'release-cart') {
+        scene.selectedCol = (scene.selectedCol - 1 + scene.colsCount) % scene.colsCount;
+        scene.updateCameraTarget();
+        return;
+      }
       // Four-sided fixtures lay their columns out LEFT-to-RIGHT on screen:
       // four-sided-display/bargain-bin all bake
       // `localX = (col - centre) * pitch`, and world +localX is the viewer's
@@ -449,6 +454,11 @@ export function moveRightInternal(scene: StoreScene) {
     scene.moveEndcapSelection(1, 0);
   } else if (scene.mode === 'browse') {
     if (scene.selectedUnitSource === 'fixture') {
+      if (scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind === 'release-cart') {
+        scene.selectedCol = (scene.selectedCol + 1 + scene.colsCount) % scene.colsCount;
+        scene.updateCameraTarget();
+        return;
+      }
       // (#44) Fixture columns are laid out RIGHT-to-LEFT on screen (see
       // moveLeftInternal), so stepping to the viewer's RIGHT means
       // DECREMENTING col.
