@@ -50,3 +50,27 @@ test('resize follows the mirror aspect ratio and exceptions restore renderer sta
   assert.throws(()=>pool.render(r.renderer,target,draw,new THREE.Scene(),new THREE.PerspectiveCamera()),/draw failed/);
   pool.dispose();target.dispose();previous.dispose();
 });
+test('cropped render failures restore projection, viewport and renderer state', () => {
+  const pool=new MirrorRenderTarget(),r=rig(),target=new THREE.WebGLRenderTarget(512,512,{samples:4});
+  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(60,1,.1,100);
+  camera.position.z=5;camera.updateMatrixWorld();
+  const panel=new THREE.Mesh(new THREE.PlaneGeometry(2,.3));panel.updateMatrixWorld();
+  const projection=camera.projectionMatrix.clone(),inverse=camera.projectionMatrixInverse.clone();
+  const previous=new THREE.WebGLRenderTarget(8,8);r.renderer.setRenderTarget(previous);
+  r.renderer.render=()=>{
+    const scratch=r.renderer.getRenderTarget()!;
+    assert.ok(scratch.scissorTest);
+    assert.ok(scratch.viewport.w<512/4);
+    assert.notDeepEqual(camera.projectionMatrix.elements,projection.elements);
+    throw Error('cropped draw failed');
+  };
+  assert.throws(()=>pool.render(r.renderer,target,renderer=>{
+    renderer.setRenderTarget(target);renderer.render(scene,camera);
+  },scene,camera,[panel]),/cropped draw failed/);
+  assert.deepEqual(camera.projectionMatrix.elements,projection.elements);
+  assert.deepEqual(camera.projectionMatrixInverse.elements,inverse.elements);
+  assert.equal(r.renderer.getRenderTarget(),previous);
+  assert.equal(target.scissorTest,false);
+  assert.ok(r.selected.filter(t=>t.samples===4).every(t=>!t.scissorTest&&t.viewport.w===512));
+  pool.dispose();panel.geometry.dispose();target.dispose();previous.dispose();
+});

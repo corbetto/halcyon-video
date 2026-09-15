@@ -3,6 +3,7 @@
 // Box projection was rejected in an earlier trial because interior furniture
 // stretched onto the room shell. This option deliberately uses plain probes.
 import * as THREE from 'three';
+import { coplanarMirrorGroups } from './mirror-view';
 import { MirrorRenderTarget } from './mirror-render-target';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { reflectionProbes } from './case-env-probes';
@@ -33,7 +34,7 @@ export function disposeMirrorTargets(scene: StoreScene): void {
   states.delete(scene);
 }
 export type MirrorEntry = MirrorScheduleEntry & {
-  r: any; original: (...a: any[]) => void; rendered: boolean;
+  material: THREE.ShaderMaterial; group: MirrorEntry[]; panels: THREE.Mesh[]; r: any; original: (...a: any[]) => void; rendered: boolean;
 };
 
 let proxyMat: THREE.MeshStandardMaterial | null = null;
@@ -47,6 +48,8 @@ const viewFrustum = new THREE.Frustum();
 const guardFrustum = new THREE.Frustum();
 const projection = new THREE.Matrix4();
 const viewProjection = new THREE.Matrix4();
+const sharedTextureMatrix = new THREE.Matrix4();
+const inverseMirrorWorld = new THREE.Matrix4();
 const bounds = new THREE.Box3();
 const normal = new THREE.Vector3();
 const centre = new THREE.Vector3();
@@ -135,8 +138,17 @@ export function renderMirrorsAhead(scene: StoreScene) {
       perfTrace.count(CT_MIRROR);
       perfTrace.begin(SP_MIRROR);
       try {
-        state.targets.render(scene.renderer, m.r.getRenderTarget(), m.original, scene.scene, state.camera);
-        m.dirty = false; m.rendered = true; m.urgent = false; m.lastRefresh = state.frame;
+        state.targets.render(scene.renderer, m.r.getRenderTarget(), m.original, scene.scene, state.camera, m.panels);
+        m.r.material.uniforms.tDiffuse.value = m.r.getRenderTarget().texture;
+        sharedTextureMatrix.copy(m.r.material.uniforms.textureMatrix.value)
+          .multiply(inverseMirrorWorld.copy(m.r.matrixWorld).invert());
+        for (const peer of m.group) {
+          if (peer !== m) {
+            peer.material.uniforms.tDiffuse.value = m.r.getRenderTarget().texture;
+            peer.material.uniforms.textureMatrix.value.multiplyMatrices(sharedTextureMatrix, peer.r.matrixWorld);
+          }
+          peer.dirty = false; peer.rendered = true; peer.urgent = false; peer.lastRefresh = state.frame;
+        }
         scene.mirrorCursor = (index + 1) % scene.mirrors.length;
       } finally {
         perfTrace.end(SP_MIRROR);
@@ -200,11 +212,15 @@ export function installMirrorThrottle(scene: StoreScene) {
     } else {
       state.targets.prepare(obj.getRenderTarget());
       scene.mirrors.push({
-        r: obj, original, dirty: true, rendered: false, visible: false,
+        material: obj.material as THREE.ShaderMaterial, group: [], panels: [obj], r: obj, original, dirty: true, rendered: false, visible: false,
         near: false, wasVisible: false, urgent: false, lastRefresh: -Infinity,
       });
     }
   });
+  for (const group of coplanarMirrorGroups(scene.mirrors)) {
+    const panels = group.map(m => m.r);
+    for (const m of group) { m.group = group; m.panels = panels; }
+  }
   // Start against this scene's live environment. Probes are assigned on its
   // first update after its own bake, never from the previous scene's targets.
   state.probes = reflectionProbes;
