@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// Fans one release announcement out to Discord, Mastodon, Bluesky, and X, and
-// writes a Reddit-ready draft for the owner to post by hand (issue #105).
+// Fans one release announcement out to Discord, Mastodon, Bluesky, and X
+// (issue #105).
 //
 //   node tools/announce-fanout.mjs discord --tag v0.9.0 --screenshot shot.png
-//   node tools/announce-fanout.mjs reddit-draft --tag v0.9.0 --out draft.md
 //
 // Every network channel is independent and fails soft: a dead integration
 // logs a ::warning:: and this process still exits 0, so one broken channel
@@ -29,12 +28,6 @@
 // notes.", which is nonsense to a reader and advertised a REVERT as a
 // feature. So (3) now also refuses internal work outright, and stays a
 // fallback for a tag someone forgot to describe.
-//
-// Reddit is never auto-posted (owner ruling, GH #105): the value on Reddit
-// is the comment thread underneath, which no webhook can hold up, and
-// Reddit's closed OAuth-app registration means an approval ticket must never
-// gate the rest of the fan-out. reddit-draft only writes a file; announce.yml
-// attaches it to the GitHub Release as a plain asset.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,14 +47,13 @@ function git(args) {
 
 function parseArgs(argv) {
   const [channel, ...rest] = argv;
-  const opts = { channel, tag: null, screenshot: null, repo: DEFAULT_REPO, out: null, blurb: null };
+  const opts = { channel, tag: null, screenshot: null, repo: DEFAULT_REPO, blurb: null };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--tag') opts.tag = rest[++i];
     else if (a === '--blurb') opts.blurb = rest[++i];
     else if (a === '--screenshot') opts.screenshot = rest[++i];
     else if (a === '--repo') opts.repo = rest[++i];
-    else if (a === '--out') opts.out = rest[++i];
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else { console.error(`announce-fanout: unknown option ${a}`); process.exit(2); }
   }
@@ -74,10 +66,9 @@ function printHelp() {
   console.error([
     'Usage: node tools/announce-fanout.mjs <channel> --tag <vX.Y.Z> [options]',
     '',
-    '  channel                one of: discord, mastodon, bluesky, x, reddit-draft',
+    '  channel                one of: preview, discord, mastodon, bluesky, x',
     '  --screenshot <path>    release screenshot, PNG or JPEG (optional, best-effort)',
     '  --repo <owner/name>    default: halcyon-video/halcyon-video',
-    '  --out <path>           reddit-draft: where to write the draft (required)',
   ].join('\n'));
 }
 
@@ -484,34 +475,6 @@ async function channelX(opts, ann) {
   console.log('announce-fanout: posted to X');
 }
 
-function channelRedditDraft(opts, ann) {
-  if (!opts.out) { console.error('announce-fanout: reddit-draft needs --out <path>'); process.exit(2); }
-  const highlights = commitHighlights(opts.tag).slice(0, 4);
-  const parts = [
-    `**${ann.title} — ${ann.blurb}**`,
-    '',
-    'Halcyon Video is an open-source (GPL), self-hosted app that renders your own\n' +
-    'Jellyfin or Plex library as a walkable 90s/2000s video rental store — browse\n' +
-    'shelves, flip boxes, rent tapes, the whole bit.',
-  ];
-  if (highlights.length) parts.push('', highlights.map((h) => `- ${h}`).join('\n'));
-  parts.push(
-    '',
-    `Try it in a browser, no server needed: ${ann.url}`,
-    `Source: https://github.com/${opts.repo}`,
-    '',
-    '---',
-    '',
-    'Posting notes (do not automate — see GH #105):',
-    '- Post to ONE subreddit at a time, never a crosspost sweep.',
-    '- Stay in the thread for about an hour after posting.',
-    '- Suggested order: r/selfhosted (F/LOSS-exempt from the promo rule), r/jellyfin, r/plex, r/homelab.',
-    '- Reserve this for real milestones, not every tag.',
-  );
-  fs.writeFileSync(opts.out, `${parts.join('\n')}\n`);
-  console.log(`announce-fanout: wrote Reddit draft to ${opts.out}`);
-}
-
 // ---- main ---------------------------------------------------------------
 
 /**
@@ -542,7 +505,6 @@ const CHANNELS = {
   mastodon: channelMastodon,
   bluesky: channelBluesky,
   x: channelX,
-  'reddit-draft': channelRedditDraft,
 };
 
 async function main() {

@@ -2,8 +2,7 @@
 # screenshot — and lands a matching CHANGELOG.md entry on master, with no
 # human action, every time a version tag is pushed. Once the Release exists,
 # fans the same artifact (a short blurb + the screenshot + the demo link) out
-# to Discord, Mastodon, Bluesky and X, and drops a Reddit-ready draft on the
-# Release as a plain file — never auto-posted, see issue #105.
+# to Discord, Mastodon, Bluesky and X (issue #105).
 #
 # Why this exists (issue #104): tags ran to v0.8.1 while the newest Release
 # page still said v0.6.2 — Releases is the only subscribe button this project
@@ -23,7 +22,7 @@
 # below runs with continue-on-error so a dead Discord webhook, an expired
 # Mastodon token, or a rotated X refresh token never blocks the others or the
 # release itself. A channel with no secret configured just no-ops — see that
-# script's header for the full contract. Reddit is drafted, never posted.
+# script's header for the full contract.
 name: Announce a release
 
 on:
@@ -249,23 +248,6 @@ jobs:
       # ---- fan-out (issue #105) ------------------------------------------
       # Everything below only runs once the Release above actually exists,
       # and every step is independently soft-failing — see the file header.
-
-      - name: Write the Reddit draft
-        continue-on-error: true
-        run: |
-          node tools/announce-fanout.mjs reddit-draft \
-            --tag "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            --out reddit-draft.md
-
-      - name: Attach the Reddit draft to the Release
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -f reddit-draft.md ]; then
-            gh release upload "${{ github.ref_name }}" reddit-draft.md --repo "${{ github.repository }}"
-          fi
 
       - name: Announce → Discord
         continue-on-error: true
