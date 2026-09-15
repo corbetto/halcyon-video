@@ -8,7 +8,9 @@ store, its sidewalk and service court, not a surveyed or aerial environment.
 
 Store coordinates are feet: X runs along the frontage, Y is height, +Z points
 out through the front glass. The asset is centered on STORE_CENTER_X. The road
-ends at Z=90; opposite storefronts start at Z=180–182, behind two parking rows.
+originally ended at Z=90; the runtime now shifts the opposite sidewalk, parking
+and storefronts together to follow the parking layout’s street boundary. The
+authored opposite storefronts start at Z=180–182, behind two parking rows.
 Side shops sit beyond the store lot. Collision and navigation bounds are unchanged.
 
 The rear batch is authored around Z=0 and moved to backWallZ minus 24 feet when

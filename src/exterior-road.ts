@@ -30,6 +30,7 @@ export interface ExteriorRoadOptions {
   frontZ: number; // lot's near edge (against the building — not curbed, never seen)
   farZ: number; // lot's far/street-facing edge (world z) — the road starts here
   initialGroundColor: THREE.Color;
+  customEdges?: boolean; // caller supplies shaped concrete and an open driveway
 }
 
 const CURB_COLOR = '#6d6a60'; // matches the entrance curb in exterior-environment.ts
@@ -72,39 +73,41 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   // what a lot edge looks like"). The far curb runs the road's full width
   // (not just the lot's) so there's no gap at the corners where the side
   // curbs meet it.
-  const curbMat = track(new THREE.MeshStandardMaterial({ color: CURB_COLOR, roughness: 0.85, metalness: 0.0 }));
-  const farCurb = new THREE.Mesh(track(new THREE.BoxGeometry(roadWidth, CURB_HEIGHT, CURB_DEPTH)), curbMat);
-  farCurb.position.set(centerX, -0.03, farZ + CURB_DEPTH / 2);
-  farCurb.receiveShadow = true;
-  edgeFallback.add(farCurb);
+  if (!opts.customEdges) {
+    const curbMat = track(new THREE.MeshStandardMaterial({ color: CURB_COLOR, roughness: 0.85, metalness: 0.0 }));
+    const farCurb = new THREE.Mesh(track(new THREE.BoxGeometry(roadWidth, CURB_HEIGHT, CURB_DEPTH)), curbMat);
+    farCurb.position.set(centerX, -0.03, farZ + CURB_DEPTH / 2);
+    farCurb.receiveShadow = true;
+    edgeFallback.add(farCurb);
 
-  const sideCurbGeo = track(new THREE.BoxGeometry(CURB_DEPTH, CURB_HEIGHT, lotDepth + CURB_DEPTH));
-  [minX, maxX].forEach((x) => {
-    const sideCurb = new THREE.Mesh(sideCurbGeo, curbMat);
-    sideCurb.position.set(x, -0.03, frontZ + lotDepth / 2);
-    sideCurb.receiveShadow = true;
-    edgeFallback.add(sideCurb);
-  });
+    const sideCurbGeo = track(new THREE.BoxGeometry(CURB_DEPTH, CURB_HEIGHT, lotDepth + CURB_DEPTH));
+    [minX, maxX].forEach((x) => {
+      const sideCurb = new THREE.Mesh(sideCurbGeo, curbMat);
+      sideCurb.position.set(x, -0.03, frontZ + lotDepth / 2);
+      sideCurb.receiveShadow = true;
+      edgeFallback.add(sideCurb);
+    });
 
-  // ─── Gutter pan: flat concrete strip between the curb and the road surface.
-  const gutterMat = track(new THREE.MeshStandardMaterial({ color: GUTTER_COLOR, roughness: 0.9, metalness: 0.0 }));
-  const gutterZ = farZ + CURB_DEPTH;
-  const gutter = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, GUTTER_DEPTH)), gutterMat);
-  gutter.rotation.x = -Math.PI / 2;
-  gutter.position.set(centerX, -0.03, gutterZ + GUTTER_DEPTH / 2);
-  gutter.receiveShadow = true;
-  edgeFallback.add(gutter);
+    // ─── Gutter pan: flat concrete strip between the curb and the road surface.
+    const gutterMat = track(new THREE.MeshStandardMaterial({ color: GUTTER_COLOR, roughness: 0.9, metalness: 0.0 }));
+    const gutterZ = farZ + CURB_DEPTH;
+    const gutter = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, GUTTER_DEPTH)), gutterMat);
+    gutter.rotation.x = -Math.PI / 2;
+    gutter.position.set(centerX, -0.03, gutterZ + GUTTER_DEPTH / 2);
+    gutter.receiveShadow = true;
+    edgeFallback.add(gutter);
 
-  // ─── Road surface: the lot's own asphalt generator with the parking-stall
-  // side lines suppressed (a through street has no stall markings).
-  const roadStartZ = gutterZ + GUTTER_DEPTH;
+  }
+
+  // The through street has no parking-stall markings.
+  const roadStartZ = farZ + CURB_DEPTH + GUTTER_DEPTH;
   const roadEndZ = roadStartZ + ROAD_DEPTH;
   const roadTex = track(createAsphaltTexture(0, 0));
   roadTex.repeat.set(roadWidth / ROAD_TILE_FT, ROAD_DEPTH / ROAD_TILE_FT);
   const roadMat = track(new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.95, metalness: 0.0 }));
   const road = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, ROAD_DEPTH)), roadMat);
   road.rotation.x = -Math.PI / 2;
-  road.position.set(centerX, -0.03, roadStartZ + ROAD_DEPTH / 2);
+  road.position.set(centerX, opts.customEdges ? -.09 : -.03, roadStartZ + ROAD_DEPTH / 2);
   road.receiveShadow = true;
   group.add(road);
 
@@ -116,7 +119,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const dashCount = Math.max(1, Math.ceil(roadWidth / pitch));
   const dashMesh = new THREE.InstancedMesh(dashGeo, dashMat, dashCount);
   const dashZ = roadStartZ + ROAD_DEPTH / 2;
-  const dashY = -0.03 + DASH_HEIGHT / 2 + 0.005; // proud of the road surface, no z-fight
+  const dashY = (opts.customEdges ? -.09 : -.03) + DASH_HEIGHT / 2 + 0.005; // proud of the road surface, no z-fight
   const m = new THREE.Matrix4();
   for (let i = 0; i < dashCount; i++) {
     const x = roadMinX + pitch / 2 + i * pitch;
@@ -139,6 +142,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
     frontZ: roadStartZ,
     farZ: roadEndZ,
     fadeWidth: FAR_FADE_WIDTH,
+    y: opts.customEdges ? -.14 : undefined,
     initialColor: initialGroundColor,
   }));
   const sideBlend = track(buildGroundBlend(group, {
@@ -147,6 +151,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
     frontZ,
     farZ,
     fadeWidth: SIDE_FADE_WIDTH,
+    y: opts.customEdges ? -.14 : undefined,
     initialColor: initialGroundColor,
   }));
 

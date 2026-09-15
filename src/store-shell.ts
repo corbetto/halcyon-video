@@ -38,7 +38,7 @@ import { buildWindowBays } from './entrance/windows';
 import { windowBayLayout } from './storefront-window-layout';
 import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
-import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
+import { buildExteriorEnvironment } from './exterior-environment';
 import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
@@ -67,7 +67,7 @@ import { buildPreownedPreorderGamesSigns } from './fixtures/preowned-preorder-ga
 import { buildNewReleaseToppers, type NrTopperRun } from './fixtures/new-release-toppers';
 import { StoreClerk, ClerkDest } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
-import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
+import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createStorefrontLogoYellowTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
 import { getActiveTheme, themeTrimDarkHex, themeKneeGoldHex, WALL_PAINT_OPTIONS } from './themes';
 import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
@@ -516,53 +516,8 @@ export function buildStore(scene: StoreScene) {
     swapBrickSlot('roughnessMap', 'roughness.png', false);
   }
 
-  // ─── Parking lot (issue #58): ONE row of stalls plus a single drive lane
-  // in front of the store, instead of the old 500-ft asphalt prairie. The
-  // large scrub-grass ground plane that used to run out past the sky-dome
-  // radius has been removed by request — only the asphalt parking lot remains,
-  // and the sky sphere now shows beyond the ~47 ft lot edge (intended: no
-  // green lawn).
-
-  // Stall width/depth/row-origin are NOT redeclared here — they're consumed
-  // straight from PARKING_STALLS (exterior-environment.ts), the single
-  // source of truth also used to place the parked cars, so the painted
-  // lines below can never drift out of alignment with them.
-  const FRONT_Z = FRONT_GLASS_Z; // matches the storefront glass line (frontZ in exterior-environment.ts)
-  const STALL_W = PARKING_STALLS.stallWidth; // stall width (one texture tile across)
-  const STALL_DEPTH = PARKING_STALLS.depth;  // single stall row at the far side of the lot
+  // Exterior owns a single shared plan for the wraparound lot and its edges.
   const sidewalkDepth = isShopFacade ? 4.7 : facadeDimensions(scene.ceilingY, extVestibuleGapHalf, facadeStyle()).sidewalkDepth;
-  const LOT_APRON = sidewalkDepth + .3; // sidewalk + curb strip along the glass line
-  const LANE_DEPTH = PARKING_STALLS.rowFrontZ - FRONT_Z - LOT_APRON; // drive lane between the sidewalk and the stalls
-  const LOT_D = LOT_APRON + LANE_DEPTH + STALL_DEPTH; // 47 ft beyond the glass
-  // Odd multiple of STALL_W so stall boundaries land at x = centerX ± 4.5,
-  // ±13.5, ±22.5 … — the same phase PARKING_STALLS uses for the car row (see
-  // lotWidth() in exterior-environment.ts, the single source of truth this
-  // also drives the road/curb bounds from).
-  const LOT_W = lotWidth(storeWidth);
-  // One V-repeat spans the whole lot depth: stall side-lines only inside the
-  // far stall band (canvas-bottom fractions), plain asphalt in the lane.
-  const asphaltTex = createAsphaltTexture((LOT_APRON + LANE_DEPTH) / LOT_D, 0.97);
-  asphaltTex.repeat.set(LOT_W / STALL_W, 1);
-  const asphaltMat = new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.95, metalness: 0.0 });
-  const parkingLot = new THREE.Mesh(new THREE.PlaneGeometry(LOT_W, LOT_D), asphaltMat);
-  parkingLot.position.set(PARKING_STALLS.centerX, -0.03, FRONT_Z + LOT_D / 2);
-  parkingLot.rotation.x = -Math.PI / 2;
-  parkingLot.receiveShadow = true;
-  dimEnvOutside(parkingLot);
-  scene.scene.add(parkingLot);
-
-  // A handful of faded oil stains on a smaller overlay patch in the drive
-  // lane right in front of the store, where the player will actually look.
-  const stainsTex = createParkingStainsTexture();
-  const stainsMat = new THREE.MeshStandardMaterial({
-    map: stainsTex, transparent: true, roughness: 0.92, metalness: 0.0,
-    polygonOffset: true, polygonOffsetFactor: -1,
-  });
-  const parkingStains = new THREE.Mesh(new THREE.PlaneGeometry(40, 22), stainsMat);
-  parkingStains.position.set(PARKING_STALLS.centerX, -0.02, FRONT_Z + LOT_APRON + LANE_DEPTH / 2);
-  parkingStains.rotation.x = -Math.PI / 2;
-  dimEnvOutside(parkingStains);
-  scene.scene.add(parkingStains);
 
   // ─── T15: exterior environment dressing (sidewalk, lamps, cars, strip-mall
   // backdrop) — everything beyond the glass that only needs to exist for the

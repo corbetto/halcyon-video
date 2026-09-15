@@ -6,7 +6,7 @@ import { selfLit } from './material-lighting';
 import { assetUrl } from './asset-url';
 import type { OutsideMode } from './outdoor-lighting';
 
-export function installCommercialStreetscape(parent: THREE.Group, centerX: number, backWallZ: number, requestRender: () => void) {
+export function installCommercialStreetscape(parent: THREE.Group, centerX: number, backWallZ: number, requestRender: () => void, roadEndZ = 90) {
   let disposed = false;
   let mode: OutsideMode = 'day';
   let model: THREE.Group | null = null;
@@ -40,11 +40,22 @@ export function installCommercialStreetscape(parent: THREE.Group, centerX: numbe
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) originals.add(m);
       const role = source.name;
       if (role === 'Rear') o.position.z = backWallZ - 24;
+      const roadShift = roadEndZ - 90;
+      if ((role === 'Frontage' || role === 'Windows') && roadShift !== 0) {
+        // Move the opposite sidewalk, parking and shops together, beyond the
+        // resized road. Nearby side shops remain at their authored positions.
+        const positions = o.geometry.getAttribute('position');
+        for (let i = 0; i < positions.count; i++) {
+          if (positions.getZ(i) >= 89.9) positions.setZ(i, positions.getZ(i) + roadShift);
+        }
+        positions.needsUpdate = true;
+        o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere();
+      }
       if (role === 'Ground') {
-        // Keep the road-facing edge at 255 while reaching beyond any store depth.
+        // Extend the ground behind the shifted frontage and the dynamic rear wall.
         const rearEdge = backWallZ - 80;
-        o.scale.z = (255 - rearEdge) / 325;
-        o.position.z = 255 * (1 - o.scale.z);
+        o.scale.z = (255 + roadShift - rearEdge) / 325;
+        o.position.z = 255 + roadShift - 255 * o.scale.z;
       }
       let material = materials.get(role);
       if (!material) {

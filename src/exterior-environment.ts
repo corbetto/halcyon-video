@@ -22,7 +22,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createLightPoolTexture, createSoftShadowTexture, createConcreteSidewalkTexture } from './canvas-textures';
 import { activeStoreFormat } from './store-format';
 import { installExteriorReturnKiosk } from './exterior-return-kiosk';
-import { installCurbKit } from './curb-kit';
+import { parkingLayout } from './parking-layout';
+import { buildParkingLot } from './parking-lot';
 import { buildExteriorRoad } from './exterior-road';
 import { tryLoadUserAssetTexture } from './user-assets';
 import { assetUrl } from './asset-url';
@@ -39,45 +40,15 @@ export interface ExteriorEnvironment {
   dispose(): void;
 }
 
-const CURB_COLOR = '#6d6a60';
 const CAR_COLORS = ['#0d0d0f', '#1a2338', '#2b1414', '#33342c', '#15181a', '#3a3a3e'];
-
-// ─── Parking-stall grid: single source of truth ─────────────────────────────
-// Shared between the parked cars below and the painted stall lines on the
-// asphalt (built separately in three-scene.ts, since the lot plane + its
-// canvas texture are part of the store shell, not the exterior dressing).
-// Both consumers derive their world positions from this one object so a car
-// can never end up straddling a line or drift off a stall — see the
-// "Parking lot" section of StoreScene's shell-building code for the paint
-// side of this contract.
-const LOT_APRON_FT = 5.0; // sidewalk + curb strip between the glass and the drive lane
-const LOT_LANE_DEPTH_FT = 24.0; // drive lane between the apron and the stall row
-export const PARKING_STALLS = {
-  centerX: STORE_CENTER_X, // world x of the stall row's centerline (== store centerline)
-  stallWidth: 9.0, // ft — x-span of one stall / one asphalt-texture tile
-  count: 5, // stalls in the single row (keep odd: centers the middle stall on centerX,
-  // which is what lets the painted-line phase — also centered on centerX with an
-  // odd tile count — line up with every stall without any extra offset math)
-  rowFrontZ: FRONT_GLASS_Z + LOT_APRON_FT + LOT_LANE_DEPTH_FT, // 44 — z where the stall row begins
-  depth: 18.0, // ft — z-span (depth) of the stall row
-} as const;
-
-// Odd multiple of stallWidth so stall boundaries land at x = centerX ± 4.5,
-// ±13.5, ±22.5 … — the same phase PARKING_STALLS uses for the car row.
-// Shared by store-shell.ts's lot plane and the ground-blend/road bounds
-// below so none of the three can ever drift out of alignment.
-export function lotWidth(storeWidth: number): number {
-  return storeWidth + 8 <= PARKING_STALLS.stallWidth * 7
-    ? PARKING_STALLS.stallWidth * 7
-    : PARKING_STALLS.stallWidth * 9;
-}
 
 export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number, sidewalkDepth = 4.7, highQuality = false, requestRender: () => void = () => {}, backWallZ = -35): ExteriorEnvironment {
   const group = new THREE.Group();
   group.name = 'exteriorEnvironment';
   scene.add(group);
 
-  const centerX = PARKING_STALLS.centerX;
+  const plan = parkingLayout(storeWidth, sidewalkDepth, backWallZ, STORE_CENTER_X, FRONT_GLASS_Z);
+  const centerX = plan.centerX;
   const leftEdgeX = centerX - storeWidth / 2;
   const rightEdgeX = centerX + storeWidth / 2;
   const frontZ = FRONT_GLASS_Z; // matches the storefront glass line in three-scene.ts
@@ -100,14 +71,6 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   const sidewalkTex = track(createConcreteSidewalkTexture());
   sidewalkTex.repeat.set((storeWidth + 8) / 4.5, 1);
   const sidewalkMat = track(new THREE.MeshStandardMaterial({ map: sidewalkTex, roughness: 0.9, metalness: 0.0 }));
-  const sidewalk = new THREE.Mesh(
-    track(new THREE.BoxGeometry(storeWidth + 8, 0.08, sidewalkDepth)),
-    sidewalkMat,
-  );
-  sidewalk.position.set(centerX, -0.04, frontZ + sidewalkDepth / 2);
-  sidewalk.receiveShadow = true;
-  group.add(sidewalk);
-
   // Optional real photo-scanned concrete (ambientCG Concrete048, CC0) from the
   // git-ignored user-assets tree. Loads async like the car GLBs below (lands in
   // the boot render window); a 404 leaves the procedural sidewalk up. The real
@@ -132,14 +95,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     }, { srgb: false });
   }
 
-  const curbMat = track(new THREE.MeshStandardMaterial({ color: CURB_COLOR, roughness: 0.85, metalness: 0.0 }));
-  const curb = new THREE.Mesh(
-    track(new THREE.BoxGeometry(storeWidth + 8, 0.14, 0.4)),
-    curbMat,
-  );
-  curb.position.set(centerX, -0.03, frontZ + sidewalkDepth + 0.05);
-  curb.receiveShadow = true;
-  group.add(curb);
+  track(buildParkingLot(group, plan, sidewalkMat));
 
   // ─── Bollards flanking the entrance ─────────────────────────────────────
   track(buildEntranceBollards(scene, group, [leftEdgeX - 1.4, rightEdgeX + 1.4], frontZ + 1.6, requestRender));
@@ -171,12 +127,10 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     depthWrite: false, fog: false,
   }), 'light-spill'));
 
-  // Lamps stand on the stall boundary lines at the far edge of the one-row
-  // lot (issue #58): lot asphalt ends at frontZ + 47, stall lines every 9 ft
-  // from centerX, so poles at ±13.5 sit between parked cars.
+  // Lamp bases stand in the verge, clear of cars and the through aisle.
   const lampPositions: [number, number][] = [
-    [centerX - 13.5, frontZ + 47],
-    [centerX + 13.5, frontZ + 47],
+    [centerX - 13.5, plan.farZ + 1.5],
+    [centerX + 13.5, plan.farZ + 1.5],
   ];
   // Every head/pool shares one material each, so flipping lampHeadMat/poolMat
   // in setOutsideMode() below updates all of them at once — no per-instance
@@ -232,11 +186,11 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   // if a model ever fails to fetch.
   const carGroup = new THREE.Group();
   group.add(carGroup);
-  // One car centered per stall, positions derived from PARKING_STALLS so the
-  // row can never drift out of alignment with the painted stall lines.
-  const carZ = PARKING_STALLS.rowFrontZ + PARKING_STALLS.depth / 2; // depth-center of the stall row
-  const stallMid = (PARKING_STALLS.count - 1) / 2;
-  const carOffsets = Array.from({ length: PARKING_STALLS.count }, (_, i) => (i - stallMid) * PARKING_STALLS.stallWidth);
+  // Keep five vehicles, distributed across actual front and side spaces.
+  const farSpaces = plan.spaces.filter(s => s.z > plan.farRowZ);
+  const sideSpaces = plan.spaces.filter(s => s.z < frontZ);
+  const carSpaces = [farSpaces[1], farSpaces[farSpaces.length - 2],
+    plan.spaces[0], sideSpaces[0], sideSpaces[3]].filter(Boolean);
   const carYaws = [0.03, -0.02, 0.015, -0.035, 0.01]; // barely-there parking-job imperfection
   const CAR_MODELS = ['models/car_sedan.glb', 'models/car_hatchback.glb', 'models/car_sports.glb'].map(assetUrl);
   const CAR_LEN = 9.0; // target bounding-box length (longer horizontal axis) in scene units
@@ -251,10 +205,10 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     depthWrite: false, fog: false,
   }), 'shadow'));
 
-  carOffsets.forEach((dx, i) => {
+  carSpaces.forEach((space, i) => {
     const stall = new THREE.Group();
-    stall.position.set(PARKING_STALLS.centerX + dx, 0, carZ);
-    stall.rotation.y = carYaws[i % carYaws.length];
+    stall.position.set(space.x, -.09, space.z);
+    stall.rotation.y = space.yaw + carYaws[i % carYaws.length];
     carGroup.add(stall);
 
     const carShadow = new THREE.Mesh(new THREE.PlaneGeometry(5.2, CAR_LEN * 1.02), carShadowMat);
@@ -348,36 +302,19 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   spill.position.set(centerX, 0.01, frontZ + sidewalkDepth * 0.4);
   group.add(spill);
 
-  // ─── Street (issue #145): models a road across the lot's front/street-
-  // facing edge — asphalt lane, curb + gutter, dashed centerline — instead
-  // of the #144 grey alpha-fade ring, which read as fog/under-lighting
-  // rather than pavement. Curbs run the lot's other two exposed edges too;
-  // only a narrow seam fade (ground-blend.ts, via exterior-road.ts) covers
-  // spots still reading as a cut. Bounds mirror the lot-sizing formula in
-  // the "Parking lot" section of store-shell.ts exactly (both read
-  // lotWidth()/PARKING_STALLS), so the two can never drift apart. Starts at
-  // a neutral gray — setGroundColor (called by store-shell.ts right after
-  // this returns, then again on every pano change) retargets the seam fades
-  // to the real sampled color before any frame renders.
-  const lotHalfWidth = lotWidth(storeWidth) / 2;
+  // The street follows the public sidewalk; the lot module supplies its
+  // shaped curbs and keeps the right-hand driveway unbroken.
   const exteriorRoad = track(buildExteriorRoad(group, {
-    centerX,
-    minX: centerX - lotHalfWidth,
-    maxX: centerX + lotHalfWidth,
-    frontZ,
-    farZ: PARKING_STALLS.rowFrontZ + PARKING_STALLS.depth,
+    centerX, minX: plan.minX, maxX: plan.maxX, frontZ: plan.rearZ,
+    farZ: plan.streetZ, customEdges: true,
     initialGroundColor: new THREE.Color(0x3a3a3a),
   }));
-  track(installCurbKit(group, {
-    centerX, minX:centerX-lotHalfWidth, maxX:centerX+lotHalfWidth, frontZ,
-    farZ:PARKING_STALLS.rowFrontZ+PARKING_STALLS.depth,
-  }, storeWidth+8, sidewalkDepth, [sidewalk,curb,exteriorRoad.edgeFallback], sidewalkMat, requestRender));
 
   function setGroundColor(color: THREE.Color) {
     exteriorRoad.setGroundColor(color);
   }
 
-  const commercial = highQuality ? track(installCommercialStreetscape(group, centerX, backWallZ, requestRender)) : null;
+  const commercial = highQuality ? track(installCommercialStreetscape(group, centerX, backWallZ, requestRender, plan.streetZ + 28)) : null;
 
   // ─── Mode reactions (no per-frame work; called on day/night flips) ─────
   function setOutsideMode(mode: OutsideMode) {
