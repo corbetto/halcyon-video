@@ -16,10 +16,9 @@ const caseModelSubscriptions = new WeakMap<StoreScene, () => void>();
 import { isPublicDemo } from './demo-mode';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
-import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
+import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, NR_WALL_SLOPE, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { validateCaseFit, type CaseFitPair } from './layout-validator';
-import { retailAudio } from './audio';
 import { clearPosterPrefetch } from './poster-prefetch';
 import {
   SlotPos,
@@ -998,23 +997,13 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // seconds. Self-clearing when the queue empties.
   if (!isPublicDemo) beginRebuildDrain();
   scene.onTextureLoadProgress?.(0, total);
-  // The runtime-program warm-up needs ONE decoded poster to build real hero
-  // materials, not all of them: run it as soon as the first few covers have
-  // landed, so its shader compiles (~1.2s on a cold cache) overlap the
-  // network/worker wait instead of adding to it right before the reveal.
-  const warmupAt = Math.min(total, 48);
   scene.texturesReadyPromise = Promise.all(gatedSlots.map(slot => new Promise<void>(resolve => {
     slot.loadShelfDetails(0, () => {
       loaded++;
       scene.onTextureLoadProgress?.(loaded, total);
-      if (loaded === warmupAt) scene.warmupRuntimePrograms();
       resolve();
     });
   }))).then(() => {
-    // Posters are in the pixel cache now, so the warm-up can build the real
-    // hero materials (not placeholder fallbacks) — see the method's comment.
-    // (A no-op when the early trigger above already ran it.)
-    scene.warmupRuntimePrograms();
     // Whatever the boot prefetched and nobody consumed is not worth keeping.
     clearPosterPrefetch();
     // Media the store held back so it would not compete with the covers for
@@ -1034,95 +1023,6 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   });
 }
 
-export function warmupRuntimePrograms(scene: StoreScene) {
-  if (scene.warmedPrograms) return;
-  scene.warmedPrograms = true;
-  try {
-    const geo = new THREE.BoxGeometry(0.01, 0.01, 0.01);
-    const warmScene = new THREE.Group();
-    let firstWithPoster: Movie | null = null;
-    let firstSeries: Movie | null = null;
-    let firstAnimated: Movie | null = null;
-    for (const lib of scene.libraries) {
-      for (const m of lib.movies) {
-        if (!firstWithPoster && posterPixelCache.has(m.id)) firstWithPoster = m;
-        if (!firstSeries && m.isSeries) firstSeries = m;
-        if (!firstAnimated && isWhiteClamshell(m,CASE_MEDIUM)) firstAnimated = m;
-        if (firstWithPoster && firstSeries && firstAnimated) break;
-      }
-    }
-    const movie = firstWithPoster ?? scene.libraries[0]?.movies[0];
-    if (!movie) { geo.dispose(); return; }
-    const warm = createProgramWarmupMaterials(movie, firstAnimated, firstSeries);
-    scene.disposeWarmedPrograms = warm.dispose;
-    const directPrograms = warm.unmodifiedMaterials.map(material => ({
-      material, compile: material.onBeforeCompile, key: material.customProgramCacheKey,
-    }));
-    // NOT renderer.compile()/compileAsync(): those compile against the
-    // CANVAS output (srgb) with whatever clipping state is current, while
-    // the scene actually renders into the composer's linear target
-    // (srgb-linear, 0 planes) — every "warmed" program was a variant the
-    // runtime never uses (verified via the __perfRun newPrograms diff). And
-    // Mesa/ANGLE defer real compilation to the first DRAW anyway. So: park
-    // the warm meshes in the real scene below the floor (frustumCulled=false
-    // forces the draw; off-screen means zero fragments) and push one real
-    // composer frame through them.
-    for (const mats of warm.materialSets) {
-      const mesh = new THREE.Mesh(geo, mats.length === 1 ? mats[0] : mats);
-      mesh.frustumCulled = false;
-      warmScene.add(mesh);
-    }
-    // The checkout bag's glossy-plastic variant (map + alphaTest + clearcoat
-    // + DoubleSide) otherwise compiles mid-checkout on its first draw.
-    const bagMat = scene.entrance?.getBagWarmupMaterial();
-    if (bagMat) {
-      const bagWarm = new THREE.Mesh(geo, bagMat);
-      bagWarm.frustumCulled = false;
-      warmScene.add(bagWarm);
-    }
-    warmScene.position.set(11, -60, 0);
-    scene.scene.add(warmScene);
-    // Scene-add decoration applies bay lighting to the probes. The asynchronous
-    // high-detail poster swap uses undecorated materials, so warm that exact
-    // variant too; factory-owned hero materials retain their normal decoration.
-    for (const { material, compile, key } of directPrograms) {
-      material.onBeforeCompile = compile;
-      material.customProgramCacheKey = key;
-      material.needsUpdate = true;
-    }
-    const t0 = performance.now();
-    if (scene.composer) {
-      if (scene.bokehPass) scene.bokehPass.enabled = true; // DOF programs compile on first inspect otherwise
-      scene.composer.render();
-      if (scene.bokehPass) scene.bokehPass.enabled = false;
-    } else {
-      scene.renderer.render(scene.scene, scene.camera);
-    }
-    scene.scene.remove(warmScene);
-    geo.dispose();
-    // Retain the dummy materials: disposing their last reference deletes the
-    // warmed GL programs and makes the first detailed inspection compile again.
-    retailAudio.prewarm(); // first sound otherwise pays AudioContext setup mid-keypress
-    // First-bind AND first-swap dry runs: the first real selection *change*
-    // pays hero mesh creation, a second title's four cover-canvas draws +
-    // texture uploads and the first hero-visible composite (a ~50ms
-    // GPU-pipeline blip even with all programs warm) — pay both binds here,
-    // each with its own composite, exactly like two real selection moves.
-    const swapTo = scene.libraries[0]?.movies[1] ?? null;
-    for (const bind of swapTo ? [movie, swapTo] : [movie]) {
-      scene.ensureHeroCases(bind);
-      if (scene.heroFrontMesh && scene.heroBackMesh) {
-        scene.heroFrontMesh.visible = true;
-        scene.heroBackMesh.visible = true;
-        scene.composer?.render();
-      }
-    }
-    scene.hideHeroCases();
-    console.log(`[warmup] hero material programs drawn+compiled in ${(performance.now() - t0).toFixed(0)}ms`);
-  } catch (e) {
-    console.warn('[warmup] runtime program warmup failed:', e);
-  }
-}
 
 export function rebuildExtraCopies(scene: StoreScene) {
   const copies = new Map<MovieSlot, {count:number;pitch:number}>();

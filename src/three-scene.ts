@@ -1,3 +1,5 @@
+import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
+import * as programWarmup from './store-program-warmup';
 import { ABOVE_R_LIBRARY_ID, partitionAboveRRoom } from './above-r-room';
 import { createNrBayWash } from './nr-bay-wash';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
@@ -1479,30 +1481,33 @@ export class StoreScene {
     // whole scene renders blank. Bake it once here so the shadow sampler is valid before
     // anything renders the scene.
     this.renderer.shadowMap.needsUpdate = true;
+    this.ready = this.finishStockBuild();
+  }
+
+  private async finishStockBuild(): Promise<void> {
     // First environment bake: the empty store shell (movie boxes don't exist yet).
     // This replaces the bootstrap RoomEnvironment with the real room, so the
     // reflection probes baked next capture correctly-lit shelving.
     // Public entry uses the existing inexpensive room environment until the
     // visitor pauses. The full bounce/probe bake used to compile the whole
     // room several times before the first interactive frame.
-    if (!isPublicDemo) this.outdoor.bakeEnvironment();
-    // The bootstrap PMREM (scene.environment before the line above) is no longer
-    // referenced by anything — dispose its render target, compiled blur shader,
-    // and the synthetic RoomEnvironment scene now rather than leaking them for
-    // the whole session (issue #121).
     if (!isPublicDemo) {
+      const prepare = () => compileProgramsInStages(this.renderer, this.scene, this.camera,
+        this.composer?.readBuffer ?? null, this.programWarmupController.signal);
+      await this.outdoor.bakeEnvironmentInStages(prepare);
+      // The real room now owns scene.environment; release the bootstrap bake.
       this.bootstrapEnvRT?.dispose();
       this.bootstrapPmremGen?.dispose();
       this.bootstrapRoomEnv?.dispose();
       this.bootstrapEnvRT = null;
       this.bootstrapPmremGen = null;
       this.bootstrapRoomEnv = null;
-      this.generateReflectionProbes();
+      await prepare();
+      for (const capture of this.reflectionProbeSteps()) {
+        await yieldForPrograms(this.programWarmupController.signal);
+        capture();
+      }
     }
-    this.ready = this.finishStockBuild();
-  }
-
-  private async finishStockBuild(): Promise<void> {
     await this.buildAllMovieBoxes();
     // Poster capacity is settled after the progressive stock build.
     this.entrance?.refreshIdleTerminal();
@@ -1574,6 +1579,8 @@ export class StoreScene {
       }
     }
 
+    await this.warmupRuntimePrograms();
+    if (this.programWarmupController.signal.aborted || this.renderer.getContext().isContextLost()) return;
     this.animate();
 
     this.onConsoleLog("[System] 3D Store rendering active in Library Select mode.", "system");
@@ -1961,7 +1968,9 @@ export class StoreScene {
     // faster Subzero JIT too) and all shadowMap.needsUpdate requests below
     // become harmless no-ops.
     this.renderer.shadowMap.enabled = !softwareGL;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Three r184 replaces PCFSoft with PCF on first shadow draw. Select the
+    // actual mode now so asynchronous warmup compiles the runtime variant.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // Prebaked lighting: don't re-render the sun's 4K shadow map every frame. The scene
     // is static apart from the (non-shadow-casting) DVD cases and the occasional end-cap
     // transition, so we render shadows on demand via shadowMap.needsUpdate (driven by
@@ -2866,6 +2875,10 @@ export class StoreScene {
   private probeRenderTargets: THREE.WebGLCubeRenderTarget[] = [];
 
   private generateReflectionProbes() {
+    for (const capture of this.reflectionProbeSteps()) capture();
+  }
+
+  private *reflectionProbeSteps(): Generator<() => void> {
     const probePositions = [
       { x: -2.0, y: 5.5, z: this.scaleZ(-15.0) },
       { x: 6.0, y: 5.5, z: this.scaleZ(-15.0) },
@@ -2889,7 +2902,7 @@ export class StoreScene {
     // renderer process. The probes don't need the mirrors anyway. Mirrors are
     // restored below and render normally (once each) during animation.
     const reflectors: THREE.Object3D[] = [];
-    this.scene.traverse((obj) => { if (obj instanceof Reflector) reflectors.push(obj); });
+    this.scene.traverse((obj) => { if (obj instanceof Reflector && obj.visible) reflectors.push(obj); });
     reflectors.forEach((r) => { r.visible = false; });
 
     // Re-bake path: release the previous generation of probes first.
@@ -2900,28 +2913,28 @@ export class StoreScene {
     // replays (5 probes x 6 faces), but shrinking the target still trims the
     // per-face raster + mip chain to near-nothing on CPU.
     const probeRes = this.softwareGL ? 64 : 256;
-    for (let i = 0; i < 5; i++) {
-      const pos = probePositions[i];
-      const renderTarget = new THREE.WebGLCubeRenderTarget(probeRes, {
-        generateMipmaps: true,
-        minFilter: THREE.LinearMipmapLinearFilter
-      });
-      const camera = new THREE.CubeCamera(0.1, 1000, renderTarget);
-      camera.position.set(pos.x, pos.y, pos.z);
-      this.scene.add(camera);
-
-      camera.update(this.renderer, this.scene);
-      textures.push(renderTarget.texture as any);
-      this.probeRenderTargets.push(renderTarget);
-      this.scene.remove(camera);
+    try {
+      for (let i = 0; i < 5; i++) {
+        const pos = probePositions[i];
+        const renderTarget = new THREE.WebGLCubeRenderTarget(probeRes, {
+          generateMipmaps: true,
+          minFilter: THREE.LinearMipmapLinearFilter
+        });
+        const camera = new THREE.CubeCamera(0.1, 1000, renderTarget);
+        camera.position.set(pos.x, pos.y, pos.z);
+        this.scene.add(camera);
+        this.probeRenderTargets.push(renderTarget);
+        try {
+          yield () => camera.update(this.renderer, this.scene);
+          textures.push(renderTarget.texture as any);
+        } finally {
+          this.scene.remove(camera);
+        }
+      }
+    } finally {
+      reflectors.forEach((r) => { r.visible = true; });
+      if (this.selectionArrow) this.selectionArrow.visible = arrowWasVisible;
     }
-
-    reflectors.forEach((r) => { r.visible = true; });
-
-    if (this.selectionArrow) {
-      this.selectionArrow.visible = arrowWasVisible;
-    }
-
     setReflectionProbes(textures);
   }
 
@@ -2938,13 +2951,14 @@ export class StoreScene {
   // selection move / first flip, freezing the frame for however long the
   // driver takes to link. Build them at boot through the REAL factories (which
   // also pre-pays their canvas draws and seeds the video-case caches the first
-  // real selection will hit) and compile via compileAsync
-  // (KHR_parallel_shader_compile — background compile, no main-thread stall).
+  // real selection will hit), then stage Three compilation, parallel-link
+  // completion polling and first-use binding queries before the first draw.
   // The BokehPass gets one throwaway composited frame for the same reason: its
   // depth + bokeh programs otherwise compile on the first inspect.
   public warmedPrograms = false;
+  public programWarmupController = new AbortController();
   public disposeWarmedPrograms: (() => void) | null = null;
-  public warmupRuntimePrograms() { return stock.warmupRuntimePrograms(this); }
+  public warmupRuntimePrograms() { return programWarmup.warmupRuntimePrograms(this); }
   public setGradeWarmth(v: number) { grade.setGradeWarmth(this, v); }
   public setGradeLut(on: boolean) { grade.setGradeLut(this, on); }
 
@@ -5836,6 +5850,7 @@ export class StoreScene {
 
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
+    this.programWarmupController.abort();
     this.disposeWarmedPrograms?.();
     this.disposeWarmedPrograms = null;
     this.disposeSurfaceFinishes?.();

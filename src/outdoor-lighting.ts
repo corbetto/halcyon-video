@@ -577,6 +577,17 @@ export class OutdoorLightingRig {
   public bakeResolution = 512;
 
   bakeEnvironment(bounces = this.defaultBakeBounces) {
+    for (const capture of this.environmentBakeSteps(bounces)) capture();
+  }
+
+  async bakeEnvironmentInStages(prepare: () => Promise<void>) {
+    for (const capture of this.environmentBakeSteps(this.defaultBakeBounces)) {
+      await prepare();
+      capture();
+    }
+  }
+
+  private *environmentBakeSteps(bounces: number): Generator<() => void> {
     const scene = this.deps.getScene();
     const renderer = this.deps.getRenderer();
     if (!this.envPmremGen) this.envPmremGen = new THREE.PMREMGenerator(renderer);
@@ -646,27 +657,31 @@ export class OutdoorLightingRig {
     const cy = 6.5 * (this.deps.getCeilingY() / CEILING_Y);
     const cz = (15.0 + this.deps.getBackWallZ()) / 2;
 
-    for (let b = 0; b < bounces; b++) {
-      // HalfFloat: the capture is scene-linear HDR (emissive troffers and sun-lit
-      // surfaces exceed 1.0); an 8-bit target would clamp the very lights that
-      // should dominate the IBL.
-      const cubeRT = new THREE.WebGLCubeRenderTarget(this.bakeResolution, { type: THREE.HalfFloatType });
-      const cubeCam = new THREE.CubeCamera(0.5, 1000, cubeRT);
-      cubeCam.position.set(cx, cy, cz);
-      scene.add(cubeCam);
-      cubeCam.update(renderer, scene);
-      scene.remove(cubeCam);
-
-      const newEnv = this.envPmremGen.fromCubemap(cubeRT.texture);
-      scene.environment = newEnv.texture;
-      if (this.envRenderTarget) this.envRenderTarget.dispose();
-      this.envRenderTarget = newEnv;
-      cubeRT.dispose();
+    try {
+      for (let b = 0; b < bounces; b++) {
+        yield () => {
+          // Capture scene-linear HDR: emissive surfaces can exceed 1.0.
+          const cubeRT = new THREE.WebGLCubeRenderTarget(this.bakeResolution, { type: THREE.HalfFloatType });
+          const cubeCam = new THREE.CubeCamera(0.5, 1000, cubeRT);
+          cubeCam.position.set(cx, cy, cz);
+          scene.add(cubeCam);
+          try {
+            cubeCam.update(renderer, scene);
+            const newEnv = this.envPmremGen!.fromCubemap(cubeRT.texture);
+            scene.environment = newEnv.texture;
+            this.envRenderTarget?.dispose();
+            this.envRenderTarget = newEnv;
+          } finally {
+            scene.remove(cubeCam);
+            cubeRT.dispose();
+          }
+        };
+      }
+    } finally {
+      hidden.forEach((o) => (o.visible = true));
+      suppressed.forEach((v, m) => ((m as THREE.MeshStandardMaterial).emissiveIntensity = v));
+      scene.environmentIntensity = this.envDisplayIntensity;
     }
-
-    hidden.forEach((o) => (o.visible = true));
-    suppressed.forEach((v, m) => ((m as THREE.MeshStandardMaterial).emissiveIntensity = v));
-    scene.environmentIntensity = this.envDisplayIntensity;
     this.envBakeReady = true;
   }
 

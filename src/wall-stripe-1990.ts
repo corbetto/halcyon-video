@@ -218,7 +218,7 @@ export function buildWallStripe1990(scene: StoreScene): void {
   if (wall instanceof THREE.MeshStandardMaterial) {
     let previousNormal: THREE.Texture | null = null, previousRoughness: THREE.Texture | null = null;
     const copies: THREE.Texture[] = [];
-    mesh.onBeforeRender = () => {
+    const syncRelief = () => {
       if (wall.normalMap === previousNormal && wall.roughnessMap === previousRoughness) return;
       copies.splice(0).forEach(t => t.dispose());
       const relief = (source: THREE.Texture | null) => {
@@ -229,6 +229,11 @@ export function buildWallStripe1990(scene: StoreScene): void {
       mat.normalScale.copy(wall.normalScale); mat.roughness = wall.roughness;
       previousNormal = wall.normalMap; previousRoughness = wall.roughnessMap; mat.needsUpdate = true;
     };
+    mesh.onBeforeRender = syncRelief;
+    mesh.userData.prepareProgram = syncRelief;
+    // Set the real map channels before startup shader preparation. Waiting for
+    // the first draw creates a new, expensive lit-material variant at that draw.
+    syncRelief();
     mat.addEventListener('dispose', () => copies.forEach(t => t.dispose()));
   }
 
