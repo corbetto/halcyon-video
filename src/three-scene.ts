@@ -5870,6 +5870,13 @@ export class StoreScene {
     
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    if (this.searchPreCameraPos) {
+      const pose = this.entrance?.getSearchCameraPose();
+      if (pose) {
+        this.targetCameraPos.copy(pose.camPos);
+        this.targetLookAt.copy(pose.lookAt);
+      }
+    }
 
     // Same single sizing path the dynamic resolution scaler uses (issue #27);
     // it reads clientWidth/clientHeight itself and applies the current resScale.

@@ -110,6 +110,13 @@ const CSS = `
   text-transform: uppercase; opacity: 0.85; transition: background 90ms, transform 90ms;
 }
 #store-touch-controls.visible .st-btn { pointer-events: auto; }
+#store-touch-directions { display: none; position: absolute; left: 16px; bottom: max(24px, env(safe-area-inset-bottom)); grid-template-columns: repeat(3, 56px); gap: 6px; }
+#store-touch-controls.terminal #store-touch-directions { display: grid; }
+#store-touch-directions .st-btn { position: static; min-width: 0; padding: 0 6px; height: 44px; }
+#store-touch-up { grid-column: 2; }
+#store-touch-left { grid-column: 1; grid-row: 2; }
+#store-touch-down { grid-column: 2; grid-row: 2; }
+#store-touch-right { grid-column: 3; grid-row: 2; }
 .st-btn.st-pressed { transform: scale(0.94); }
 #store-touch-back {
   top: max(24px, env(safe-area-inset-top));
@@ -206,6 +213,19 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   ok.setAttribute('aria-label', 'Select');
   bind(ok, () => { poke(); void callbacks.onEnter(); });
 
+  const directions = document.createElement('div');
+  directions.id = 'store-touch-directions';
+  for (const [label, fire] of [['UP', callbacks.onUp], ['LEFT', callbacks.onLeft],
+    ['DOWN', callbacks.onDown], ['RIGHT', callbacks.onRight]] as const) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = `store-touch-${label.toLowerCase()}`;
+    button.className = 'st-btn';
+    button.textContent = label;
+    bind(button, () => { poke(); fire(); });
+    directions.appendChild(button);
+  }
+  root.appendChild(directions);
   root.appendChild(back);
   root.appendChild(ok);
   (document.getElementById('hud-overlay') ?? document.body).appendChild(root);

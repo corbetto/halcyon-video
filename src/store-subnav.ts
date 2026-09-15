@@ -1,3 +1,4 @@
+import { clearCounterVantage } from './camera-clearance';
 import { mobileStoreActive } from './mobile-store.ts';
 // The JUMP INDEX — the store's ONE navigation layer, and what you are in the
 // moment the doors close behind you.
@@ -348,7 +349,10 @@ function aisleVantage(scene: StoreScene, item: SubNavItem): { x: number; z: numb
   const w = scene.plan.unitToWorld(unit, localX, localZ);
   // Never stand through the front glass: a short store can put the mouth lead
   // outside the building. Pulling only Z back keeps the walkway alignment.
-  return { x: w.x, z: Math.min(w.z, FRONT_GLASS_Z - 1.2) };
+  return clearCounterVantage(
+    { x: w.x, z: Math.min(w.z, FRONT_GLASS_Z - 1.2) }, item,
+    scene.entrance?.getClerkNav()?.footprints ?? [],
+  );
 }
 
 function previewCurrent(scene: StoreScene, state: SubNavState): void {

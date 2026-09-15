@@ -67,7 +67,7 @@ import type { Movie } from '../jellyfin';
 import { counterCrtPalette } from '../crt-theme';
 import { brandString } from '../brand-pack';
 import { textureArrayManager } from '../poster-textures';
-import { counterMonitorAsset, counterMonitorUsesTubeEffects, fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
+import { counterMonitorAsset, counterMonitorUsesTubeEffects, terminalPictureDistance, fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
 
 export class EntranceCheckout implements StoreFixture {
   // The counter's store-facing point Z (used by StoreScene to frame the checkout camera move).
@@ -1471,7 +1471,7 @@ export class EntranceCheckout implements StoreFixture {
   // finished loading yet, so search can be triggered immediately on a cold
   // start without waiting on the GLTF.
   getSearchCameraPose(): { camPos: THREE.Vector3; lookAt: THREE.Vector3 } {
-    const DIST = 1.3;
+    let width = 1.4, height = 1.05;
     let screenPos: THREE.Vector3;
     let normal: THREE.Vector3;
     if (this.searchScreenMesh) {
@@ -1479,6 +1479,10 @@ export class EntranceCheckout implements StoreFixture {
       this.searchScreenMesh.getWorldPosition(screenPos);
       const quat = new THREE.Quaternion();
       this.searchScreenMesh.getWorldQuaternion(quat);
+      const scale = this.searchScreenMesh.getWorldScale(new THREE.Vector3());
+      const parameters = (this.searchScreenMesh.geometry as THREE.PlaneGeometry).parameters;
+      width = parameters.width * Math.abs(scale.x);
+      height = parameters.height * Math.abs(scale.y);
       normal = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
     } else {
       const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.searchStationRotY);
@@ -1486,7 +1490,8 @@ export class EntranceCheckout implements StoreFixture {
       screenPos = this.searchStationOrigin.clone().add(localOffset);
       normal = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
     }
-    const camPos = screenPos.clone().addScaledVector(normal, DIST);
+    const distance = terminalPictureDistance(width, height, this.ctx.camera.aspect, this.ctx.camera.fov);
+    const camPos = screenPos.clone().addScaledVector(normal, distance);
     return { camPos, lookAt: screenPos };
   }
 

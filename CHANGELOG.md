@@ -5,6 +5,23 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.19.2] — 2026-09-15
+
+### CHANGELOG
+- V0.19.1
+
+### General
+- Fix: include security proxy in the Docker image build
+
+## [v0.19.1] — 2026-09-15
+
+### CHANGELOG
+- V0.19.0
+
+### General
+- Security: restrict hosted integration access and protect private responses
+- Fix(touch): align vertical swipe and drag with natural scroll direction
+
 ## [v0.19.0] — 2026-09-13
 
 ### CHANGELOG

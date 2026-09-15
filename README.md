@@ -309,7 +309,7 @@ older-browser route, not a separate catalog.
 
 ## Hosting security
 
-Upgrade to **v0.19.1 or later** and restart the server or recreate the container.
+Upgrade to **v0.19.2 or later** and restart the server or recreate the container.
 The integration proxy now accepts only operator-configured service URLs. Shared
 Jellyseerr credentials provide read-only catalog access; creating a movie request
 requires the visitor's own upstream credentials. Connection checks and request

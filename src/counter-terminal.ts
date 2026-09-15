@@ -126,3 +126,10 @@ export function counterMonitorAsset(themeId: string, stationIndex: number, stati
 export function counterMonitorUsesTubeEffects(assetPath: string): boolean {
   return !assetPath.includes('flat-panel-terminal');
 }
+
+/** Fit the actual terminal picture inside the viewport with room for its bezel. */
+export function terminalPictureDistance(width: number, height: number, aspect: number, fov: number): number {
+  const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const tan = Math.tan((Number.isFinite(fov) && fov > 0 ? fov : 60) * Math.PI / 360);
+  return Math.max(1.3, width / (2 * tan * safeAspect * 0.9), height / (2 * tan * 0.76));
+}

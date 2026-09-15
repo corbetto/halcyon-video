@@ -1,3 +1,4 @@
+import { syncSetupTouchInput } from './setup-touch-input';
 // NEW STORE SETUP (#41) — the CONTROLLER behind the opening-day counter
 // terminal. The empty store boots, the camera docks at the checkout CRT (the
 // manager-terminal camera dock), and this flow walks the player from "bare
@@ -141,6 +142,12 @@ function render(): void {
     ? sourceScreenLines(screen)
     : setupScreenLines(screen);
   scene.setTerminalText(lines, cursorLine);
+  syncSetupTouchInput(isSourceScreen(screen) ? null : screen, value => {
+    if (screen.kind === 'home') screen = { ...screen, address: value.slice(0, 2048) };
+    else if (screen.kind === 'manual-auth') screen = screen.row === 0
+      ? { ...screen, username: value.slice(0, 256) } : { ...screen, password: value.slice(0, 1024) };
+    render();
+  });
   // Verification hook (same idiom as __promoStands & co): what the setup CRT
   // is showing right now, for scripts that drive the real first-run flow.
   (window as any).__setupScreen = { kind: screen.kind, lines, cursorLine };
@@ -153,6 +160,7 @@ function render(): void {
 // the menus identically to a keyboard.
 function onTypedKey(e: KeyboardEvent): void {
   if (!deps?.ui.isSetupOpen || isMembershipPickerOpen()) return;
+  if ((e.target as HTMLElement)?.id === 'setup-touch-input') return;
   // No multi-server screen has a text field — they are all checkbox lists and
   // menus — so a source screen never takes typed characters (GH #84).
   if (isSourceScreen(screen)) return;
@@ -218,6 +226,7 @@ function openWith(s: SetupScreen): void {
 export function closeSetupTerminal(opts?: { keepCamera?: boolean }): void {
   if (!deps?.ui.isSetupOpen) return;
   deps.ui.isSetupOpen = false;
+  syncSetupTouchInput(null, () => {});
   window.removeEventListener('keydown', onTypedKey, true);
   if (!opts?.keepCamera) deps.scene()?.exitSearchMode();
 }

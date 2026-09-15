@@ -993,12 +993,20 @@ function updateBrowseHUDVisibility() {
     // other overlay, but it's scene-driven so `ui.*` doesn't track it.
     || storeScene.isSubNavOpen() || isAttractActive();
 
+  // A terminal owns navigation but still needs the phone's controls. DOM
+  // dialogs keep their own inputs and suppress these scene controls.
+  const terminal = ui.isSetupOpen || ui.isCounterTerminalOpen || ui.isSettingsDrawerOpen || ui.isSearchOpen;
+  const terminalBlocked = ui.isLoginOpen || ui.isPowerMenuOpen || ui.isExitConfirmOpen
+    || ui.isVersionPickerOpen || ui.isCandyCheckoutOpen || ui.isFeedbackOpen
+    || ui.isEmblemStudioOpen || isMembershipPickerOpen() || ui.isPlaybackActive || ui.isScreensaverActive;
+  touchControls?.classList.toggle('terminal', terminal);
+  touchControls?.classList.toggle('visible', terminal ? !terminalBlocked : !suppressed);
+
   if (suppressed) {
     if (browseHudVisible !== false) {
       browseHudVisible = false;
       locator.classList.remove('visible');
       hint.classList.remove('visible');
-      touchControls?.classList.remove('visible');
     }
     return;
   }
@@ -1007,7 +1015,6 @@ function updateBrowseHUDVisibility() {
     browseHudVisible = true;
     locator.classList.add('visible');
     hint.classList.add('visible');
-    touchControls?.classList.add('visible');
   }
 
   const name = storeScene.getActiveAisleName();
@@ -1757,7 +1764,7 @@ window.addEventListener('halcyon:tv-status', () => {
 // this textarea collects what looks wrong. Saved via the vite dev-server
 // middleware in vite.config.ts, which writes it to feedback/NNN/.
 const FEEDBACK_CONFIG_KEYS = [
-  'bb_theme', 'bb_medium', 'bb_arrangement', 'bb_outside', 'bb_corner',
+  'bb_theme', 'bb_store_format', 'bb_browse_camera', 'bb_medium', 'bb_arrangement', 'bb_outside', 'bb_corner',
   'bb_ceiling', 'bb_ceiling_structure', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_reflections', 'bb_walldecor',
 ] as const;
 
