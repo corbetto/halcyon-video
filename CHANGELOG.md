@@ -5,6 +5,33 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.20.0] — 2026-09-15
+
+### CHANGELOG
+- V0.19.2
+
+### General
+- Size parked cars to realistic lengths in the foot-based scene
+- Shape parking around the storefront with a grass verge and open driveway
+- Populate open floor pockets with actor, studio and film displays
+- Browse every return cart box from a fixed shopper view
+- Sharpen cubemap mirrors and aim them across the shelving field
+- Repair store feedback pins and fill a larger streaming demo
+- Stage startup shader compilation and lighting preparation
+- Cull planar reflection views and share coplanar captures
+- Render streaming checkout choices on the visible case back (Closes [#319](https://github.com/halcyon-video/halcyon-video/issues/319))
+- Keep mobile taps and flicks within their intended shelf targets (Closes [#314](https://github.com/halcyon-video/halcyon-video/issues/314), [#315](https://github.com/halcyon-video/halcyon-video/issues/315))
+- Omit physical disc specifications from streaming case backs (Closes [#327](https://github.com/halcyon-video/halcyon-video/issues/327))
+- Prune remembered libraries when disconnecting a source (Closes [#322](https://github.com/halcyon-video/halcyon-video/issues/322))
+- Allow back action in overview mode to route to manager terminal
+- Add cubemap mirror option and prepare planar reflections before entry
+- Perf: retain the exact inspection shader variants
+- Perf: share mirror workspaces and guard startup recovery
+- Keep the startup splash over delayed counter models
+- Refresh the README and add a 32-image tour of Halcyon 0.19
+- Fix(touch): align vertical swipe and drag with natural scroll direction
+- Restore streaming entrance cover preloading (Closes [#326](https://github.com/halcyon-video/halcyon-video/issues/326))
+
 ## [v0.19.2] — 2026-09-15
 
 ### CHANGELOG
