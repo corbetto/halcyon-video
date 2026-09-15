@@ -4140,7 +4140,13 @@ export class StoreScene {
     // through to `return false`), and every other entry point goes to the
     // overview instead. Escaping past it just stranded you in the seccam view.
     if (this.mode === 'overview') {
-      if (this.overviewStart) return true; // already at the floor — swallow it
+      if (this.overviewStart) {
+        if (this.onCounterTerminal) {
+          this.onCounterTerminal();
+          return true;
+        }
+        return true; // already at the floor — swallow it
+      }
       this.hideOverviewVisuals();
       this.mode = 'library-select';
       if (this.onModeChange) this.onModeChange(this.mode);

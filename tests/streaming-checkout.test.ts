@@ -96,6 +96,18 @@ function createMockScene(extra: Record<string, any> = {}) {
         this.onConsoleLog('[System] Returned to shelf browse.', 'system');
         return true;
       }
+      if (this.mode === 'overview') {
+        if (this.overviewStart) {
+          if (this.onCounterTerminal) {
+            this.onCounterTerminal();
+            return true;
+          }
+          return true;
+        }
+        this.mode = 'library-select';
+        if (this.onModeChange) this.onModeChange(this.mode);
+        return true;
+      }
       if (this.mode === 'checkout') {
         if (this.checkoutRunning) return true;
         const streamingMovie = getStreamingCheckoutMovie(this);
@@ -553,4 +565,17 @@ test('settled service faces repaint on start, arrow selection, row selection and
   handleStreamingBackTap(scene, { x: .5, y: 1-220/768 } as any);
   cancelStreamingServiceChoice(scene);
   assert.deepEqual(paints, [0, 1, 0, null]);
+});
+
+test('backAction: backing out of overview mode opens counter terminal', () => {
+  let terminalOpened = false;
+  const scene = createMockScene({
+    mode: 'overview',
+    overviewStart: true,
+    onCounterTerminal: () => { terminalOpened = true; },
+  });
+
+  const handled = scene.backAction();
+  assert.equal(handled, true);
+  assert.equal(terminalOpened, true);
 });
