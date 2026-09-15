@@ -315,6 +315,9 @@ Jellyseerr credentials provide read-only catalog access; creating a movie reques
 uses the signed-in Jellyfin user's linked Jellyseerr account, with that account's
 permissions, request limits, and approval policy. Sign in to Jellyseerr with the
 same Jellyfin account once (or have the host import it) before requesting.
+This linking requirement applies only to movie requests through the host's
+Jellyseerr service. Browsing the store and watching existing titles do not
+require a Jellyseerr account or a separate Jellyseerr login.
 Halcyon verifies the session against Jellyseerr's configured Jellyfin server;
 anonymous visitors cannot submit requests. Visitors supplying their own
 request-service credentials keep using those credentials. Connection checks and request
