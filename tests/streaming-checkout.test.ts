@@ -94,6 +94,18 @@ function createMockScene(extra: Record<string, any> = {}) {
         this.onConsoleLog('[System] Returned to shelf browse.', 'system');
         return true;
       }
+      if (this.mode === 'overview') {
+        if (this.overviewStart) {
+          if (this.onCounterTerminal) {
+            this.onCounterTerminal();
+            return true;
+          }
+          return true;
+        }
+        this.mode = 'library-select';
+        if (this.onModeChange) this.onModeChange(this.mode);
+        return true;
+      }
       if (this.mode === 'checkout') {
         if (this.checkoutRunning) return true;
         const streamingMovie = getStreamingCheckoutMovie(this);
@@ -485,3 +497,16 @@ test('mobileStoreTap: switching slots or touching outside cancels active streami
   assert.equal(scene.mode, 'browse');
 });
 
+
+test('backAction: backing out of overview mode opens counter terminal', () => {
+  let terminalOpened = false;
+  const scene = createMockScene({
+    mode: 'overview',
+    overviewStart: true,
+    onCounterTerminal: () => { terminalOpened = true; },
+  });
+
+  const handled = scene.backAction();
+  assert.equal(handled, true);
+  assert.equal(terminalOpened, true);
+});
