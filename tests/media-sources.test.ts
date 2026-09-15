@@ -302,6 +302,34 @@ test('remembered libraries are kept per source and dropped when it disconnects',
   assert.equal(known.find((e) => e.sourceId === a.id)?.sourceName, 'Home');
 
   removeMediaSource(b.id);
+  assert.deepEqual(knownLibrariesBySource(), [known.find((e) => e.sourceId === a.id)]);
+  assert.deepEqual(JSON.parse(store.get('bb_known_libraries_by_source')!), knownLibrariesBySource());
+});
+
+
+test('removing the primary preserves the promoted server libraries', () => {
+  const a = addMediaSource(JF);
+  const b = addMediaSource(PLEX);
   rememberSourceLibraries(a, [{ id: '1', name: 'Movies' }]);
-  assert.deepEqual(knownLibrariesBySource().map((e) => e.sourceId), [a.id]);
+  rememberSourceLibraries(b, [{ id: '1', name: 'Films' }]);
+  const survivor = knownLibrariesBySource()[1];
+  removeMediaSource(a.id);
+  assert.deepEqual(knownLibrariesBySource(), [survivor]);
+  assert.equal(primaryMediaSource()?.id, b.id);
+  removeMediaSource(b.id);
+  assert.deepEqual(knownLibrariesBySource(), []);
+  assert.deepEqual(listMediaSources(), []);
+});
+
+test('removal also clears previously stale remembered sources and tolerates corrupt storage', () => {
+  const a = addMediaSource(JF);
+  rememberSourceLibraries(a, [{ id: '1', name: 'Movies' }]);
+  const survivor = knownLibrariesBySource()[0];
+  store.set('bb_known_libraries_by_source', JSON.stringify([survivor,
+    { sourceId: 'disconnected', sourceName: 'Gone', libraries: [{ id: '1', name: 'Movies' }] }]));
+  removeMediaSource('already-gone');
+  assert.deepEqual(knownLibrariesBySource(), [survivor]);
+  store.set('bb_known_libraries_by_source', '{broken');
+  assert.doesNotThrow(() => removeMediaSource(a.id));
+  assert.deepEqual(knownLibrariesBySource(), []);
 });

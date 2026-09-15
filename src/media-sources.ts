@@ -255,7 +255,10 @@ function nextSourceId(list: ReadonlyArray<MediaSource>): string {
 }
 
 export function removeMediaSource(id: string): void {
-  saveMediaSources(listMediaSources().filter((s) => s.id !== id));
+  const remaining = listMediaSources().filter((s) => s.id !== id);
+  saveMediaSources(remaining);
+  const live = new Set(remaining.map((s) => s.id));
+  write(KNOWN_LIBS_BY_SOURCE_KEY, JSON.stringify(knownLibrariesBySource().filter((e) => live.has(e.sourceId))));
 }
 
 /** Disconnect everything (log out / change server). */
