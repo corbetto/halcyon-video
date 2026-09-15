@@ -15,12 +15,12 @@ import * as net from "node:net";
 import { remotePlayPlugin } from "./tools/remote-play-server.mjs";
 import {
   OPERATOR_CONFIG_PATH,
-  operatorAuthHeaders,
-  operatorRequestAllowed,
-  operatorServiceForTarget,
   publicOperatorDefaults,
   readOperatorEnv,
 } from "./src/operator-defaults";
+
+// @ts-expect-error plain-js server middleware
+import { integrationProxyPlugin, localEndpointGuardPlugin } from "./tools/integration-proxy.mjs";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -360,11 +360,18 @@ function mpvPlayerPlugin() {
     if (req.method !== "POST") return json(405, { error: "method" });
 
     const chunks: any[] = [];
-    req.on("data", (c: any) => chunks.push(c));
+    let bodyBytes = 0;
+    req.on("data", (c: any) => {
+      bodyBytes += c.length;
+      if (bodyBytes <= 64 * 1024) chunks.push(c);
+    });
     req.on("end", () => {
       try {
+        if (bodyBytes > 64 * 1024) return json(413, { error: "Payload too large" });
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
-        const file = path.resolve(String(body.path ?? ""));
+        const requested = path.resolve(String(body.path ?? ""));
+        if (!fs.existsSync(requested)) return json(404, { error: "no such file" });
+        const file = fs.realpathSync(requested);
         if (!MEDIA_ROOTS.some((r: string) => file === r || file.startsWith(r + path.sep))) {
           return json(403, { error: "path outside media roots" });
         }
@@ -390,81 +397,6 @@ function mpvPlayerPlugin() {
     },
     // launch.sh serves the built bundle via `vite preview`, so the endpoint has
     // to exist there too or local playback only works under `npm run dev`.
-    configurePreviewServer(server: any) {
-      server.middlewares.use(handler);
-    },
-  };
-}
-
-// Reverse proxy for integrations whose servers don't speak CORS (Jellyseerr,
-// Romm): the browser build can't fetch them directly — the X-Api-Key /
-// Authorization headers trigger a preflight those servers never answer, so
-// every request dies before it leaves the browser (the Tauri shell dodges
-// this via its Rust-side proxies). The client sends the real URL in an
-// X-Proxy-Target header; being a custom header, any cross-origin use needs a
-// preflight, which this middleware never approves — other sites can't use it
-// as an open proxy.
-function integrationProxyPlugin() {
-  async function handler(req: any, res: any, next: any) {
-    if (!req.url.startsWith("/dev-proxy")) return next();
-    const json = (code: number, obj: any) => {
-      res.statusCode = code;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(obj));
-    };
-    const target = String(req.headers["x-proxy-target"] || "");
-    if (!/^https?:\/\//.test(target)) return json(400, { error: "bad or missing X-Proxy-Target" });
-    try {
-      const chunks: Buffer[] = [];
-      for await (const c of req) chunks.push(c);
-      const headers: Record<string, string> = {};
-      for (const h of ["x-api-key", "authorization", "content-type"]) {
-        if (req.headers[h]) headers[h] = String(req.headers[h]);
-      }
-      const method = String(req.method || "GET");
-
-      // Operator-managed credentials (GH #129). A client that holds no key of
-      // its own sends none; if the target is one of the operator's own
-      // servers, theirs is attached HERE, host-side, where the browser can
-      // never read it. A client that DID send a credential keeps it — a
-      // visitor with their own Romm is not rerouted onto the operator's.
-      //
-      // The endpoint allow-list is not optional: the operator's server address
-      // is necessarily public (the browser has to name it as the proxy
-      // target), so without it this would be an authenticated open door onto
-      // their Romm/Jellyseerr for anyone who loaded the page.
-      if (!headers["x-api-key"] && !headers["authorization"]) {
-        const service = operatorServiceForTarget(operatorEnv, target);
-        if (service) {
-          if (!operatorRequestAllowed(service, method, target)) {
-            return json(403, {
-              error: `${method} ${target} is not an endpoint the store calls on the operator's ${service}`,
-            });
-          }
-          Object.assign(headers, operatorAuthHeaders(service, operatorEnv[service]!));
-        }
-      }
-      const r = await fetch(target, {
-        method,
-        headers,
-        body: chunks.length && method !== "GET" && method !== "HEAD" ? Buffer.concat(chunks) : undefined,
-      });
-      if (!r.ok) {
-        console.warn(`[dev-proxy] Upstream error from ${method} ${target}: HTTP ${r.status} ${r.statusText}`);
-      }
-      res.statusCode = r.status;
-      res.setHeader("Content-Type", r.headers.get("content-type") || "application/json");
-      res.end(Buffer.from(await r.arrayBuffer()));
-    } catch (err) {
-      console.error(`[dev-proxy] Failed to reach target ${target}:`, err);
-      json(502, { error: String(err) });
-    }
-  }
-  return {
-    name: "integration-proxy",
-    configureServer(server: any) {
-      server.middlewares.use(handler);
-    },
     configurePreviewServer(server: any) {
       server.middlewares.use(handler);
     },
@@ -629,10 +561,11 @@ export default defineConfig(async () => ({
   plugins: [
     // First: everything below it answers only to an allowed Host header.
     hostGuardPlugin(),
+    localEndpointGuardPlugin(),
     clientErrorRelayPlugin(),
     feedbackPinPlugin(),
     mpvPlayerPlugin(),
-    integrationProxyPlugin(),
+    integrationProxyPlugin(operatorEnv),
     operatorConfigPlugin(),
     remotePlayPlugin(),
   ],
@@ -678,6 +611,12 @@ export default defineConfig(async () => ({
           port: 1421,
         }
       : undefined,
+    fs: {
+      // Preserve Vite's default exclusions and protect local runtime/private
+      // files even when addressed through /@fs/ in a development server.
+      deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/.remote-play-seed.json',
+        '**/feedback/**', '**/scratch/**', '**/tickets/**', '**/.agents/**', '**/.claude/**'],
+    },
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
