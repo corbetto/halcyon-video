@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { assetUrl } from './asset-url';
+import { unitDepthAtHeight } from './store-layout';
 import { splitTrapezoidGroups } from './sign-builders';
 
 export interface ShelfPart {
@@ -18,6 +19,7 @@ export interface ShelfPart {
   panel?: boolean;
   topDepth?: number;
   physicalUV?: boolean;
+  profile?: boolean;
 }
 interface Replacement { fallback: THREE.Mesh; parts: ShelfPart[]; material: THREE.Material | THREE.Material[]; inPlace: boolean }
 
@@ -144,10 +146,12 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i), t = y / 5;
       const sourceWidth = 2.16 + (1.4 - 2.16) * t;
-      const width = p.depth + ((p.topDepth ?? p.depth) - p.depth) * t;
+      const mappedY = p.kind === 'spine' && (p.height ?? 5) < .5 ? (y - .20) * (p.height ?? 5) / 4.8
+        : y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8;
+      const width = p.profile ? unitDepthAtHeight(mappedY)
+        : p.depth + ((p.topDepth ?? p.depth) - p.depth) * t;
       pos.setXYZ(i, pos.getX(i) * (p.kind !== 'spine' ? width / sourceWidth : p.depth / .5),
-        p.kind === 'spine' && (p.height ?? 5) < .5 ? (y - .20) * (p.height ?? 5) / 4.8
-          : y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8,
+        mappedY,
         pos.getZ(i) * (p.kind === 'spine' ? p.length : 1));
     }
     if (p.kind === 'cap') {

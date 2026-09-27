@@ -12,6 +12,8 @@ import * as THREE from 'three';
 import { isWhiteClamshell, WHITE_CLAMSHELL_DIMS } from './packaging-formats';
 import { onCaseModelsChanged } from './packaging-model';
 import { rentalRestZ, shelfCasePacking } from './packaging-fit';
+import { shelfLeanAngle, lowerShelfProjection } from './shelf-profile';
+import { activeStoreFormat } from './store-format';
 import { updateBackstock, forgetBackstock } from './case-backstock';
 const caseModelSubscriptions = new WeakMap<StoreScene, () => void>();
 import { isPublicDemo } from './demo-mode';
@@ -107,12 +109,12 @@ function slotRentalHalfDepth(movie: Movie, tilt = LEAN_ANGLE): number {
   const depth = rentalBoxDepth(undefined, shell);
   return -rentalRestZ(retail.depth, depth, slotRentalLift(movie), tilt);
 }
-function packingFor(movie: Movie, shelfY: number, tilt = LEAN_ANGLE) {
-  if (movie.isSeries || isUnstockedTitle(movie)) return { offset: .44, count: 0, pitch: 0 };
+function packingFor(movie: Movie, shelfY: number, tilt: number, depth = unitDepthAtHeight(shelfY)) {
+  if (movie.isSeries || isUnstockedTitle(movie)) return { offset: .44 + (activeStoreFormat().unitTaper ? lowerShelfProjection(shelfY, AISLE_SHELF_HEIGHTS) : 0), count: 0, pitch: 0 };
   const retail = aisleCaseDims(movie);
   const rental = movie.game ? gameRentalDims(movie.platform) : undefined;
   return shelfCasePacking(retail.height, retail.depth, rentalBoxHeight(undefined,rental),
-    rentalBoxDepth(undefined,rental),tilt,unitDepthAtHeight(shelfY)/2,extraCopiesCount(movie));
+    rentalBoxDepth(undefined,rental),tilt,depth/2,extraCopiesCount(movie));
 }
 
 /**
@@ -730,12 +732,12 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
 
       const localZ = scene.aisleColZ(unit, col, side);
       const fSign = unit.browseSign;
-      const offset = packingFor(movie, shelfY).offset;
+      const lean = movie.isSeries ? 0 : activeStoreFormat().unitTaper ? shelfLeanAngle(shelfIdx) : LEAN_ANGLE;
+      const offset = packingFor(movie, shelfY, lean).offset;
       const localX = xCenter + (side === 'front' ? 1 : -1) * fSign * offset;
       const unitAngle = unit.yaw;
       const aisleWorld = scene.unitToWorld(unit, localX, localZ);
       const rotationY = (side === 'front' ? 1 : -1) * fSign * (Math.PI / 2) + unitAngle;
-      const lean = movie.isSeries ? 0 : LEAN_ANGLE;
       const hinge = scene.leanHingeOffset(lean, rotationY, boxHeight);
       // Box sets stand flat; individual cases retain their display lean.
       const yPos = shelfY + 0.03 + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(lean));
@@ -784,8 +786,8 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
         frontRotY: 0,
         backJitter,
         backX: -STAGGER_OFFSET + backJitter,
-        backZ: -slotRentalHalfDepth(movie),
-        rentalRestZ: -slotRentalHalfDepth(movie),
+        backZ: -slotRentalHalfDepth(movie, lean),
+        rentalRestZ: -slotRentalHalfDepth(movie, lean),
         backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
@@ -812,7 +814,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
 
     const shelfY = WALL_SHELF_HEIGHTS[shelfIdx];
     const transform = scene.getNewReleasesSlotTransform(col, movie, shelfY);
-    const lean = movie.isSeries ? 0 : LEAN_ANGLE;
+    const lean = movie.isSeries ? 0 : shelfLeanAngle(shelfIdx);
     const hinge = scene.leanHingeOffset(lean, transform.rotationY, boxHeight);
     // Box sets stand flat; individual cases retain their display lean.
     const yPos = shelfY + 0.03 + NR_WALL_SLOPE * -.14
@@ -860,8 +862,8 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       frontRotY: 0,
       backJitter,
       backX: -STAGGER_OFFSET + backJitter,
-      backZ: -slotRentalHalfDepth(movie),
-      rentalRestZ: -slotRentalHalfDepth(movie),
+      backZ: -slotRentalHalfDepth(movie, lean),
+      rentalRestZ: -slotRentalHalfDepth(movie, lean),
       backYLift: slotRentalLift(movie),
       backRotY: 0,
       currentScale: 1.0,
@@ -893,7 +895,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const gameShelf = fixture.placement.id.startsWith('game-section');
       const retail = aisleCaseDims(movie);
       const shelfY = fixtureSlot.restingY - .03 - retail.height/2*Math.cos(tilt) - retail.depth/2*Math.abs(Math.sin(tilt));
-      const forward = gameShelf ? packingFor(movie,shelfY,tilt).offset - .44 : 0;
+      const forward = gameShelf ? packingFor(movie,shelfY,tilt,unitDepthAtHeight(shelfY,(fixture as any).shelfHeights)).offset - .44 : 0;
       const x = fixtureSlot.restingX + forward * Math.sin(fixtureSlot.restingRotY);
       const z = fixtureSlot.restingZ + forward * Math.cos(fixtureSlot.restingRotY);
       const key = fixtureSlot.key;
@@ -1044,7 +1046,8 @@ export function rebuildExtraCopies(scene: StoreScene) {
     if (seen.has(key)) return; seen.add(key);
     const retail = aisleCaseDims(slot.movie), tilt = slot.restingRotX ?? LEAN_ANGLE;
     const shelfY = slot.restingY - .03 - retail.height/2*Math.cos(tilt) - retail.depth/2*Math.abs(Math.sin(tilt));
-    const plan = packingFor(slot.movie,shelfY,tilt);
+    const fixture = slot.source === 'fixture' ? scene.slottedFixtures.find(f => f.placement.id === slot.fixtureId) : undefined;
+    const plan = packingFor(slot.movie,shelfY,tilt,unitDepthAtHeight(shelfY,(fixture as any)?.shelfHeights));
     if (plan.count) copies.set(slot,{count:plan.count,pitch:plan.pitch});
   });
   updateBackstock(scene,copies);
@@ -1143,12 +1146,12 @@ export function rebuildMovieBoxes(scene: StoreScene) {
       const { height: boxHeight, liftDepth } = aisleCaseDims(movie);
       const localZ = scene.aisleColZ(unit, col, side);
       const fSign = unit.browseSign;
-      const offset = packingFor(movie, shelfY).offset;
+      const lean = movie.isSeries ? 0 : activeStoreFormat().unitTaper ? shelfLeanAngle(shelfIdx) : LEAN_ANGLE;
+      const offset = packingFor(movie, shelfY, lean).offset;
       const localX = xCenter + (side === 'front' ? 1 : -1) * fSign * offset;
       const unitAngle = unit.yaw;
       const aisleWorld = scene.unitToWorld(unit, localX, localZ);
       const rotationY = (side === 'front' ? 1 : -1) * fSign * (Math.PI / 2) + unitAngle;
-      const lean = movie.isSeries ? 0 : LEAN_ANGLE;
       const hinge = scene.leanHingeOffset(lean, rotationY, boxHeight);
       // Box sets stand flat; individual cases retain their display lean.
       const yPos = shelfY + 0.03 + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(lean));
@@ -1203,6 +1206,7 @@ export function rebuildMovieBoxes(scene: StoreScene) {
       slot.restingZ = boxZ;
       slot.restingRotY = rotationY;
       slot.restingRotX = lean;
+      slot.backZ = slot.rentalRestZ = -slotRentalHalfDepth(movie, lean);
       slot.aisleAngle = unitAngle;
       slot.browseSign = fSign;
       slot.unitIdx = unitIdxInLibrary;

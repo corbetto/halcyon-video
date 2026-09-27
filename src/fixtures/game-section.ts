@@ -1,9 +1,11 @@
 // Redesigned video game shelf: a standard double-sided freestanding gondola shelf.
 // Displays the selected platform catalog on the same shelf decks as movies.
 import * as THREE from 'three';
+import { shelfLeanAngle } from '../shelf-profile';
+import { shelfProfilePanel } from '../shelf-profile-geometry';
 import { ShelfModelBatch } from '../shelf-model';
 import { Movie } from '../jellyfin';
-import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH, LEAN_ANGLE } from '../store-layout';
+import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH, unitDepthAtHeight } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint, localZOffset } from '../layout-validator';
 import { createCategorySignTexture, createFlushTopperLabelTexture } from '../canvas-textures';
@@ -223,7 +225,9 @@ export class GameSection implements SlottedFixture {
     // to short-end (like movie aisles), so caps only belong at the two true outer ends.
     // Interior joints get nothing so the run reads as one continuous shelf.
     const capTopDepth = isWireFrame ? unitDepth : unitTopDepth;
-    const trapezoidGeo = createTrapezoidGeometry(5.1, unitDepth, capTopDepth, 0.1);
+    const depthAt = (y: number) => unitDepthAtHeight(y, SHELF_HEIGHTS);
+    const trapezoidGeo = isWireFrame ? createTrapezoidGeometry(5.1, unitDepth, capTopDepth, .1)
+      : shelfProfilePanel(5.1, SHELF_HEIGHTS.slice(0, 3), y => -depthAt(y)/2, y => depthAt(y)/2, .1);
     if (this.faces === 'front') this.trimRearHalf(trapezoidGeo);
     splitTrapezoidGroups(trapezoidGeo);
     const capMats = createLibraryEndCapMaterial(false);
@@ -271,7 +275,7 @@ export class GameSection implements SlottedFixture {
 
     // 3. Horizontal Shelves
     SHELF_HEIGHTS.forEach((yPos) => {
-      const shelfDepth = unitDepth - (unitDepth - unitTopDepth) * (yPos / 5.1);
+      const shelfDepth = depthAt(yPos);
       const deckDepth = this.faces === 'front' ? shelfDepth / 2 + .25 : shelfDepth;
       const deckCenter = this.faces === 'front' ? shelfDepth / 4 - .125 : 0;
       const shelfGeo = new THREE.BoxGeometry(deckDepth, 0.04, shelfLength);
@@ -352,7 +356,8 @@ export class GameSection implements SlottedFixture {
         dividerMat = wireMat;
         this.textures.push(wireTex);
       }
-      const dividerGeo = createTrapezoidGeometry(5.1, unitDepth - 0.05, unitTopDepth - 0.05, 0.04);
+      const dividerGeo = shelfProfilePanel(5.1, SHELF_HEIGHTS.slice(0, 3),
+        y => -(depthAt(y)-.05)/2, y => (depthAt(y)-.05)/2, .04);
 
       if (this.faces === 'front') this.trimRearHalf(dividerGeo);
       const addDivider = (zDiv: number) => {
@@ -500,8 +505,8 @@ export class GameSection implements SlottedFixture {
       // This gives the marker a continuous mounting edge without burying any
       // part of its face through the shelf decks below.
       const cardBottom = TOP_SHELF_TIP - CARD_H;
-      const edgeHalfTop = (unitDepth - (unitDepth - unitTopDepth) * (TOP_SHELF_TIP / 5.1)) / 2;
-      const edgeHalfBottom = (unitDepth - (unitDepth - unitTopDepth) * (cardBottom / 5.1)) / 2;
+      const edgeHalfTop = depthAt(TOP_SHELF_TIP) / 2;
+      const edgeHalfBottom = depthAt(cardBottom) / 2;
       const edgeHalfMid = (edgeHalfTop + edgeHalfBottom) / 2;
       const edgeAngle = Math.atan((edgeHalfBottom - edgeHalfTop) / CARD_H);
       const cardSides: ('front' | 'back')[] = this.faces === 'front' ? ['front'] : ['front', 'back'];
@@ -645,6 +650,7 @@ export class GameSection implements SlottedFixture {
       const platformGames = this.frontMovies[s] || [];
       for (let shelfIdx = 0; shelfIdx < this.shelfHeights.length; shelfIdx++) {
         const shelfY = this.shelfHeights[shelfIdx];
+        const lean = shelfLeanAngle(shelfIdx);
         for (let localCol = 0; localCol < GAME_SECTION_COLS; localCol++) {
           const idx = shelfIdx * GAME_SECTION_COLS + localCol;
           if (idx >= platformGames.length) continue;
@@ -666,8 +672,8 @@ export class GameSection implements SlottedFixture {
 
           const localX = 0.44;
           const rotationY = Math.PI / 2 + yaw;
-          const hinge = leanHingeOffset(LEAN_ANGLE, rotationY, currentBoxHeight);
-          const yPos = shelfY + 0.03 + hinge.y + (currentBoxDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
+          const hinge = leanHingeOffset(lean, rotationY, currentBoxHeight);
+          const yPos = shelfY + 0.03 + hinge.y + (currentBoxDepth / 2) * Math.sin(Math.abs(lean));
           const rx = localX + hinge.x;
           const rz = colZ + hinge.z;
 
@@ -685,7 +691,7 @@ export class GameSection implements SlottedFixture {
             restingY: yPos,
             restingZ: zPos,
             restingRotY: rotationY,
-            restingRotX: LEAN_ANGLE,
+            restingRotX: lean,
             depth: currentBoxDepth,
             key: `fixture_${this.placement.id}_side_front_shelf_${shelfIdx}_col_${col}`
           });
@@ -698,6 +704,7 @@ export class GameSection implements SlottedFixture {
       const platformGames = this.backMovies[s] || [];
       for (let shelfIdx = 0; shelfIdx < this.shelfHeights.length; shelfIdx++) {
         const shelfY = this.shelfHeights[shelfIdx];
+        const lean = shelfLeanAngle(shelfIdx);
         for (let localCol = 0; localCol < GAME_SECTION_COLS; localCol++) {
           const idx = shelfIdx * GAME_SECTION_COLS + localCol;
           if (idx >= platformGames.length) continue;
@@ -719,8 +726,8 @@ export class GameSection implements SlottedFixture {
 
           const localX = -0.44;
           const rotationY = -Math.PI / 2 + yaw;
-          const hinge = leanHingeOffset(LEAN_ANGLE, rotationY, currentBoxHeight);
-          const yPos = shelfY + 0.03 + hinge.y + (currentBoxDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
+          const hinge = leanHingeOffset(lean, rotationY, currentBoxHeight);
+          const yPos = shelfY + 0.03 + hinge.y + (currentBoxDepth / 2) * Math.sin(Math.abs(lean));
           const rx = localX + hinge.x;
           const rz = colZ + hinge.z;
 
@@ -738,7 +745,7 @@ export class GameSection implements SlottedFixture {
             restingY: yPos,
             restingZ: zPos,
             restingRotY: rotationY,
-            restingRotX: LEAN_ANGLE,
+            restingRotX: lean,
             depth: currentBoxDepth,
             key: `fixture_${this.placement.id}_side_back_shelf_${shelfIdx}_col_${col}`
           });
