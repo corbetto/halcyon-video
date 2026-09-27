@@ -3,11 +3,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { assetUrl } from './asset-url';
-import { unitDepthAtHeight } from './store-layout';
 import { splitTrapezoidGroups } from './sign-builders';
 
 export interface ShelfPart {
-  kind: 'deck' | 'rail' | 'wire' | 'slat' | 'upright' | 'spine' | 'standard' | 'foot' | 'cap';
+  kind: 'deck' | 'rail' | 'wire' | 'slat' | 'upright' | 'spine' | 'standard' | 'foot' | 'cap' | 'backrest';
   depth: number;
   length: number;
   x?: number;
@@ -19,7 +18,7 @@ export interface ShelfPart {
   panel?: boolean;
   topDepth?: number;
   physicalUV?: boolean;
-  profile?: boolean;
+  row?: number;
 }
 interface Replacement { fallback: THREE.Mesh; parts: ShelfPart[]; material: THREE.Material | THREE.Material[]; inPlace: boolean }
 
@@ -61,7 +60,7 @@ export class ShelfModelBatch {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => ownedMats.add(m));
       });
       try {
-        if (disposed || ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel', 'RailClip', 'RailEndStop'].some(name => !kit.has(name))) return;
+        if (disposed || ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel', 'RailClip', 'RailEndStop', 'BackrestLower', 'BackrestSecond'].some(name => !kit.has(name))) return;
         const fittedCaps = new Set<THREE.BufferGeometry>();
         for (const entry of entries) {
           const { fallback, material } = entry;
@@ -146,12 +145,10 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i), t = y / 5;
       const sourceWidth = 2.16 + (1.4 - 2.16) * t;
-      const mappedY = p.kind === 'spine' && (p.height ?? 5) < .5 ? (y - .20) * (p.height ?? 5) / 4.8
-        : y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8;
-      const width = p.profile ? unitDepthAtHeight(mappedY)
-        : p.depth + ((p.topDepth ?? p.depth) - p.depth) * t;
+      const width = p.depth + ((p.topDepth ?? p.depth) - p.depth) * t;
       pos.setXYZ(i, pos.getX(i) * (p.kind !== 'spine' ? width / sourceWidth : p.depth / .5),
-        mappedY,
+        p.kind === 'spine' && (p.height ?? 5) < .5 ? (y - .20) * (p.height ?? 5) / 4.8
+          : y <= .20 ? y : .20 + (y - .20) * ((p.height ?? 5) - .20) / 4.8,
         pos.getZ(i) * (p.kind === 'spine' ? p.length : 1));
     }
     if (p.kind === 'cap') {
@@ -165,6 +162,8 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     g.rotateY(p.yaw ?? 0);
     g.translate(p.x ?? 0, p.y ?? 0, p.z ?? 0);
     result.push(g);
+  } else if (p.kind === 'backrest') {
+    place(p.row === 0 ? 'BackrestLower' : 'BackrestSecond', 1, 1, p.length);
   } else if (p.kind === 'standard') {
     // Turn the authored C extrusion upright. A rolled foot carries its load.
     const g = kit.get('Standard')!.clone();

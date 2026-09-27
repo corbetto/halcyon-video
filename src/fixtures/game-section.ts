@@ -2,10 +2,10 @@
 // Displays the selected platform catalog on the same shelf decks as movies.
 import * as THREE from 'three';
 import { shelfLeanAngle } from '../shelf-profile';
-import { shelfProfilePanel } from '../shelf-profile-geometry';
+import { lowerBackrestGeometry } from '../shelf-profile-geometry';
 import { ShelfModelBatch } from '../shelf-model';
 import { Movie } from '../jellyfin';
-import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH, unitDepthAtHeight } from '../store-layout';
+import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint, localZOffset } from '../layout-validator';
 import { createCategorySignTexture, createFlushTopperLabelTexture } from '../canvas-textures';
@@ -225,9 +225,7 @@ export class GameSection implements SlottedFixture {
     // to short-end (like movie aisles), so caps only belong at the two true outer ends.
     // Interior joints get nothing so the run reads as one continuous shelf.
     const capTopDepth = isWireFrame ? unitDepth : unitTopDepth;
-    const depthAt = (y: number) => unitDepthAtHeight(y, SHELF_HEIGHTS);
-    const trapezoidGeo = isWireFrame ? createTrapezoidGeometry(5.1, unitDepth, capTopDepth, .1)
-      : shelfProfilePanel(5.1, SHELF_HEIGHTS.slice(0, 3), y => -depthAt(y)/2, y => depthAt(y)/2, .1);
+    const trapezoidGeo = createTrapezoidGeometry(5.1, unitDepth, capTopDepth, 0.1);
     if (this.faces === 'front') this.trimRearHalf(trapezoidGeo);
     splitTrapezoidGroups(trapezoidGeo);
     const capMats = createLibraryEndCapMaterial(false);
@@ -274,8 +272,17 @@ export class GameSection implements SlottedFixture {
     }
 
     // 3. Horizontal Shelves
-    SHELF_HEIGHTS.forEach((yPos) => {
-      const shelfDepth = depthAt(yPos);
+    SHELF_HEIGHTS.forEach((yPos, row) => {
+      if (row < 2) for (const side of this.faces === 'front' ? [1] : [-1, 1]) {
+        const backing = new THREE.Mesh(lowerBackrestGeometry(row, shelfLength - .04), baseShelfMat);
+        backing.position.set(side * .25, yPos + .02, 0);
+        backing.rotation.y = side < 0 ? Math.PI : 0;
+        backing.castShadow = backing.receiveShadow = true;
+        backing.name = 'lower-tier internal backing';
+        this.group!.add(backing); this.ctx.addCollider(backing);
+        shelfModels.add(backing, [{kind:'backrest',row,depth:0,length:shelfLength-.04}]);
+      }
+      const shelfDepth = unitDepth - (unitDepth - unitTopDepth) * (yPos / 5.1);
       const deckDepth = this.faces === 'front' ? shelfDepth / 2 + .25 : shelfDepth;
       const deckCenter = this.faces === 'front' ? shelfDepth / 4 - .125 : 0;
       const shelfGeo = new THREE.BoxGeometry(deckDepth, 0.04, shelfLength);
@@ -356,8 +363,7 @@ export class GameSection implements SlottedFixture {
         dividerMat = wireMat;
         this.textures.push(wireTex);
       }
-      const dividerGeo = shelfProfilePanel(5.1, SHELF_HEIGHTS.slice(0, 3),
-        y => -(depthAt(y)-.05)/2, y => (depthAt(y)-.05)/2, .04);
+      const dividerGeo = createTrapezoidGeometry(5.1, unitDepth - 0.05, unitTopDepth - 0.05, 0.04);
 
       if (this.faces === 'front') this.trimRearHalf(dividerGeo);
       const addDivider = (zDiv: number) => {
@@ -505,8 +511,8 @@ export class GameSection implements SlottedFixture {
       // This gives the marker a continuous mounting edge without burying any
       // part of its face through the shelf decks below.
       const cardBottom = TOP_SHELF_TIP - CARD_H;
-      const edgeHalfTop = depthAt(TOP_SHELF_TIP) / 2;
-      const edgeHalfBottom = depthAt(cardBottom) / 2;
+      const edgeHalfTop = (unitDepth - (unitDepth - unitTopDepth) * (TOP_SHELF_TIP / 5.1)) / 2;
+      const edgeHalfBottom = (unitDepth - (unitDepth - unitTopDepth) * (cardBottom / 5.1)) / 2;
       const edgeHalfMid = (edgeHalfTop + edgeHalfBottom) / 2;
       const edgeAngle = Math.atan((edgeHalfBottom - edgeHalfTop) / CARD_H);
       const cardSides: ('front' | 'back')[] = this.faces === 'front' ? ['front'] : ['front', 'back'];

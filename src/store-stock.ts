@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { isWhiteClamshell, WHITE_CLAMSHELL_DIMS } from './packaging-formats';
 import { onCaseModelsChanged } from './packaging-model';
 import { rentalRestZ, shelfCasePacking } from './packaging-fit';
-import { shelfLeanAngle, lowerShelfProjection } from './shelf-profile';
+import { shelfLeanAngle, lowerShelfProjection, LOWER_BACKREST_HEIGHT } from './shelf-profile';
 import { activeStoreFormat } from './store-format';
 import { updateBackstock, forgetBackstock } from './case-backstock';
 const caseModelSubscriptions = new WeakMap<StoreScene, () => void>();
@@ -114,7 +114,8 @@ function packingFor(movie: Movie, shelfY: number, tilt: number, depth = unitDept
   const retail = aisleCaseDims(movie);
   const rental = movie.game ? gameRentalDims(movie.platform) : undefined;
   return shelfCasePacking(retail.height, retail.depth, rentalBoxHeight(undefined,rental),
-    rentalBoxDepth(undefined,rental),tilt,depth/2,extraCopiesCount(movie));
+    rentalBoxDepth(undefined,rental),tilt,depth/2,extraCopiesCount(movie),
+    Math.abs(tilt) > Math.abs(LEAN_ANGLE) + .001 ? LOWER_BACKREST_HEIGHT : 0);
 }
 
 /**
@@ -895,7 +896,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const gameShelf = fixture.placement.id.startsWith('game-section');
       const retail = aisleCaseDims(movie);
       const shelfY = fixtureSlot.restingY - .03 - retail.height/2*Math.cos(tilt) - retail.depth/2*Math.abs(Math.sin(tilt));
-      const forward = gameShelf ? packingFor(movie,shelfY,tilt,unitDepthAtHeight(shelfY,(fixture as any).shelfHeights)).offset - .44 : 0;
+      const forward = gameShelf ? packingFor(movie,shelfY,tilt,unitDepthAtHeight(shelfY)).offset - .44 : 0;
       const x = fixtureSlot.restingX + forward * Math.sin(fixtureSlot.restingRotY);
       const z = fixtureSlot.restingZ + forward * Math.cos(fixtureSlot.restingRotY);
       const key = fixtureSlot.key;
@@ -1046,8 +1047,7 @@ export function rebuildExtraCopies(scene: StoreScene) {
     if (seen.has(key)) return; seen.add(key);
     const retail = aisleCaseDims(slot.movie), tilt = slot.restingRotX ?? LEAN_ANGLE;
     const shelfY = slot.restingY - .03 - retail.height/2*Math.cos(tilt) - retail.depth/2*Math.abs(Math.sin(tilt));
-    const fixture = slot.source === 'fixture' ? scene.slottedFixtures.find(f => f.placement.id === slot.fixtureId) : undefined;
-    const plan = packingFor(slot.movie,shelfY,tilt,unitDepthAtHeight(shelfY,(fixture as any)?.shelfHeights));
+    const plan = packingFor(slot.movie,shelfY,tilt);
     if (plan.count) copies.set(slot,{count:plan.count,pitch:plan.pitch});
   });
   updateBackstock(scene,copies);

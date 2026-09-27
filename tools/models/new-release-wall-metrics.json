@@ -1,15 +1,6 @@
 {
   "section_width_ft": 8.0,
-  "depth_ft": 1.32,
-  "lower_projection_ft": [
-    0.22,
-    0.11
-  ],
-  "case_lean_degrees": [
-    25,
-    18,
-    10
-  ],
+  "depth_ft": 1.1,
   "tiers": [
     0.42,
     1.295,
@@ -22,11 +13,16 @@
   ],
   "top_depth_ft": 0.55,
   "slope_degrees": 5,
+  "internal_backing_degrees": [
+    25,
+    18
+  ],
+  "outer_profile_unchanged": true,
   "facings_per_study_row": 8,
   "popular_title_study_rows": 5,
   "comfortable_rental_depth": 3,
   "tight_rental_depth": 4,
   "meshes": 28,
-  "triangles": 752,
-  "glb_bytes": 61980
+  "triangles": 728,
+  "glb_bytes": 61088
 }

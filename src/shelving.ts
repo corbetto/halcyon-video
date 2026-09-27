@@ -7,7 +7,7 @@
 // movie boxes bake their resting transforms from the plan, not from these
 // meshes, so any structure that respects the plan's dimensions works.
 import * as THREE from 'three';
-import { shelfProfilePanel } from './shelf-profile-geometry';
+import { lowerBackrestGeometry } from './shelf-profile-geometry';
 import { buildWallLibraryUnit } from './wall-library-shelving';
 import { activeStoreFormat } from './store-format';
 import { ShelfModelBatch, type ShelfPart } from './shelf-model';
@@ -351,19 +351,17 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   // rectangular, not tapered (#48) — top depth equals bottom depth; other
   // themes keep the tapered trapezoid look.
   //
-  // The frame follows the lower-tier flare and the original upper taper,
-  // stopping at the crown required by the stock.
+  // Everything here stops at UNIT_FRAME_HEIGHT, the crown the stock actually
+  // needs (see the constant) — the taper SLOPE is unchanged, so the frame is
+  // simply cut off where it is still unitDepthAtHeight(UNIT_FRAME_HEIGHT) deep
+  // rather than run on to the old 5.1.
   const frameTopDepth = unitDepthAtHeight(UNIT_FRAME_HEIGHT);
   const frameCenterY = UNIT_FRAME_HEIGHT / 2;
   const dividerTemplate: THREE.BufferGeometry = wireBlackFrame
     ? getBoxTemplate(0.8, UNIT_FRAME_HEIGHT, 0.04)
-    : shelfProfilePanel(UNIT_FRAME_HEIGHT, AISLE_SHELF_HEIGHTS.slice(0, 3),
-      y => -unitDepthAtHeight(y) / 2, y => unitDepthAtHeight(y) / 2, .04);
+    : createTrapezoidGeometry(UNIT_FRAME_HEIGHT, UNIT_DEPTH, frameTopDepth, 0.04);
   const capTopDepth = wireBlackFrame ? UNIT_DEPTH : frameTopDepth;
-  const capTrapezoidGeo = wireBlackFrame
-    ? createTrapezoidGeometry(UNIT_FRAME_HEIGHT, UNIT_DEPTH, capTopDepth, .1)
-    : shelfProfilePanel(UNIT_FRAME_HEIGHT, AISLE_SHELF_HEIGHTS.slice(0, 3),
-      y => -unitDepthAtHeight(y) / 2, y => unitDepthAtHeight(y) / 2, .1);
+  const capTrapezoidGeo = createTrapezoidGeometry(UNIT_FRAME_HEIGHT, UNIT_DEPTH, capTopDepth, 0.1);
   splitTrapezoidGroups(capTrapezoidGeo);
 
 
@@ -475,7 +473,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         deps.shelfModels.add(div, [{ kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY }, { kind: 'foot', depth: UNIT_DEPTH - .12, length: .14, y: -frameCenterY }], materials.strip);
       } else {
         stamp(structureParts, dividerTemplate, xCenter, frameCenterY, zDiv);
-        structureModels.push({ kind: 'upright', profile: true, depth: UNIT_DEPTH, topDepth: frameTopDepth,
+        structureModels.push({ kind: 'upright', depth: UNIT_DEPTH, topDepth: frameTopDepth,
           height: UNIT_FRAME_HEIGHT, length: .04, x: xCenter, z: zDiv });
       }
     };
@@ -539,6 +537,18 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       stamp(structureParts, getBoxTemplate(0.5, UNIT_FRAME_HEIGHT, shelfLength - 0.04), xCenter, frameCenterY, zCenter);
       structureModels.push({ kind: 'spine', depth: .5, length: shelfLength - .04,
         height: UNIT_FRAME_HEIGHT, x: xCenter, z: zCenter });
+    }
+
+    // The lower rake belongs inside the unchanged frame, on both stock faces.
+    if (activeStoreFormat().unitTaper) for (const row of [0, 1]) for (const side of [-1, 1]) {
+      const backing = new THREE.Mesh(lowerBackrestGeometry(row, shelfLength - .04),
+        wireFrame ? modeledSpineMat : materials.shelf);
+      backing.position.set(xCenter + side * .25, AISLE_SHELF_HEIGHTS[row] + .02, zCenter);
+      backing.rotation.y = side < 0 ? Math.PI : 0;
+      backing.name = 'lower-tier internal backing';
+      backing.castShadow = backing.receiveShadow = true;
+      aisleParent.add(backing); deps.addCollider(backing);
+      deps.shelfModels.add(backing, [{ kind: 'backrest', row, depth: 0, length: shelfLength - .04 }]);
     }
 
     // Section toppers. Each 6-column section carries the classic
@@ -840,7 +850,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       aisleParent.add(leftCap);
       deps.addCollider(leftCap);
       deps.registerEndCap(leftCap);
-      deps.shelfModels.add(leftCap, [{ kind: 'cap', profile: !wireBlackFrame, depth: UNIT_DEPTH, topDepth: capTopDepth,
+      deps.shelfModels.add(leftCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
         height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY, physicalUV: wireBlackFrame }], capMats, true);
     }
 
@@ -862,7 +872,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       aisleParent.add(rightCap);
       deps.addCollider(rightCap);
       deps.registerEndCap(rightCap);
-      deps.shelfModels.add(rightCap, [{ kind: 'cap', profile: !wireBlackFrame, depth: UNIT_DEPTH, topDepth: capTopDepth,
+      deps.shelfModels.add(rightCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
         height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY, physicalUV: wireBlackFrame }], capMats, true);
     }
   });

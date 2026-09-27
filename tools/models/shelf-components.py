@@ -83,17 +83,14 @@ sweep('Slat', [(-.25,-.125),(.25,-.125),(.25,.072),(.213,.072),
                (-.25,.105),(-.213,.105),(-.213,.072),(-.25,.072)])
 # Structural carcass components: finished laminate panel with a recessed toe,
 # eased edges and a fitted central spine. Nominal height five feet.
-profile_levels = [0, .006, .20] + [.20 + (y-.20)*4.8/4.4 for y in [.5,1.333,2.167]] + [4.994,5]
-def panel_profile():
-    # Extra rings are deliberate bend stations; source remains a neutral taper.
-    right=[((2.16+(1.4-2.16)*y/5)/2,y) for y in profile_levels]
-    return [(-x,y) for x,y in reversed(right)] + right
-panel=sweep('Upright', panel_profile(), .04)
+panel=sweep('Upright', [(-1.08,0),(1.08,0),(.70,4.994),(.694,5),(-.694,5),(-.70,4.994)], .04)
+# Bevel every sheet edge, including the cut underside of the toe notch.
 bpy.context.view_layer.objects.active=panel
 bevel=panel.modifiers.new('Finished panel edges','BEVEL');bevel.width=.006;bevel.segments=2
 bpy.ops.object.modifier_apply(modifier=bevel.name)
 sweep('Spine', [(-.25,.20),(.25,.20),(.25,4.994),(.244,5),(-.244,5),(-.25,4.994)])
-cap=sweep('EndPanel', panel_profile(), .10)
+cap=sweep('EndPanel', [(-1.074,0),(1.074,0),(1.08,.006),(1.08,.20),
+    (.70,4.994),(.694,5),(-.694,5),(-.70,4.994),(-1.08,.20),(-1.08,.006)], .10)
 bpy.context.view_layer.objects.active=cap
 bevel=cap.modifiers.new('Finished cap edges','BEVEL');bevel.width=.008;bevel.segments=3
 bpy.ops.object.modifier_apply(modifier=bevel.name)
@@ -102,6 +99,11 @@ standard=sweep('Standard', [(-.07,-.045),(.07,-.045),(.07,.045),(.042,.045),
     (.042,.032),(.056,.032),(.056,-.031),(-.056,-.031),(-.056,.032),(-.042,.032),(-.042,.045),(-.07,.045)])
 # Formed steel foot with a rolled top edge. Runs across the aisle depth.
 sweep('Foot', [(-.5,0),(.5,0),(.5,.10),(.46,.15),(-.46,.15),(-.5,.10)],.14)
+
+# Separate internal lower-tier backings; outer uprights/end panels above are unchanged.
+for name,angle in [('BackrestLower',25),('BackrestSecond',18)]:
+    h=.58; t=.0625; p=h*math.tan(math.radians(angle))
+    sweep(name,[(p-t,0),(p,0),(0,h),(-t,h)])
 
 # Editable source spreads parts out so their individual construction is visible.
 for i,obj in enumerate(bpy.context.scene.objects):

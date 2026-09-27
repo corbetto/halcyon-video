@@ -39,12 +39,7 @@ def sweep(name, profile, width, mat, collection=fixture, x=0):
 def box(name, x,y,z, w,h,d, mat, collection=fixture):
     return sweep(name,[(y-h/2,z-d/2),(y-h/2,z+d/2),(y+h/2,z+d/2),(y+h/2,z-d/2)],w,mat,collection,x)
 
-def projection(y):
-    if y <= HEIGHTS[0]: return .22
-    if y >= HEIGHTS[2]: return 0
-    row=0 if y <= HEIGHTS[1] else 1
-    return .11*(2-row-(y-HEIGHTS[row])/(HEIGHTS[row+1]-HEIGHTS[row]))
-def depth_at(y): return DEPTH - (DEPTH-.55)*max(0,min(8,y))/8 + projection(y)
+def depth_at(y): return DEPTH - (DEPTH-.55)*max(0,min(8,y))/8
 front=CLEARANCE+DEPTH
 for i,y in enumerate(HEIGHTS):
     front=CLEARANCE+depth_at(y)
@@ -56,7 +51,14 @@ for i,y in enumerate(HEIGHTS):
     ob=sweep(f'Deck_{i}',p,7.875,laminate)
     ob['substrate']='3/4 inch particle board, vinyl wrapped'; ob['slope_degrees']=5
     # Each shelf's high back is structural laminate, below the next tray.
-    box(f'HighBack_{i}',0,y+.275,CLEARANCE+.05125,7.875,.65,.0625,laminate)
+    if i < 2:
+        # Only the two internal backs rake forward; no outer member is reshaped.
+        top=y+.60; low=y-.05; rear=CLEARANCE+.02; front_top=rear+.0625
+        advance=.65*math.tan(math.radians(25 if i==0 else 18))
+        sweep(f'HighBack_{i}',[(low,rear+advance),(low,front_top+advance),
+              (top,front_top),(top,rear)],7.875,laminate)
+    else:
+        box(f'HighBack_{i}',0,y+.275,CLEARANCE+.05125,7.875,.65,.0625,laminate)
     sweep(f'Rail_{i}',[(y-.041,front),(y-.041,front+.019),(y-.033,front+.025),
         (y-.020,front+.025),(y-.020,front+.013),(y-.026,front+.013),
         (y-.026,front+.005),(y+.033,front+.005),(y+.033,front+.013),
@@ -68,12 +70,11 @@ box('Backing',0,4,CLEARANCE,7.875,8,.04,laminate)
 # In authentic 1990 perimeter wall shelving, the vertical carcass uprights
 # enclose the sloped shelves and front price rails, extending slightly proud (carcass_front = front + .035)
 # with a clean, continuous vertical front face from floor (y=0) to top (y=8) without an artificial toe cutout.
-front=CLEARANCE+depth_at(0)
+front=CLEARANCE+DEPTH
 carcass_front=front+.035
 carcass_top=CLEARANCE+depth_at(8)+.035
 for name,x in [('LeftEnd',-3.96875),('RightEnd',3.96875)]:
-    profile=[(0,CLEARANCE),(0,carcass_front)] + [(y,CLEARANCE+depth_at(y)+.035) for y in HEIGHTS[:3]]
-    ob=sweep(name,profile+[(7.994,carcass_top),(8,carcass_top-.006),(8,CLEARANCE)],.0625,edge,x=x)
+    ob=sweep(name,[(0,CLEARANCE),(0,carcass_front),(7.994,carcass_top),(8,carcass_top-.006),(8,CLEARANCE)],.0625,edge,x=x)
 
 # Toe kick:
 # Plinth board extends from floor (y=0) up to the underside of the bottom shelf tray
@@ -93,7 +94,7 @@ bpy.context.scene['capacity']='8 facings x 5 tiers for one title; 3 Amray behind
 for ob in fixture.objects: ob.select_set(True)
 bpy.context.preferences.filepaths.save_version=0
 bpy.ops.export_scene.gltf(filepath=str(ROOT/'public/models/new-release-wall.glb'),export_format='GLB',use_selection=True,export_yup=True,export_apply=True,export_extras=True)
-metrics={'section_width_ft':WIDTH,'depth_ft':depth_at(0),'lower_projection_ft':[.22,.11],'case_lean_degrees':[25,18,10],'tiers':HEIGHTS,'top_depth_ft':.55,'slope_degrees':5,'facings_per_study_row':8,'popular_title_study_rows':5,'comfortable_rental_depth':3,'tight_rental_depth':4,'meshes':len(fixture.objects),'triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in fixture.objects),'glb_bytes':(ROOT/'public/models/new-release-wall.glb').stat().st_size}
+metrics={'section_width_ft':WIDTH,'depth_ft':DEPTH,'tiers':HEIGHTS,'top_depth_ft':.55,'slope_degrees':5,'internal_backing_degrees':[25,18],'outer_profile_unchanged':True,'facings_per_study_row':8,'popular_title_study_rows':5,'comfortable_rental_depth':3,'tight_rental_depth':4,'meshes':len(fixture.objects),'triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in fixture.objects),'glb_bytes':(ROOT/'public/models/new-release-wall.glb').stat().st_size}
 (ROOT/'tools/models/new-release-wall-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 
 # Non-exported capacity study: nominal cases (4.38 x 8 x 1.10 inches), with

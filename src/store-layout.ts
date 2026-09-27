@@ -331,7 +331,6 @@ export const BROWSE_WINDOW_SIZE = 8; // Number of columns visible at once in bro
 export const AISLE_SHELF_HEIGHTS = FORMAT.aisleShelfHeights;
 export const WALL_SHELF_HEIGHTS = [0.42, 1.295, 2.17, 3.045, 3.92, 4.795, 5.67, 6.545]; // Y coordinates for New Releases wall shelves (floor-to-high coverage)
 export const BOX_SPACING = 0.58; // Space between boxes on a shelf in feet
-import { LOWER_SHELF_PROJECTION, lowerShelfProjection } from './shelf-profile.ts';
 export const LEAN_ANGLE = -10 * Math.PI / 180; // 10 degrees in radians (0.1745) leaning backward
 export const STAGGER_OFFSET = -0.04; // Offset in feet — the rental copy peeks out on LEFT (-X) of the movie cover
 // A "section" is one signboard/divider bay -- 6 columns wide. Freestanding units
@@ -347,8 +346,7 @@ export const NR_SECTION_COLS = 8; // Eight display boxes in a full New Release b
 // a bare face on it.
 export const UNIT_SECTIONS = FORMAT.unitSections;
 export const MAX_SHELF_COLS = SECTION_COLS * UNIT_SECTIONS; // 12 on the corporate box
-const UNIT_BASE_DEPTH = 2.16;
-export const UNIT_DEPTH = UNIT_BASE_DEPTH + (FORMAT.unitTaper ? 2 * LOWER_SHELF_PROJECTION : 0); // Maximum freestanding footprint, including the lower flare, in feet.
+export const UNIT_DEPTH = 2.16; // Double-sided freestanding depth (X extent when axis-aligned), in feet.
 export const UNIT_TOP_DEPTH = 1.26; // Double-sided freestanding depth at the taper reference height, in feet.
 
 // The height (ft) at which the depth taper reaches UNIT_TOP_DEPTH. This is the
@@ -377,14 +375,13 @@ export const UNIT_FRAME_HEIGHT = FORMAT.unitFrameHeight;
  * browse camera's stand-off and every fixture that clips onto a shelf lip all
  * solve their width/depth through this.
  */
-export function unitDepthAtHeight(y: number, heights: readonly number[] = AISLE_SHELF_HEIGHTS): number {
+export function unitDepthAtHeight(y: number): number {
   // A format whose shelving does NOT taper is full depth all the way up: a
   // mom-and-pop's wooden case is a plain box, and carrying the chain gondola's
   // taper to a 7.4 ft top tier would leave that tier 0.9 ft deep — too shallow
   // to stand a tape on, and negative before the ceiling.
   if (!FORMAT.unitTaper) return UNIT_DEPTH;
-  return UNIT_BASE_DEPTH - (UNIT_BASE_DEPTH - UNIT_TOP_DEPTH) * (y / UNIT_TAPER_HEIGHT)
-    + 2 * lowerShelfProjection(y, heights);
+  return UNIT_DEPTH - (UNIT_DEPTH - UNIT_TOP_DEPTH) * (y / UNIT_TAPER_HEIGHT);
 }
 
 // Freestanding aisles are rotated by one uniform angle about a pivot so the whole
@@ -472,7 +469,7 @@ export function newReleasesLeftWallCols(unitSpace: number): number {
 // the corner insets in three-scene.ts, so the left-wall unit and back-wall
 // Run 1 always butt flush at the back-left corner whatever the store
 // dimensions are.
-export const NR_WALL_SHELF_DEPTH = 1.10 + LOWER_SHELF_PROJECTION;  // shelf-board depth (ft) — buildShelfRun's backWallShelfDepth
+export const NR_WALL_SHELF_DEPTH = 1.10;  // shelf-board depth (ft) — buildShelfRun's backWallShelfDepth
 // Assembly back face stand-off from the room wall plane. Must clear the
 // walls' navy baseboards (0.04 ft thick, standing 0.02 off the wall — see
 // bbBack et al. in buildStore): at the old 0.02 the backing panel and the
@@ -484,8 +481,7 @@ export const NR_RUN_DEPTH = NR_WALL_CLEARANCE + NR_WALL_SHELF_DEPTH;
 // Front cover hinge, shared by the stock transform and sloped support plane.
 export const NR_WALL_TOP_DEPTH = .55;
 export function nrWallDepthAtHeight(y: number): number {
-  return 1.10 - (1.10 - NR_WALL_TOP_DEPTH) * Math.max(0, Math.min(8, y)) / 8
-    + lowerShelfProjection(y, WALL_SHELF_HEIGHTS);
+  return NR_WALL_SHELF_DEPTH - (NR_WALL_SHELF_DEPTH - NR_WALL_TOP_DEPTH) * Math.max(0, Math.min(8, y)) / 8;
 }
 export function nrWallStockOffset(y: number): number {
   return NR_WALL_CLEARANCE + nrWallDepthAtHeight(y) - .14;

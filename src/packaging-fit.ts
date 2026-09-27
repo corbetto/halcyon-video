@@ -5,12 +5,17 @@ export function rentalRestZ(retailD: number, shellD: number, lift: number, tilt:
   // normal's Y component as well as the two real half-depths.
   return retailD / 2 - ((retailD + shellD) / 2 + .002 - lift * Math.sin(tilt)) / c;
 }
-export function shelfCasePacking(retailH: number, retailD: number, shellH: number, shellD: number, tilt: number, shelfHalfDepth: number, requested: number) {
+export function shelfCasePacking(retailH: number, retailD: number, shellH: number, shellD: number, tilt: number, shelfHalfDepth: number, requested: number, backingRise = 0) {
   const s = Math.abs(Math.sin(tilt)), c = Math.cos(tilt);
   const backZ = rentalRestZ(retailD, shellD, (shellH - retailH) / 2, tilt);
   const pitch = (shellD + .004) / c;
   // .25 is the existing half-width of the gondola's central backing.
-  const minimum = .25 + retailH / 2 * s - backZ + shellH / 2 * s + shellD / 2 * c + .006;
+  const spineMinimum = .25 + retailH / 2 * s - backZ + shellH / 2 * s + shellD / 2 * c + .006;
+  // Short cases may sit entirely below the top of a raked internal backing.
+  // Fit their rear face to that plane, as well as to the vertical structural spine.
+  const backingMinimum = backingRise > 0 ? .25 + backingRise * s / c - backZ
+    + shellD / (2 * c) - s / c * (.01 + retailD / 2 * s + (shellH - retailH) / 2) + .006 / c : 0;
+  const minimum = Math.max(spineMinimum, backingMinimum);
   const maximum = shelfHalfDepth - retailD / 2 * (1 + c) - .006;
   const count = Math.max(0, Math.min(requested, Math.floor((maximum - minimum) / pitch)));
   return { offset: minimum + count * pitch, count, pitch, backZ, fits: minimum <= maximum };

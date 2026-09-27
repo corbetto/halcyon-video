@@ -198,12 +198,12 @@
     "uv": true
   },
   "Upright": {
-    "triangles": 252,
-    "vertices": 128,
+    "triangles": 164,
+    "vertices": 84,
     "bounds_blender_ft": [
       [
-        -1.0795773267745972,
-        1.0795773267745972
+        -1.0796781778335571,
+        1.0796781778335571
       ],
       [
         -0.019999999552965164,
@@ -242,12 +242,12 @@
     "uv": true
   },
   "EndPanel": {
-    "triangles": 380,
-    "vertices": 192,
+    "triangles": 412,
+    "vertices": 208,
     "bounds_blender_ft": [
       [
-        -1.0795773267745972,
-        1.0795773267745972
+        -1.0800000429153442,
+        1.0800000429153442
       ],
       [
         -0.05000000074505806,
@@ -300,6 +300,50 @@
       [
         0.0,
         0.15000000596046448
+      ]
+    ],
+    "materials": [
+      "ShelfFinish"
+    ],
+    "uv": true
+  },
+  "BackrestLower": {
+    "triangles": 12,
+    "vertices": 8,
+    "bounds_blender_ft": [
+      [
+        -0.0625,
+        0.2704584300518036
+      ],
+      [
+        -0.5,
+        0.5
+      ],
+      [
+        0.0,
+        0.5799999833106995
+      ]
+    ],
+    "materials": [
+      "ShelfFinish"
+    ],
+    "uv": true
+  },
+  "BackrestSecond": {
+    "triangles": 12,
+    "vertices": 8,
+    "bounds_blender_ft": [
+      [
+        -0.0625,
+        0.18845342099666595
+      ],
+      [
+        -0.5,
+        0.5
+      ],
+      [
+        0.0,
+        0.5799999833106995
       ]
     ],
     "materials": [

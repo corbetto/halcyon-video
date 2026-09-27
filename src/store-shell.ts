@@ -26,7 +26,7 @@ import { selfLit, auditStoreMaterials } from './material-lighting';
 // first parameter and reads/writes scene state exactly as the original
 // methods did — behaviour-preserving move, not a redesign.
 import * as THREE from 'three';
-import { shelfProfilePanel } from './shelf-profile-geometry';
+import { lowerBackrestGeometry } from './shelf-profile-geometry';
 import { Movie } from './jellyfin';
 import { assetUrl } from './asset-url';
 import { posterQueue, loadDecorPosterTexture } from './video-case';
@@ -1955,7 +1955,7 @@ export function buildStore(scene: StoreScene) {
     ? new THREE.MeshStandardMaterial({ color: 0x2e333a, roughness: 0.55, metalness: 0.2 })
     : new THREE.MeshStandardMaterial({ color: 0xd6d0c5, roughness: 0.55, metalness: 0.05 });
 
-  // Eight sloped trays, with the bottom two projecting beyond the upper taper.
+  // #311: straight laminate carcass with eight independently sloped trays.
   // Keep the established floor-to-eight-foot panel and local +Z wall anchors.
   const WALL_CLEARANCE = NR_WALL_CLEARANCE;
   const nrDepthAt = nrWallDepthAtHeight;
@@ -1964,10 +1964,15 @@ export function buildStore(scene: StoreScene) {
   const NR_ANCHOR_Z = WALL_CLEARANCE + backWallShelfDepth / 2;
   const NR_PANEL_H = 8.0;
   const NR_PANEL_CY = NR_PANEL_H / 2;
-  const backSidePanelGeo = shelfProfilePanel(NR_PANEL_H, WALL_SHELF_HEIGHTS.slice(0, 3),
-    () => -backWallShelfDepth / 2, y => nrDepthAt(y) - backWallShelfDepth / 2, .04)
-    .rotateY(-Math.PI / 2);
-  const backDividerGeo = backSidePanelGeo.clone();
+  const backSidePanelGeo = new THREE.BoxGeometry(0.04, NR_PANEL_H, backWallShelfDepth);
+  const backDividerGeo = new THREE.BoxGeometry(0.04, NR_PANEL_H, backWallShelfDepth);
+  for (const geometry of [backSidePanelGeo, backDividerGeo]) {
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) if (positions.getZ(i) > 0) {
+      positions.setZ(i, nrDepthAt(positions.getY(i) + NR_PANEL_CY) - backWallShelfDepth / 2);
+    }
+    geometry.computeVertexNormals();
+  }
 
   // Left-wall unit shelf width, sized from the ADAPTIVE column count
   // (the layout calc already shrank it to fit behind the side-window
@@ -2075,7 +2080,7 @@ export function buildStore(scene: StoreScene) {
     const nrFallback: THREE.Mesh[] = [];
     const nrPanels: number[] = [];
 
-    WALL_SHELF_HEIGHTS.forEach((yPos) => {
+    WALL_SHELF_HEIGHTS.forEach((yPos, row) => {
       const depth = nrDepthAt(yPos);
       const shelfGeo = new THREE.BoxGeometry(length, .0625, depth);
       const positions = shelfGeo.getAttribute('position');
@@ -2090,6 +2095,14 @@ export function buildStore(scene: StoreScene) {
       group.add(shelf);
       scene.shelves.push(shelf);
       nrFallback.push(shelf);
+      if (row < 2) {
+        const backing = new THREE.Mesh(lowerBackrestGeometry(row, length), sharedShelfMat);
+        backing.rotation.y = -Math.PI / 2;
+        backing.position.set(0, yPos + .02, WALL_CLEARANCE + .0825);
+        backing.name = 'lower-tier internal backing';
+        backing.castShadow = backing.receiveShadow = true;
+        group.add(backing); scene.shelves.push(backing); nrFallback.push(backing);
+      }
 
       const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, 0.02), nrClaspMat);
       strip.position.set(0, yPos + 0.02, nrFrontZAt(yPos) + 0.01);

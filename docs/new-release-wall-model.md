@@ -4,11 +4,11 @@ Original Blender mesh construction for Halcyon's existing shelf layout. No downl
 
 The construction contract uses particleboard with beige vinyl laminate, eight tiers in eight-foot sections, high-backed angled shelves, and space for three rental cases behind a cover comfortably (four tightly). A separate capacity study demonstrates five shelves of eight facings; it is not a historical store recreation.
 
-The reconstruction uses an **8 ft wide × 8 ft high, 1.32 ft deep at the floor and 0.55 ft at the top, with a steeper lower two-tier flare** carcass, 3/4-inch tray boards, a 5° tray slope rising toward the customer, 0.65 ft high individual backs, continuous full-height tapered end uprights enclosing the sloped shelves and front price rails, a grounded recessed toe kick plinth, and recessed price-card channels. Height, depth, angle, sheet thickness, edge profiles and hardware details are modeling assumptions, not measured historical specifications. Tier elevations match the existing scene: 0.42 through 6.545 ft at 0.875 ft intervals. This preserves clearance for the existing VHS cases and sign anchors.
+The reconstruction uses an **8 ft wide × 8 ft high, tapering from 1.10 ft deep at the floor to 0.55 ft at the top** carcass, 3/4-inch tray boards, a 5° tray slope rising toward the customer, 0.65 ft high individual backs, continuous full-height tapered end uprights enclosing the sloped shelves and front price rails, a grounded recessed toe kick plinth, and recessed price-card channels. Height, depth, angle, sheet thickness, edge profiles and hardware details are modeling assumptions, not measured historical specifications. Tier elevations match the existing scene: 0.42 through 6.545 ft at 0.875 ft intervals. This preserves clearance for the existing VHS cases and sign anchors.
 
 - Editable source: `tools/models/new-release-wall.blend`.
 - Deterministic authoring: `tools/models/new-release-wall.py`.
-- Runtime: `public/models/new-release-wall.glb` (61,980 bytes, 752 triangles, 28 separate mesh parts).
+- Runtime: `public/models/new-release-wall.glb` (61,088 bytes, 728 triangles, 28 separate mesh parts).
 - Metrics: `tools/models/new-release-wall-metrics.json`.
 - Material roles: `BeigeVinylLaminate`, `BeigeVinylEdgeBand`, `SatinPriceChannel`; opaque PBR, zero metalness, no texture downloads.
 
@@ -42,23 +42,16 @@ recessed fitting at each bay and real circular apertures through its underside.
 The repeated fittings share instanced geometry and materials. Six nearby shelf
 beams are reused as the visitor moves, bounding rendering cost.
 
-## Lower browsing tiers
+## Internal lower-tier backing
 
-The bottom two rows use a reconstruction estimate from period store footage:
-25 degrees from vertical on the bottom row, 18 degrees on the next, and the
-existing 10 degrees above. The footage is oblique and uncalibrated: these are
-working reconstruction angles, not recovered manufacturer specifications.
+The exterior remains the original straight taper: a 1.10-foot wall carcass,
+2.16-foot gondola footprint, and unchanged end panels, dividers, shelf lips and
+plinths. Only the two lower internal backing faces receive the steeper rake:
+25 degrees from vertical at the bottom and 18 degrees on the second tier.
+These are visual reconstruction estimates, not calibrated historical measurements.
+The cases use the same angles and remain inside the existing footprint.
 
-Relative to the original upper taper, the lowest shelf projects an additional
-0.22 ft (2.64 inches), the second 0.11 ft (1.32 inches), and the third zero.
-The side profile interpolates through those stations. New Release runs,
-standard gondolas and game-department shelves share this lower-tier treatment;
-the independent shop's untapered timber library case retains its own format.
-Series box sets remain upright for their existing support/packaging contract.
-Decks retain their existing support slope; cover inclination is independent.
-
-Shelf fronts, dividers, end panels, collision footprints, stock hinges and
-rental packing all follow the new profile. The gondola Blender kit includes
-additional profile vertices; scaling only a four-corner trapezoid cannot bend
-at the lower rows. `tests/shelf-profile.test.ts` checks the flare, upper-tier
-depth, upward-facing cover normals, exported bend stations and wall enclosure.
+New Release high backs are part of the wall GLB. Freestanding and game shelves
+use the added BackrestLower/BackrestSecond parts in the existing Blender kit.
+The original outer components are retained without deformation. Regression tests
+separately check the unchanged outer profile and the inward fit/rake of the backs.
