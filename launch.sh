@@ -9,6 +9,14 @@ export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-$(ls /run/user/$(id -u)/xauth_* 2>/dev/null | head -1)}"
 
+# Load local environment overrides if present
+if [ -f .env.local ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . ./.env.local
+  set +a
+fi
+
 # Only one launcher at a time. On this machine two things start the kiosk at
 # boot (the desktop autostart entry and the session watcher), and with no lock
 # they collided: both built, both raced for :1420 — where the reclaim below

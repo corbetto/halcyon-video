@@ -75,7 +75,7 @@ fn open_approval(app: &AppHandle, id: &str) -> Result<(), String> {
     if let Some(old) = app.get_webview_window(APPROVAL_WINDOW) { let _ = old.show(); let _ = old.set_focus(); return Err("Close the existing approval window before starting another pairing.".into()); }
     WebviewWindowBuilder::new(app, APPROVAL_WINDOW, WebviewUrl::App(approval_path(id).into()))
         .title("Pair Halcyon Steam Companion").inner_size(560., 380.).resizable(false)
-        .on_navigation(|url| url.scheme() == "tauri" && url.host_str() == Some("localhost") && url.path() == "/companion-approve.html")
+        .on_navigation(|url| (url.scheme() == "tauri" || url.scheme() == "http") && url.host_str() == Some("localhost") && url.path() == "/companion-approve.html")
         .build().map(|_| ()).map_err(|_| "Could not open the companion approval window.".into())
 }
 fn is_approval_window(label: &str) -> bool { label == APPROVAL_WINDOW }

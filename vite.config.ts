@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 // @ts-expect-error node:fs/node:path have no type declarations without @types/node
 // (not installed; vite.config.ts is outside tsconfig's "include" so this never
 // hits the `npm run build` gate, only editor intellisense).
@@ -105,7 +105,9 @@ function ownHostNames(): string[] {
 // credential on the way out. Same env-var shape as HALCYON_ALLOWED_HOSTS
 // above, so a `docker run -e ...` line configures the lot.
 // @ts-expect-error process is a nodejs global
-const operatorEnv = readOperatorEnv(process.env);
+const envFromFiles = loadEnv(process.env.NODE_ENV || "development", process.cwd(), "");
+// @ts-expect-error process is a nodejs global
+const operatorEnv = readOperatorEnv({ ...envFromFiles, ...process.env });
 const operatorPublic = publicOperatorDefaults(operatorEnv);
 
 // @ts-expect-error process is a nodejs global
