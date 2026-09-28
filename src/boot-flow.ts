@@ -36,7 +36,7 @@ import {
 } from './membership-cards';
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
-import { seedAutomaticDemoStreamingServices } from './streaming-catalog';
+import { seedAutomaticDemoStreamingServices, resolveEnabledServices } from './streaming-catalog';
 import { isDemoMode, useSyntheticDemoStock } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
 import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
@@ -1065,6 +1065,14 @@ export async function checkCredentialsAndLoad() {
     document.removeEventListener('keydown', bootEscape);
     document.removeEventListener('click', bootEscape);
     setTimeout(() => { hideBootOverlay(); showLoginOrCards(); }, 500);
+  } else if (getSetting<boolean>('bb_streaming_enabled')
+      && resolveEnabledServices(getSetting<string>('bb_streaming_services')).length > 0) {
+    document.removeEventListener('keydown', bootEscape);
+    document.removeEventListener('click', bootEscape);
+    // A streaming-only store has no media-server session. Its saved catalogue
+    // choice is sufficient to reopen it, including on desktop after a reload.
+    d.log('[System] Restoring the store from saved streaming-service choices.', 'system');
+    void startDemoAndLoad();
   } else {
     // Nothing saved at all — this is the store's OPENING DAY (#41): boot the
     // empty shell and wake at the counter CRT's NEW STORE SETUP. No DOM form.
