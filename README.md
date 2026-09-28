@@ -1,7 +1,7 @@
-# Halcyon Video — walk your media library
+# Halcyon Video — the video store in your browser
 
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20store-5865F2?logo=discord&logoColor=white)](https://discord.gg/SN6FnJgQe)
-[![Live demo](https://img.shields.io/badge/demo-no%20signup%2C%20no%20server-E9A93D)](https://halcyon-video.github.io/halcyon-video/)
+[![Enter the store](https://img.shields.io/badge/enter%20the%20store-no%20signup%2C%20no%20server-E9A93D)](https://halcyon-video.github.io/halcyon-video/)
 [![Version](https://img.shields.io/github/v/tag/halcyon-video/halcyon-video?label=version&color=4c9a72)](https://github.com/halcyon-video/halcyon-video/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-6a737d)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/halcyon-video/halcyon-video?color=6a737d)](https://github.com/halcyon-video/halcyon-video/stargazers)
@@ -12,16 +12,16 @@ Halcyon Video turns movie night into a visit to the video store. Glide down
 real 3D aisles, pick up a VHS or DVD case, flip it to read the back, and take
 your choice to the counter — right down to the glossy rental bag.
 
-Start with streaming services, or bring your own Jellyfin, Plex, or Emby
-library. Add RomM for a games department. Halcyon gives those catalogs a
-place you can explore with a keyboard, gamepad, TV remote, or phone.
+**[Enter Halcyon Video](https://halcyon-video.github.io/halcyon-video/)** —
+no signup, installation, media server, or API key required. The browser store
+opens with movies on the shelves, ready to browse. Choose a title and open
+its streaming service; Halcyon does not host movies or provide subscriptions.
+
+Prefer your own collection? Connect your Jellyfin, Plex, or Emby library,
+and add RomM for a games department. Browse with a keyboard, gamepad,
+TV remote, or phone.
 
 ![Halcyon Video at sunset](docs/screenshots/facade-sunset.jpg)
-
-**[Launch the hosted demo](https://halcyon-video.github.io/halcyon-video/)** —
-no signup, media server, or API key required. It opens directly into a stocked
-store; streaming titles link out to their services, while playback stays
-disabled in the public demo.
 
 Need help or want to show your store? Join the
 [Discord community](https://discord.gg/SN6FnJgQe) for setup help, release
