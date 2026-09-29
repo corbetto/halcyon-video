@@ -9,7 +9,7 @@ import { isWhiteClamshell } from './packaging-formats';
 import { retailAudio } from './audio';
 import { isPublicDemo } from './demo-mode';
 import { mobileStoreActive } from './mobile-store';
-import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
+import { compileProgramsInStages, prepareStaticTextures, yieldForPrograms } from './program-warmup';
 
 const stagedInitialRooms = new WeakSet<StoreScene>();
 const preparing = new WeakSet<StoreScene>();
@@ -56,6 +56,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
       if (stagedInitialRooms.has(scene)) {
         await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
           scene.composer?.readBuffer ?? null, signal, scene.scene, undefined, options);
+        await prepareStaticTextures(scene.renderer, scene.scene, signal, backgroundOptions(scene, signal).beforeWork);
         stagedInitialRooms.delete(scene);
       }
     }
@@ -192,18 +193,7 @@ export async function prepareDetailModel(scene: StoreScene, model: THREE.Group, 
   const signal = AbortSignal.any([scene.programWarmupController.signal, lifetime]);
   await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
     scene.composer?.readBuffer ?? null, signal, model, undefined, backgroundOptions(scene, signal));
-  const textures = new Set<THREE.Texture>();
-  model.traverse(object => {
-    const material = (object as THREE.Mesh).material;
-    for (const mat of Array.isArray(material) ? material : material ? [material] : []) {
-      for (const value of Object.values(mat)) if (value instanceof THREE.Texture) textures.add(value);
-    }
-  });
-  for (const texture of textures) {
-    await backgroundOptions(scene, signal).beforeWork();
-    if (scene.renderer.getContext().isContextLost()) return;
-    scene.renderer.initTexture(texture);
-  }
+  await prepareStaticTextures(scene.renderer, model, signal, backgroundOptions(scene, signal).beforeWork);
 }
 
 function backgroundOptions(scene: StoreScene, signal: AbortSignal) {

@@ -60,8 +60,15 @@ export function installDisplayModel(
     if (detached) { release(model); return; }
     // Custom preparers own named parts (screens, decals, instancing). Plain
     // static imports can share the same opaque-material batching as retail kits.
-    if (prepare) prepare(model);
-    else prepareRetailModel(model);
+    try {
+      if (prepare) prepare(model);
+      else prepareRetailModel(model);
+    } catch (error) {
+      // A failed custom adapter/batcher owns a loaded asset even though it has
+      // not reached the scene yet. Retire it just like a failed GPU preparation.
+      release(model);
+      throw error;
+    }
     model.name = 'display-model';
     model.scale.copy(scale);
     // Adding the hidden detail applies the scene's surface/lighting hooks.

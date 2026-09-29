@@ -140,3 +140,48 @@ export async function compileProgramsInStages(
     }
   }
 }
+
+/** Prepare static room maps before a camera move exposes them together. Shader
+ * compilation alone never uploads them. Keep each driver call behind the same
+ * interaction gate as compilation, and never revive a texture retired in a yield.
+ */
+export async function prepareStaticTextures(
+  renderer: THREE.WebGLRenderer, roots: THREE.Object3D, signal: AbortSignal,
+  beforeWork: () => Promise<void> = () => yieldForPrograms(signal),
+): Promise<void> {
+  const textures = new Set<THREE.Texture>();
+  const collect = (value: unknown) => {
+    if (value instanceof THREE.Texture && !value.isRenderTargetTexture
+        && !(value as THREE.VideoTexture).isVideoTexture) textures.add(value);
+    else if (Array.isArray(value)) value.forEach(collect);
+  };
+  roots.traverse(object => {
+    const material = (object as THREE.Mesh).material;
+    for (const mat of Array.isArray(material) ? material : material ? [material] : []) {
+      Object.values(mat).forEach(collect);
+      if ((mat as THREE.ShaderMaterial).uniforms) {
+        Object.values((mat as THREE.ShaderMaterial).uniforms).forEach(uniform => collect(uniform.value));
+      }
+    }
+  });
+  const retired = new Set<THREE.Texture>();
+  const onDispose = (event: { target: THREE.Texture }) => { retired.add(event.target); };
+  textures.forEach(texture => texture.addEventListener('dispose', onDispose));
+  try {
+    for (const texture of textures) {
+      // Three tracks the uploaded texture version; its normal draw may already
+      // have paid this cost while we yielded. Live video/render targets have
+      // separate owners and must never be initialized by background preparation.
+      const pending = () => !retired.has(texture) && texture.version > 0
+        && texture.image != null && (renderer.properties.get(texture) as { __version?: number }).__version !== texture.version;
+      signal.throwIfAborted();
+      if (!pending()) continue;
+      await beforeWork();
+      signal.throwIfAborted();
+      if (renderer.getContext().isContextLost()) return;
+      if (pending()) renderer.initTexture(texture);
+    }
+  } finally {
+    textures.forEach(texture => texture.removeEventListener('dispose', onDispose));
+  }
+}

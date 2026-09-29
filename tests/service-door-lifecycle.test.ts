@@ -82,6 +82,31 @@ test('service door loader preserves fallback on failure and retires successful o
       assert.equal(sharedDisposals, 0);
       holder.removeFromParent();
     }
+    // A custom mesh adapter can fail before attachment. That asset still owns
+    // real GPU resources, and preserving its fallback must not leak those.
+    {
+      const holder = new THREE.Group(), simple = new THREE.Group();
+      holder.add(simple); scene.add(holder);
+      const model = await parse();
+      let geometryDisposals = 0, textureDisposals = 0;
+      const texture = new THREE.Texture();
+      texture.addEventListener('dispose', () => textureDisposals++);
+      model.traverse(o => { if (o instanceof THREE.Mesh) {
+        o.geometry.addEventListener('dispose', () => geometryDisposals++);
+        (o.material as THREE.MeshStandardMaterial).map = texture;
+      } });
+      const beforeRenders = renders;
+      const cancel = installDisplayModel(ctx, holder, simple, 'models/service-door.glb',
+        {ServiceLeaf:finish}, undefined, () => { throw Error('adapter failed'); });
+      accept({scene:model});
+      await new Promise<void>(resolve => setImmediate(resolve));
+      cancel(); cancel();
+      assert.equal(geometryDisposals, 4, 'failed pre-attachment model must release geometry');
+      assert.equal(textureDisposals, 1, 'shared imported map is released exactly once');
+      assert.equal(sharedDisposals, 0); assert.equal(renders, beforeRenders);
+      assert.equal(simple.visible, true); assert.equal(model.parent, null);
+      holder.removeFromParent();
+    }
     const mediaDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
     Object.defineProperty(globalThis, 'matchMedia', {configurable:true, value:()=>({matches:true})});
     const camera = new THREE.PerspectiveCamera(); camera.position.set(1000,0,0);

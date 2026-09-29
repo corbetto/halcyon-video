@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { compileProgramsInStages, yieldForPrograms } from '../src/program-warmup.ts';
+import { compileProgramsInStages, prepareStaticTextures, yieldForPrograms } from '../src/program-warmup.ts';
 
 function fixture(parallel = true) {
   const signal = new AbortController();
@@ -155,4 +155,62 @@ test('ordinary and instanced meshes sharing geometry/material keep distinct shad
   assert.deepEqual(submitted, [ordinary, instanced]);
   assert.equal(instanced.parent, f.scene);
   f.checkRestored();
+});
+
+function textureFixture() {
+  const root = new THREE.Group(), signal = new AbortController();
+  const maps = Array.from({ length: 3 }, () => new THREE.DataTexture(new Uint8Array(4), 1, 1));
+  maps.forEach(map => { map.needsUpdate = true; });
+  const shared = new THREE.MeshStandardMaterial({ map: maps[0], roughnessMap: maps[1] });
+  root.add(new THREE.Mesh(new THREE.BoxGeometry(), shared), new THREE.Mesh(new THREE.BoxGeometry(), shared));
+  root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.ShaderMaterial({ uniforms: { maps: { value: [maps[2], maps[0]] } } })));
+  const versions = new WeakMap<THREE.Texture, { __version?: number }>();
+  const uploads: THREE.Texture[] = [];
+  let lost = false;
+  const renderer = {
+    properties: { get(texture: THREE.Texture) {
+      let properties = versions.get(texture);
+      if (!properties) { properties = {}; versions.set(texture, properties); }
+      return properties;
+    } },
+    getContext: () => ({ isContextLost: () => lost }),
+    initTexture(texture: THREE.Texture) { uploads.push(texture); renderer.properties.get(texture).__version = texture.version; },
+  };
+  return { root, signal, maps, uploads, renderer, lose: () => { lost = true; },
+    run: (gate: () => Promise<void>) => prepareStaticTextures(renderer as unknown as THREE.WebGLRenderer, root, signal.signal, gate),
+  };
+}
+
+test('static map preparation gates every upload, deduplicates shared maps and includes shader uniforms', async () => {
+  const f = textureFixture(); let gates = 0;
+  await f.run(async () => { assert.equal(f.uploads.length, gates++); });
+  assert.deepEqual(f.uploads, f.maps); assert.equal(gates, 3);
+  await f.run(async () => { throw Error('already resident maps should not wait'); });
+  assert.equal(f.uploads.length, 3);
+  f.maps[1].needsUpdate = true;
+  await f.run(async () => { gates++; });
+  assert.equal(gates, 4); assert.equal(f.uploads.at(-1), f.maps[1]);
+});
+
+test('texture preparation excludes render targets and live video, and observes cancellation after a gate', async () => {
+  const f = textureFixture();
+  f.maps[0].isRenderTargetTexture = true;
+  (f.maps[1] as THREE.Texture & { isVideoTexture: boolean }).isVideoTexture = true;
+  await assert.rejects(f.run(async () => { f.signal.abort(); }), { name: 'AbortError' });
+  assert.deepEqual(f.uploads, []);
+});
+
+test('disposed or newly resident maps are not revived after yielding; listeners are removed', async () => {
+  const f = textureFixture();
+  await f.run(async () => {
+    f.maps[0].dispose();
+    f.renderer.properties.get(f.maps[1]).__version = f.maps[1].version;
+  });
+  assert.deepEqual(f.uploads, [f.maps[2]]);
+  for (const map of f.maps) assert.equal((map as unknown as { _listeners: { dispose: unknown[] } })._listeners.dispose.length, 0);
+});
+
+test('a lost context does not upload any prepared map', async () => {
+  const f = textureFixture(); await f.run(async () => { f.lose(); });
+  assert.deepEqual(f.uploads, []);
 });
