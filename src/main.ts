@@ -1,3 +1,4 @@
+import { installReelRecorder, refreshReelControls, toggleReelRecording, toggleReelCamera, stopReelRecording, reelRecordingActive } from './reel-recorder';
 import { paintStoreLoading, updateStoreLoading, showStoreLoadingFailure } from './store-loading';
 import { mobileStoreActive } from './mobile-store';
 import { beginMobileEraChoice, finishMobileEraChoice } from './mobile-era-choice';
@@ -2391,6 +2392,7 @@ function applyLiveSettings(scene: StoreScene) {
  * changes on close.
  */
 async function rebuildStoreScene() {
+  stopReelRecording('Saved before rebuilding the store.');
   if (!settingsPendingGameRefetch && librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0 && !streamingStockIsStale()) return; // nothing loaded yet
   logToConsole('[System] Applying store changes (rebuilding scene, no reload)...', 'system');
   showBootOverlay();
@@ -2635,6 +2637,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       if (action === 'inspect') {
         updateMovieHUD(movie || null);
       } else if (action === 'play' && movie) {
+        if (storeScene?.reelMode) { stopReelRecording(); showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
         // Version choice resolves before the candy checkout / flourish — see
         // the onEnter play path.
         const version = await resolvePlayVersion(movie);
@@ -2798,6 +2801,7 @@ async function initializeStoreScene(preservePosterCache = false) {
         return;
       }
       storeScene = scene;
+      refreshReelControls(scene);
       // The boot/rebuild that just finished got past every texture upload
       // without a context loss (or recovered from one) — a fully separate,
       // later loss shouldn't inherit whatever was left of this run's retry
@@ -2868,7 +2872,7 @@ async function initializeStoreScene(preservePosterCache = false) {
           }
         },
       });
-      installAttractMode(scene, () => !shortcutsAllowed()); // #273: idle showreel; any input breaks it
+      installAttractMode(scene, () => scene.reelMode || !shortcutsAllowed()); // #273: idle showreel; any input breaks it
     });
 
   } catch (err: any) {
@@ -3270,6 +3274,7 @@ function finishPlayback(movie: Movie, fromCouch: boolean): void {
 }
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
+  if (storeScene?.reelMode) { stopReelRecording(); showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
   if (movie.streaming) {
     handleStreamingLaunch(movie);
     return;
@@ -4005,6 +4010,7 @@ async function main() {
       if (action === 'inspect') {
         updateMovieHUD(movie || null);
       } else if (action === 'play' && movie) {
+        if (storeScene?.reelMode) { stopReelRecording(); showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
         // Multi-version titles (4K + 1080p) pick their quality FIRST — before
         // the candy checkout and the play flourish — so backing out of the
         // picker leaves the store untouched.
@@ -4104,6 +4110,7 @@ async function main() {
       }
     },
     onPower: () => {
+      if (stopReelRecording()) return;
       if (storeScene?.isWalkAroundMode) return;
       // Same hard-stop the power key gives the real player.
       if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
@@ -4142,6 +4149,7 @@ async function main() {
       }
     },
     onSearch: () => {
+      if (stopReelRecording()) return;
       if (storeScene?.isWalkAroundMode) return;
       // / while search is up closes it, from anywhere.
       if (ui.isSearchOpen) { closeSearch(); return; }
@@ -4180,7 +4188,7 @@ async function main() {
       }
     },
     onIdle: () => {
-      if (isExternalGameActive()) return;
+      if (isExternalGameActive() || reelRecordingActive()) return;
       // An abandoned exit-confirm must not pin the renderer/audio awake
       // forever (onIdle fires ONCE per idle period, so bailing here meant the
       // screensaver never engaged until the next input). The dialog is
@@ -4204,6 +4212,7 @@ async function main() {
       }
     },
     onToggleWalkAround: () => {
+      if (toggleReelCamera()) return;
       // Whatever owns the keyboard also owns the camera. This used to check
       // only playback/screensaver/login/exit-confirm, so F walked away from a
       // docked CRT — and on opening day that was unrecoverable: NEW STORE
@@ -4224,6 +4233,7 @@ async function main() {
       storeScene?.enterCheckout();
     },
     onReturnTape: () => {
+      if (toggleReelRecording()) return;
       if (!shortcutsAllowed()) return;
       storeScene?.returnCarriedTape();
     },
@@ -4270,6 +4280,7 @@ async function main() {
     onHoldBackProgress: (p) => setHoldReturnProgress(p),
   };
 
+  installReelRecorder(() => storeScene, shortcutsAllowed);
   const inputManager = new InputManager(inputCallbacks);
   onExternalGameChange((active) => {
     if (active) {
@@ -4313,6 +4324,7 @@ async function main() {
   // leave an in-app movie playing if the window merely lost focus.
   let isOccluded = false;
   function onOcclude() {
+    stopReelRecording('Saved when the store lost focus.');
     if (isOccluded) return;
     isOccluded = true;
     retailAudio.suspendForIdle();

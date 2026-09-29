@@ -34,6 +34,7 @@ const SKIP_PREFIXES = [
 const SKIP_KEYS = new Set([
   // Device-local rendering + performance.
   'bb_render_mode',
+  'bb_reel_mode', // local recording controls and GPU profile, never another device's preference
   'bb_ao',
   'bb_ssao',
   'bb_aa',

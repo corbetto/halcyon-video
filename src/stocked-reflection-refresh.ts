@@ -1,3 +1,4 @@
+import { reelSetting } from './reel-profile';
 import { mobileStoreActive } from './mobile-store';
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
@@ -33,7 +34,7 @@ export function refreshStockedReflections(store: StoreScene): void {
       // Publish the first room vista before the multi-bounce lighting and five
       // case probes. Those optional refinements can take many idle slices;
       // leaving the mirrors blank until all of them finish starves the tour.
-      if (initialMirrorCapturePending(localStorage.getItem('bb_reflections'), liveMirrorsAllowed(store), store.mirrorCubemap)) {
+      if (initialMirrorCapturePending(reelSetting('bb_reflections'), liveMirrorsAllowed(store), store.mirrorCubemap)) {
         panorama = new THREE.WebGLCubeRenderTarget(1024,
           {generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter});
         const camera = new THREE.CubeCamera(.1, 1000, panorama);
@@ -55,7 +56,7 @@ export function refreshStockedReflections(store: StoreScene): void {
         const camera = new THREE.CubeCamera(.1, 1000, target); camera.position.copy(position);
         await captureCubeInSlices(store.renderer, store.scene, camera, wait, signal, state);
       }
-      if (shouldCaptureMirrorRoomProbe(localStorage.getItem('bb_reflections'), liveMirrorsAllowed(store), true)) {
+      if (shouldCaptureMirrorRoomProbe(reelSetting('bb_reflections'), liveMirrorsAllowed(store), true)) {
         panorama = new THREE.WebGLCubeRenderTarget(1024,
           {generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter});
         const camera = new THREE.CubeCamera(.1, 1000, panorama);

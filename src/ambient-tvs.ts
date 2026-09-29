@@ -1,3 +1,4 @@
+import { reelModeEnabled } from './reel-profile';
 import { compactAssets } from './mobile-assets';
 import { installTvMount } from './ambient-tv-mount';
 import { isExternalGameActive } from './external-game-state.ts';
@@ -334,6 +335,8 @@ export class AmbientTvs implements StoreFixture {
   constructor(private ctx: FixtureContext) {}
 
   build(): void {
+    // A library reel contains covers and the store, never frames from films.
+    if (reelModeEnabled()) { this.buildHardware(null); return; }
     // What the overhead sets may play (#39): libraries the user explicitly
     // selected (Settings → Playback → Overhead TVs, bb_tvlib_* toggles via
     // library-settings.ts) — or, with nothing selected, the original

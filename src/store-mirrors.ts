@@ -2,6 +2,7 @@
 // elevated room panorama: camera motion is free, moving objects are not live.
 // Box projection was rejected in an earlier trial because interior furniture
 // stretched onto the room shell. This option deliberately uses plain probes.
+import { reelSetting } from './reel-profile';
 import * as THREE from 'three';
 import { mobileStoreActive } from './mobile-store';
 import { coplanarMirrorGroups } from './mirror-view';
@@ -15,7 +16,7 @@ import { resolveReflectionMode, type MirrorReflectionMode } from './mirror-cubem
 import type { StoreScene } from './three-scene';
 export { shouldCaptureMirrorRoomProbe } from './mirror-cubemap-lifecycle';
 
-const reflectionMode = (): MirrorReflectionMode => resolveReflectionMode(localStorage.getItem('bb_reflections'));
+const reflectionMode = (): MirrorReflectionMode => resolveReflectionMode(reelSetting('bb_reflections'));
 type CubeMirror = { material: THREE.MeshBasicMaterial; mesh: THREE.Mesh };
 type MirrorState = {
   targets: MirrorRenderTarget; mode: MirrorReflectionMode; frame: number;
@@ -73,7 +74,7 @@ export function liveMirrorsAllowed(scene: StoreScene): boolean {
 }
 export function reflectorTargetSize(renderer: THREE.WebGLRenderer): { w: number; h: number } {
   const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const quality = localStorage.getItem('bb_quality') || 'high';
+  const quality = reelSetting('bb_quality') || 'high';
   const cap = quality === 'low' ? 256 : quality === 'medium' ? 512 : 1024;
   const w = Math.max(64, Math.min(cap, Math.round(buf.x)));
   return { w, h: Math.max(64, Math.round(w * (buf.y / Math.max(1, buf.x)))) };

@@ -1,3 +1,5 @@
+import { reelModeEnabled, reelSetting } from './reel-profile';
+import { updateReelFlight, reelFlightKey, reelFlightMouse } from './store-reel-flight';
 import { loadMobileRoomLighting, updateMobileRoomLighting } from './mobile-room-lighting';
 import { refreshStockedReflections, reflectionRefreshRunning } from './stocked-reflection-refresh';
 import { streamingInspectPose } from './streaming-case-pose';
@@ -217,6 +219,9 @@ function matrixAlmostEquals(a: THREE.Matrix4, b: THREE.Matrix4, eps = 1e-6): boo
 }
 
 export class StoreScene {
+  public readonly reelMode = reelModeEnabled();
+  public reelRecording = false;
+  public reelFlightActive = false;
   private disposeSurfaceFinishes: (() => void) | null = null;
   public container: HTMLDivElement;
   public renderer!: THREE.WebGLRenderer;
@@ -1855,7 +1860,7 @@ export class StoreScene {
     // (never consulted under softwareGL — that's always forced 'low' below);
     // else this regex guess, which stays forever as the first-boot-before-
     // calibration and calibration-failure fallback.
-    const explicitQuality = localStorage.getItem('bb_quality');
+    const explicitQuality = reelSetting('bb_quality');
     const calibrated = !explicitQuality && !softwareGL ? readCalibratedQuality(gpuName) : null;
     const phoneEntry = usesPhoneQualityDefault();
     const phoneBudget = phoneEntry && !explicitQuality;
@@ -1887,7 +1892,7 @@ export class StoreScene {
     // without that headroom get the 60-target divisor cap that protects weak
     // hardware. An explicit bb_fps_cap (the SERVICE MODE row) still forces
     // either behavior on any machine.
-    this.fpsCapOverride = localStorage.getItem('bb_fps_cap')
+    this.fpsCapOverride = reelSetting('bb_fps_cap')
       ?? (supersampleGranted ? '0' : null);
     if (softwareGL) {
       // Software frames cost seconds, so the dynamic scaler's one-step-per-
@@ -1932,7 +1937,7 @@ export class StoreScene {
     // ceiling (the 720p harness renders 2x, 1080p ~1.34x) — the budget is a
     // ceiling on total pixels, not a fixed scale. bb_px_budget (millions of
     // pixels) overrides for tuning, e.g. localStorage.bb_px_budget = "8.3".
-    const _budgetOverride = Number(localStorage.getItem('bb_px_budget'));
+    const _budgetOverride = Number(reelSetting('bb_px_budget'));
     const _budgetPx = _budgetOverride > 0 ? _budgetOverride * 1e6 :
       effectiveQuality === 'low' ? 2.1e6 : 3.7e6;
     const _cssPx = Math.max(1, (this.container.clientWidth || window.innerWidth || 1280) *
@@ -1960,11 +1965,11 @@ export class StoreScene {
     // off-switch, no rebuild: localStorage.bb_motion_sharp = "0".
     // Automatic phone quality keeps its pixel cap during swipes and settling.
     // Native-DPR refinement otherwise multiplies this budget by up to eight.
-    this.motionSharpDisabled = phoneBudget || localStorage.getItem('bb_motion_sharp') === '0';
+    this.motionSharpDisabled = phoneBudget || reelSetting('bb_motion_sharp') === '0';
     // Settle supersample factor (see settleScale). Software GL never pays it —
     // one full-res SwiftShader composite is already seconds long — and the
     // 'low' tier is a "this machine is struggling" signal, so it opts out too.
-    const _settleRaw = localStorage.getItem('bb_settle_ss');
+    const _settleRaw = reelSetting('bb_settle_ss');
     const _settleFactor = _settleRaw === null ? StoreScene.SETTLE_SS_DEFAULT : Number(_settleRaw);
     this.settleSsFactor = (phoneBudget || this.softwareGL || effectiveQuality === 'low' ||
                            !Number.isFinite(_settleFactor) || _settleFactor < 1)
@@ -1972,7 +1977,7 @@ export class StoreScene {
     // Motion supersample (see motionScale). Same opt-outs as the settle
     // factor — this one is paid every moving frame, so a struggling machine
     // must not take it. Off-switch, no rebuild: bb_motion_ss = "0".
-    const _motionRaw = localStorage.getItem('bb_motion_ss');
+    const _motionRaw = reelSetting('bb_motion_ss');
     const _motionFactor = _motionRaw === null ? StoreScene.MOTION_SS_DEFAULT : Number(_motionRaw);
     this.motionSsFactor = (phoneBudget || this.softwareGL || effectiveQuality === 'low' ||
                            !Number.isFinite(_motionFactor) || _motionFactor < 1)
@@ -2086,7 +2091,7 @@ export class StoreScene {
     omitPostprocessDepth(this.composer.renderTarget2);
 
     // AO: disabled on medium/low quality, or via explicit bb_ssao=0 override.
-    const ssaoEnabled = localStorage.getItem('bb_ssao') !== '0' && effectiveQuality === 'high';
+    const ssaoEnabled = reelSetting('bb_ssao') !== '0' && effectiveQuality === 'high';
     // AO engine (bb_ao): 'n8ao' (default) or 'gtao' (the previous engine,
     // kept selectable as a fallback while N8AO burns in). N8AO computes AO
     // from the beauty pass's own depth buffer — NO second full-scene
@@ -2100,7 +2105,7 @@ export class StoreScene {
     // Kept for the partial composite: N8AO owns the beauty target it patches,
     // and on every other tier the plain RenderPass is the pass it disables.
     const beautySource: { n8ao: N8AOPass | null; beautyPass: BeautyPass | null } = { n8ao: null, beautyPass: null };
-    console.log(`[AO] ssaoEnabled: ${ssaoEnabled} engine: ${ssaoEnabled ? aoEngine : '-'} (bb_ssao=${localStorage.getItem('bb_ssao')})`);
+    console.log(`[AO] ssaoEnabled: ${ssaoEnabled} engine: ${ssaoEnabled ? aoEngine : '-'} (bb_ssao=${reelSetting('bb_ssao')})`);
 
     if (useN8ao) {
       // N8AOPass REPLACES RenderPass (it renders the scene into its own
@@ -2895,7 +2900,7 @@ export class StoreScene {
   public mirrorMotionParity = 0;
   // bb_mirrors=0 — opt-out/measurement knob: freeze reflections at their last
   // render instead of re-rendering the scene as the camera moves.
-  public mirrorsFrozen = localStorage.getItem('bb_mirrors') === '0';
+  public mirrorsFrozen = reelSetting('bb_mirrors') === '0';
   // Sticky one-shot, consumed by the updateMirrorThrottle() call in animate():
   // set when the clerk comes to rest so mirrors catch her final pose. Her
   // update() runs in the pre-tier bookkeeping section (issue #96), so the rAF
@@ -2973,7 +2978,7 @@ export class StoreScene {
       }
       // Mirrors need a room vista, not a case-height close-up of one aisle.
       // One shared, elevated entrance capture adds only six scene passes per rebake.
-      if (mirrors.shouldCaptureMirrorRoomProbe(localStorage.getItem('bb_reflections'),
+      if (mirrors.shouldCaptureMirrorRoomProbe(reelSetting('bb_reflections'),
           mirrors.liveMirrorsAllowed(this), this.mirrorCubemap.ready)) {
         const target = new THREE.WebGLCubeRenderTarget(1024, {
           generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter,
@@ -3969,8 +3974,8 @@ export class StoreScene {
   // `free` (harness `?fly=1` / `npm run shot -- --fly 1`) suspends the walk
   // clamps — constrainWalkPosition()'s bounds AND the 5.5ft eye height — so
   // verification shots can frame the whole exterior (facade elevations, side
-  // walls) from outside the walkable envelope. Never set from gameplay input;
-  // any manual walk toggle clears it.
+  // walls) from outside the walkable envelope. Reel flight also uses it;
+  // returning to normal walking clears it.
   public teleportWalk(x: number, z: number, yawDeg = 0, pitchDeg = 0, y = 5.5, free = false): void { return cam.teleportWalk(this, x, z, yawDeg, pitchDeg, y, free); }
 
   /**
@@ -4426,8 +4431,12 @@ export class StoreScene {
       }
     }
 
+    if (this.reelFlightActive && !this.isWalkAroundMode) this.reelFlightActive = false;
     const touchWalk = mobileWalkInput(this);
-    if (this.isWalkAroundMode) {
+    if (this.reelFlightActive && this.isWalkAroundMode) {
+      updateReelFlight(this, clerkDt, firstActiveGamepad);
+      this.lastUpdateTime = time;
+    } else if (this.isWalkAroundMode) {
       const dt = Math.min(0.1, (time - this.lastUpdateTime) / 1000.0);
       this.lastUpdateTime = time;
       const ROTATION_SPEED = 1.6;
@@ -4776,7 +4785,7 @@ export class StoreScene {
     // point in the cap's vsync window it happened to land on.
     const forceWake = this.forceRenderFrames > 0;
     let active =
-      forceWake ||
+      this.reelRecording || this.reelFlightActive || forceWake ||
       walkKeyHeld ||
       cameraLerping ||
       aoFading ||
@@ -6084,87 +6093,12 @@ export class StoreScene {
 
   // First Person Walk Around Mode handlers
   private handleWalkKeyDown = (e: KeyboardEvent) => {
-    this.requestRender();
-    if (!this.isWalkAroundMode) return;
-
-    if (keyboardOwnedByControl()) {
-      return;
-    }
-
-    switch (e.key) {
-      case 'w':
-      case 'W':
-        this.walkKeys.w = true;
-        e.preventDefault();
-        break;
-      case 'a':
-      case 'A':
-        this.walkKeys.a = true;
-        e.preventDefault();
-        break;
-      case 's':
-      case 'S':
-        this.walkKeys.s = true;
-        e.preventDefault();
-        break;
-      case 'd':
-      case 'D':
-        this.walkKeys.d = true;
-        e.preventDefault();
-        break;
-      case 'ArrowUp':
-        this.walkKeys.ArrowUp = true;
-        e.preventDefault();
-        break;
-      case 'ArrowDown':
-        this.walkKeys.ArrowDown = true;
-        e.preventDefault();
-        break;
-      case 'ArrowLeft':
-        this.walkKeys.ArrowLeft = true;
-        e.preventDefault();
-        break;
-      case 'ArrowRight':
-        this.walkKeys.ArrowRight = true;
-        e.preventDefault();
-        break;
-    }
+    if (reelFlightKey(this, e, true)) return;
+    walk.handleWalkKey(this, e, true);
   };
-
   private handleWalkKeyUp = (e: KeyboardEvent) => {
-    this.requestRender();
-    if (!this.isWalkAroundMode) return;
-
-    switch (e.key) {
-      case 'w':
-      case 'W':
-        this.walkKeys.w = false;
-        break;
-      case 'a':
-      case 'A':
-        this.walkKeys.a = false;
-        break;
-      case 's':
-      case 'S':
-        this.walkKeys.s = false;
-        break;
-      case 'd':
-      case 'D':
-        this.walkKeys.d = false;
-        break;
-      case 'ArrowUp':
-        this.walkKeys.ArrowUp = false;
-        break;
-      case 'ArrowDown':
-        this.walkKeys.ArrowDown = false;
-        break;
-      case 'ArrowLeft':
-        this.walkKeys.ArrowLeft = false;
-        break;
-      case 'ArrowRight':
-        this.walkKeys.ArrowRight = false;
-        break;
-    }
+    if (reelFlightKey(this, e, false)) return;
+    walk.handleWalkKey(this, e, false);
   };
 
   private handlePointerLockChange = () => {
@@ -6177,6 +6111,11 @@ export class StoreScene {
     this.requestRender();
     if (!this.isWalkAroundMode || mobileStoreActive()) return;
 
+    if (this.reelFlightActive) {
+      reelFlightMouse(this, e);
+      if (this.isDragging) this.walkPressDragPx += Math.abs(e.movementX) + Math.abs(e.movementY);
+      return;
+    }
     // FPS mouse-look off raw movement deltas, locked or not.
     const MOUSE_SENSITIVITY = 0.0025;
     // Drop pointer-lock jump burst outlier (>200px)

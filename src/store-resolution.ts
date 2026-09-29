@@ -59,7 +59,7 @@ export function resetScalerWindow(scene: StoreScene, time: number) {
 export function updateDynamicResolution(
   scene: StoreScene, time: number, active: boolean, moving: boolean,
 ) {
-  if (!active || !moving) {
+  if (scene.reelMode || !active || !moving) {
     // VIDEO tier or stationary: don't let throttled or resting pacing feed the
     // window; just keep the clock from accumulating stale elapsed time across
     // the gap. (Deliberately keeps resScaleGoodStreak, as the original did —

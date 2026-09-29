@@ -1,3 +1,4 @@
+import { reelSetting } from './reel-profile';
 import { mobileStoreActive } from './mobile-store';
 import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
 import { exitReturnLayout } from './exit-return-layout';
@@ -3053,7 +3054,7 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
 export function buildMarqueeBulbs(scene: StoreScene, storeWidth: number, backWallZ: number) {
   const bulbsSetting = localStorage.getItem('bb_marquee_bulbs');
   const bulbsEnabled = bulbsSetting === null ? true : bulbsSetting === '1'; // default ON
-  const quality = localStorage.getItem('bb_quality') || 'high';
+  const quality = reelSetting('bb_quality') || 'high';
   if (!bulbsEnabled || quality === 'low') {
     scene.marqueeBulbsMesh = null;
     return;

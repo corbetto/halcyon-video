@@ -1,0 +1,15 @@
+#reel-controls {
+  position: fixed; z-index: 10020; left: 16px; bottom: 16px;
+  max-width: min(590px, calc(100vw - 32px)); padding: 14px 18px;
+  background: #16191eef; color: #f6eedb; border: 2px solid #c8b382;
+  box-sizing: border-box; font: 16px/1.4 sans-serif;
+}
+#reel-controls[hidden], #reel-controls [hidden] { display: none; }
+#reel-controls p { margin: 6px 0 10px; font-size: 16px; }
+#reel-controls button, #reel-controls a {
+  display: inline-block; padding: 9px 12px; margin: 4px 8px 0 0;
+  border: 1px solid #c8b382; background: #292e37; color: #fff3cf;
+  font: inherit; text-decoration: none; cursor: pointer;
+}
+body.reel-recording * { visibility: hidden !important; }
+body.reel-recording canvas[data-reel-canvas] { visibility: visible !important; cursor: none !important; }

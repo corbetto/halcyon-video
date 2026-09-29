@@ -1,3 +1,4 @@
+import { keyboardOwnedByControl } from './text-entry-focus';
 import { OVERVIEW_POS } from './scene-shared';
 import { mobileStoreActive } from './mobile-store';
 import { constrainWalkObstacles } from './walk-collision';
@@ -291,10 +292,11 @@ export function updateWalkHUD(scene: StoreScene) {
 }
 
 export function toggleWalkAround(scene: StoreScene) {
+  scene.reelFlightActive = false;
   // T23: no wandering the pocket room (its walls are set dressing, and the
   // store must stay unreachable during a lockout).
   if (scene.mode === 'backroom' && !scene.isWalkAroundMode) return;
-  scene.walkFreecam = false; // freecam is teleportWalk(free)-only; any manual toggle re-clamps
+  scene.walkFreecam = false; // leaving reel flight or a verification pose restores normal walk clamps
   scene.requestRender();
   if (scene.isWalkAroundMode) {
     // Exit walk around mode
@@ -375,4 +377,14 @@ export function toggleWalkAround(scene: StoreScene) {
     scene.updateWalkHUD();
     scene.onConsoleLog("[System] Walk Mode activated. Press WASD to walk, Arrows/Mouse to look.", "system");
   }
+}
+
+/** Shared down/up mapping; release always clears held movement. */
+export function handleWalkKey(scene: StoreScene, event: KeyboardEvent, pressed: boolean): void {
+  scene.requestRender();
+  if (!scene.isWalkAroundMode || (pressed && keyboardOwnedByControl())) return;
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  if (!(key in scene.walkKeys)) return;
+  scene.walkKeys[key as keyof typeof scene.walkKeys] = pressed;
+  if (pressed) event.preventDefault();
 }

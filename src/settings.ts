@@ -1,3 +1,4 @@
+import { REEL_MODE_KEY } from './reel-profile';
 import { STEAM_REVIEW_TIERS } from './steam-catalog';
 // ─── Schema-driven settings registry ───────────────────────────────────────
 //
@@ -988,6 +989,12 @@ export function registerCoreSettings(): void {
   });
 
   // Performance --------------------------------------------------------------
+  registerSetting({
+    key: REEL_MODE_KEY, label: 'Reel Recording Mode', kind: 'toggle',
+    group: 'Performance', default: false, applyMode: 'rebuild-scene',
+    hint: 'High detail, 4K pixel budget and reflections. L1/F9 records; R1/F flies. Silent, clean video; movie playback off. Close settings to apply.',
+  });
+
   registerSetting({
     key: 'bb_render_mode',
     label: 'Render Mode',

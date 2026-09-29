@@ -1,3 +1,4 @@
+import { hideReelObject } from './reel-visibility';
 import { selfLit } from './material-lighting';
 // T21 — floating labeled shelf cursors for the entrance-overview browsing mode.
 //
@@ -230,6 +231,10 @@ export class OverviewCursors {
 
   private labelY(i: number): number {
     return this.targets[i].y + 0.62 + (LABEL_W * (LABEL_CANVAS_H / LABEL_CANVAS_W)) / 2;
+  }
+
+  setCaptureHidden(hidden: boolean): void {
+    hideReelObject(this.group, hidden);
   }
 
   get visible(): boolean {

@@ -42,6 +42,17 @@ interface HelpSection {
 // then the in-store destinations it reaches, then the optional hardware.
 const HELP_SECTIONS: HelpSection[] = [
   {
+    title: 'Record a reel — Settings > Performance > Reel Recording Mode',
+    rows: [
+      { id: 'reel-record', control: 'L1 / F9', action: 'Start or stop a clean recording',
+        hint: 'High detail, silent video, up to 2 minutes. Saves locally.' },
+      { id: 'reel-fly', control: 'R1 / F', action: 'Toggle smooth fly camera',
+        hint: 'Sticks move/look; L2/R2 lower/raise; hold L3 for speed.' },
+      { id: 'reel-keys', control: 'WASD / Arrows / Page Up / Page Down',
+        action: 'Fly, look and change height', hint: 'Drag to look. Shift speeds up. Back returns to browsing.' },
+    ],
+  },
+  {
     title: 'The Remote — arrows, OK and Back run everything',
     rows: [
       {

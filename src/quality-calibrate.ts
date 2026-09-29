@@ -1,3 +1,4 @@
+import { reelSetting } from './reel-profile.ts';
 // Measured GPU quality calibration — replaces the WEBGL_debug_renderer_info
 // regex guess (see three-scene.ts's softwareGL/integratedGL match) with an
 // actual ~0.5-1s fill-rate micro-benchmark run on a throwaway WebGL2 canvas
@@ -478,7 +479,7 @@ async function runBenchmark(gl: WebGL2RenderingContext): Promise<number | null> 
  */
 export async function calibrateQualityIfNeeded(): Promise<QualityTier | null> {
   if (typeof localStorage === 'undefined') return null;
-  const explicit = localStorage.getItem('bb_quality');
+  const explicit = reelSetting('bb_quality');
   if (explicit) return isValidTier(explicit) ? explicit : null; // explicit override always wins, skips calibration entirely
   if (isHarnessActive()) return null;
   if (usesPhoneQualityDefault()) return 'low';
@@ -541,7 +542,7 @@ let backstopArmed = false;
 export function armQualityBackstop(): void {
   if (backstopArmed) return; // one-shot per page load — a settings rebuild re-calls this
   if (typeof localStorage === 'undefined' || typeof window === 'undefined') return;
-  if (localStorage.getItem('bb_quality')) return;
+  if (reelSetting('bb_quality')) return;
   backstopArmed = true;
   const tier = localStorage.getItem('bb_quality_auto');
   if (!isValidTier(tier) || tier === 'low') return; // nothing lower to fall back to
