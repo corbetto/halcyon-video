@@ -132,7 +132,7 @@ export function enterTvPeek(scene: StoreScene): boolean {
 export function tvPeekSelect(scene: StoreScene): boolean {
   const peek = scene.tvPeek;
   if (!peek) return false;
-  const movie = scene.ambientTvs?.getPlayingMovie();
+  const movie = scene.ambientTvs?.getPlayingMovie(peek.tvIdx);
   if (!movie) return true; // dead glass / test card — nothing to jump to
   scene.tvPeek = null; // leaving the peek for real inspect, not a browse return
   scene.jumpToTitle(movie.id);

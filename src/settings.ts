@@ -992,7 +992,7 @@ export function registerCoreSettings(): void {
   registerSetting({
     key: REEL_MODE_KEY, label: 'Reel Recording Mode', kind: 'toggle',
     group: 'Performance', default: false, applyMode: 'rebuild-scene',
-    hint: 'High detail, 4K pixel budget and reflections. L1/F9 records; R1/F flies. Silent, clean video; movie playback off. Close settings to apply.',
+    hint: 'High detail, 4K pixel budget and reflections. L1/F9 records; R1/F flies. Silent, clean video; full-screen playback off. Close settings to apply.',
   });
 
   registerSetting({

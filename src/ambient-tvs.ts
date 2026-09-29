@@ -1,4 +1,4 @@
-import { reelModeEnabled } from './reel-profile';
+import { AUTO_TV, groupTvPrograms, loadTvPrograms, tvProgramMovie, type TvProgram } from './ambient-tv-program';
 import { compactAssets } from './mobile-assets';
 import { installTvMount } from './ambient-tv-mount';
 import { isExternalGameActive } from './external-game-state.ts';
@@ -326,17 +326,59 @@ export class AmbientTvs implements StoreFixture {
   // video so the tube treatment is verifiable without a Jellyfin stream.
   private testCardTex: THREE.CanvasTexture | null = null;
   private disposed = false;
-  // The one movie streaming to every set (all screens share a single video
-  // element — see makeVideoTexture) — null when there's no stream (dead
-  // glass / test card). Read by the TV peek's Select action (store-tv-peek.ts)
-  // to jump straight to this title's box.
+  // The movie on this feed. Explicit screen programs create child feeds,
+  // shared by screens assigned the same program. TV peek resolves its own feed.
   private playingMovie: Movie | null = null;
 
-  constructor(private ctx: FixtureContext) {}
+  private feeds: AmbientTvs[] = [];
+  private screenFeeds: AmbientTvs[] = [];
+  private status: AmbientTvStatus = { source: 'dead', ok: false, title: null, lastFailureReason: null };
+  constructor(private ctx: FixtureContext, private feed?: {
+    program: TvProgram; screens: THREE.Mesh[]; poses: AmbientTvs['screenPoses'];
+    spheres: THREE.Sphere[]; primary: boolean;
+  }) {}
+
+  private reportStatus(patch: Partial<AmbientTvStatus>): void {
+    this.status = { ...this.status, ...patch };
+    this.lastFailureReason = this.status.lastFailureReason;
+    if (!this.feed || this.feed.primary) updateAmbientTvStatus(this.status);
+  }
+
+  private publishPicture(material: THREE.Material | null): void {
+    if (!this.feed || this.feed.primary) publishAmbientPicture(this.ctx.scene, material);
+  }
+
+  private buildProgramFeeds(programs: TvProgram[]): void {
+    const oldMaterial = this.pictureMat;
+    for (const { program, screens } of groupTvPrograms(programs, this.screenMeshes.length)) {
+      const feed = new AmbientTvs(this.ctx, { program, primary: screens.includes(0),
+        screens: screens.map(i => this.screenMeshes[i]),
+        poses: screens.map(i => this.screenPoses[i]),
+        spheres: screens.map(i => this.tvWorldSpheres[i]).filter(Boolean) });
+      feed.screenAspect = this.screenAspect;
+      this.feeds.push(feed);
+      for (const i of screens) this.screenFeeds[i] = feed;
+      feed.build();
+    }
+    oldMaterial?.dispose();
+    this.pictureMat = null;
+  }
+
+  getScreenLabels(): string[] {
+    return this.screenPoses.map((pose, i) => this.screenPoses.length === 2
+      ? 'TV ' + (i + 1) + (pose.center.x < 11 ? ' LEFT' : ' RIGHT')
+      : 'TV ' + (i + 1) + [' LEFT', ' CENTER', ' RIGHT'][i]);
+  }
 
   build(): void {
-    // A library reel contains covers and the store, never frames from films.
-    if (reelModeEnabled()) { this.buildHardware(null); return; }
+    if (!this.feed) {
+      const programs = loadTvPrograms();
+      if (programs.some(p => p.mode !== 'auto')) {
+        this.buildHardware(null);
+        this.buildProgramFeeds(programs);
+        return;
+      }
+    }
     // What the overhead sets may play (#39): libraries the user explicitly
     // selected (Settings → Playback → Overhead TVs, bb_tvlib_* toggles via
     // library-settings.ts) — or, with nothing selected, the original
@@ -375,7 +417,25 @@ export class AmbientTvs implements StoreFixture {
       size: pool.length,
       libs: [...new Set(pool.map(m => m.libraryName))].sort(),
     };
+    const program = this.feed?.program ?? AUTO_TV;
+    if (program.mode === 'movie') {
+      const selected = tvProgramMovie(program, allMovies);
+      pool = selected ? [selected] : [];
+    }
     this.pool = pool;
+    if (program.mode === 'off' || program.mode === 'loop' || program.mode === 'movie') {
+      let texture: THREE.VideoTexture | null = null;
+      if (program.mode === 'loop' && !compactAssets()) texture = this.makeDemoLoopTexture();
+      if (program.mode === 'movie' && pool.length && !compactAssets()) {
+        this.playingMovie = pool[0];
+        texture = this.makeVideoTexture(pool[0], 0);
+      }
+      this.reportStatus({ source: this.pictureSource, ok: !!texture || program.mode === 'off',
+        title: this.playingMovie?.title ?? (texture ? 'Big Buck Bunny' : null),
+        lastFailureReason: program.mode === 'movie' && !pool.length ? 'chosen movie is no longer available' : null });
+      this.buildHardware(texture);
+      return;
+    }
 
     // The TVs are store furniture — they hang from the ceiling regardless of
     // whether a stream is available; without a server they just show dead glass.
@@ -390,7 +450,7 @@ export class AmbientTvs implements StoreFixture {
         try {
           backend = localStorage.getItem('provider_kind') ?? 'jellyfin';
         } catch { /* no storage */ }
-        updateAmbientTvStatus({
+        this.reportStatus({
           source: 'stream',
           ok: true,
           title: movie.title,
@@ -416,7 +476,7 @@ export class AmbientTvs implements StoreFixture {
       const fallbackPref = getTvFallbackPreference();
       if (fallbackPref === 'testcard' || localStorage.getItem('bb_tv_testcard') === '1') {
         this.pictureSource = 'dead';
-        updateAmbientTvStatus({
+        this.reportStatus({
           source: 'dead',
           ok: true,
           title: 'SMPTE Test Card',
@@ -424,7 +484,7 @@ export class AmbientTvs implements StoreFixture {
         });
       } else if (fallbackPref !== 'dark' && demoLoopEnabled()) {
         videoTex = this.makeDemoLoopTexture();
-        updateAmbientTvStatus({
+        this.reportStatus({
           source: 'loop',
           ok: true,
           title: 'Big Buck Bunny',
@@ -432,7 +492,7 @@ export class AmbientTvs implements StoreFixture {
         });
       } else {
         this.pictureSource = 'dead';
-        updateAmbientTvStatus({
+        this.reportStatus({
           source: 'dead',
           ok: true,
           title: null,
@@ -441,7 +501,7 @@ export class AmbientTvs implements StoreFixture {
       }
     } else {
       this.pictureSource = 'dead';
-      updateAmbientTvStatus({
+      this.reportStatus({
         source: 'dead',
         ok: false,
         title: null,
@@ -525,7 +585,7 @@ export class AmbientTvs implements StoreFixture {
       // ended up on the glass, decided by a decoded frame rather than by
       // configuration. Cheap, and it is the one question a support log about
       // the ceiling TVs always has to answer first.
-      updateAmbientTvStatus({
+      this.reportStatus({
         ok: true,
         source: this.pictureSource,
         title: this.pictureSource === 'stream'
@@ -556,6 +616,7 @@ export class AmbientTvs implements StoreFixture {
   // of a title (#70).
   private pickPoolTitle(exclude: Movie | null): Movie {
     const pool = this.pool;
+    if (this.feed?.program.mode === 'movie') return pool[0];
     let next = pool[Math.floor(Math.random() * pool.length)];
     if (exclude && pool.length > 1) {
       for (let tries = 0; tries < 5 && next.id === exclude.id; tries++) {
@@ -571,16 +632,8 @@ export class AmbientTvs implements StoreFixture {
    * this can happen: a real store's monitors didn't freeze on the last frame
    * or silently rewind, they moved to another tape.
    *
-   * All the screens this fixture builds — the two ceiling sets, or the 2000
-   * theme's three-wide wall bank — already share this ONE <video>/HLS
-   * pipeline (see the class comment); that sharing predates this fix and
-   * settles the "independent or in step" question the ticket raises before
-   * it's even asked here. There is only ever one active transcode for the
-   * whole fixture, so advancing every screen together isn't a design choice
-   * made in this method — it's what the existing architecture already does.
-   * Giving each screen its own encode would multiply the transcode cost #69
-   * is about, for a loop-desync nobody watching a wall of monitors would
-   * ever register.
+   * Automatic screens share a feed. Explicit programs use one feed per
+   * distinct choice; a fixed movie restarts from its beginning.
    */
   private async advanceToNextTitle(): Promise<void> {
     if (this.disposed || this.pictureSource !== 'stream') return;
@@ -599,13 +652,13 @@ export class AmbientTvs implements StoreFixture {
     const next = this.pickPoolTitle(this.playingMovie);
     this.playingMovie = next;
     this.lastFailureReason = null;
-    updateAmbientTvStatus({
+    this.reportStatus({
       source: 'stream',
       ok: true,
       title: next.title,
       lastFailureReason: null,
     });
-    const seekSec = tvStartOffsetSec(next);
+    const seekSec = this.feed?.program.mode === 'movie' ? 0 : tvStartOffsetSec(next);
     this.ctx.log(`[System] CRT TVs: "${next.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
     this.armStreamWatchdog();
     await this.openStream(next, seekSec, video);
@@ -763,7 +816,7 @@ export class AmbientTvs implements StoreFixture {
     // same broken pipeline another video and keep a dead decoder attached to
     // the page, which is precisely what starved Remote Play's canvas capture
     // to zero frames while the store rendered fine.
-    if (opts.decoderFault || !video || fallbackPref === 'dark' || !demoLoopEnabled()) {
+    if (this.feed?.program.mode === 'movie' || opts.decoderFault || !video || fallbackPref === 'dark' || !demoLoopEnabled()) {
       showClerkToast(
         `Overhead TVs: Stream failed for "${movieTitle}" (${reason}) — screens dark`,
         6000,
@@ -785,7 +838,7 @@ export class AmbientTvs implements StoreFixture {
 
     this.ctx.log('[System] CRT TVs: running the in-store promo loop instead.', 'system');
     this.pictureSource = 'loop';
-    updateAmbientTvStatus({
+    this.reportStatus({
       source: 'loop',
       ok: false,
       title: 'Big Buck Bunny',
@@ -811,7 +864,7 @@ export class AmbientTvs implements StoreFixture {
     if (this.disposed || this.pictureSource === 'dead') return;
     this.pictureSource = 'dead';
     this.lastFailureReason = reason;
-    updateAmbientTvStatus({
+    this.reportStatus({
       source: 'dead',
       ok: false,
       title: null,
@@ -826,7 +879,7 @@ export class AmbientTvs implements StoreFixture {
     // so the one just detached would otherwise never be freed.
     this.pictureMat?.dispose();
     this.pictureMat = dead;
-    publishAmbientPicture(this.ctx.scene, dead);
+    this.publishPicture(dead);
     this.ctx.requestRender();
   }
 
@@ -834,7 +887,7 @@ export class AmbientTvs implements StoreFixture {
     if (this.disposed || this.pictureSource === 'dead') return;
     this.pictureSource = 'dead';
     this.lastFailureReason = reason;
-    updateAmbientTvStatus({
+    this.reportStatus({
       source: 'dead',
       ok: false,
       title: 'SMPTE Test Card',
@@ -848,7 +901,7 @@ export class AmbientTvs implements StoreFixture {
     for (const mesh of this.screenMeshes) mesh.material = testCardMat;
     this.pictureMat?.dispose();
     this.pictureMat = testCardMat;
-    publishAmbientPicture(this.ctx.scene, testCardMat);
+    this.publishPicture(testCardMat);
     this.ctx.requestRender();
   }
 
@@ -933,6 +986,12 @@ export class AmbientTvs implements StoreFixture {
         itemId,
         req
       );
+      if (this.disposed || this.pictureSource !== 'stream' || this.video !== video) {
+        if (source.kind === 'transcode' && source.sessionId) {
+          provider.cancelActiveTranscode?.(source.sessionId, undefined, { server, session })?.catch(() => {});
+        }
+        return;
+      }
       url = source.url;
       kind = source.kind;
       // Held so the encode can be torn down again — see cancelTranscode().
@@ -946,7 +1005,7 @@ export class AmbientTvs implements StoreFixture {
       this.giveUpOnStream(`server would not name a stream (${e?.message ?? e})`);
       return;
     }
-    if (this.disposed) return;
+    if (this.disposed || this.pictureSource !== 'stream' || this.video !== video) return;
 
     if (kind === 'direct') {
       // A backend with no transcoder hands back the file itself; the element
@@ -957,7 +1016,7 @@ export class AmbientTvs implements StoreFixture {
     }
 
     const HlsClass = await loadHls();
-    if (this.disposed) return;
+    if (this.disposed || this.pictureSource !== 'stream' || this.video !== video) return;
     if (HlsClass && HlsClass.isSupported()) {
       const hls = new HlsClass({
         startLevel: -1,
@@ -1087,6 +1146,7 @@ export class AmbientTvs implements StoreFixture {
    * immediately once this has been called.
    */
   public releaseDeferredMedia(): void {
+    for (const feed of this.feeds) feed.releaseDeferredMedia();
     this.mediaReleased = true;
     const video = this.deferredLoop;
     this.deferredLoop = null;
@@ -1097,6 +1157,23 @@ export class AmbientTvs implements StoreFixture {
   // positional audio). Kept separate from the streaming setup so the hardware
   // exists even when there's nothing to play.
   private buildHardware(videoTex: THREE.VideoTexture | null): void {
+    if (this.feed) {
+      this.screenMeshes = this.feed.screens;
+      this.screenPoses = this.feed.poses;
+      this.tvWorldSpheres = this.feed.spheres;
+      let texture: THREE.Texture | null = videoTex;
+      if (!texture && this.feed.program.mode === 'auto' &&
+          (localStorage.getItem('bb_tv_testcard') === '1' || getTvFallbackPreference() === 'testcard')) {
+        texture = this.testCardTex = makeCrtTestCardTexture();
+      }
+      const material = texture
+        ? selfLit(new THREE.MeshBasicMaterial({ map: texture }), 'light-source') : makeDeadTubeMaterial();
+      this.pictureMat = material;
+      for (const mesh of this.screenMeshes) mesh.material = material;
+      this.publishPicture(material);
+      this.setupTvAudio(this.screenPoses.map(p => p.center));
+      return;
+    }
     this.tvWorldSpheres = [];
     this.tvParts = [];
     this.screenPoses = [];
@@ -1155,7 +1232,7 @@ export class AmbientTvs implements StoreFixture {
     // Kept so goDeadGlass can retire the picture later: whether a source turns
     // out to be playable is not knowable at build time.
     this.pictureMat = screenMat;
-    publishAmbientPicture(this.ctx.scene, screenMat);
+    this.publishPicture(screenMat);
     // Static tube overlay (crt-tube.ts): rounded corners falling off dark,
     // edge vignette, faint scanlines — the PHOSPHOR side of the tube, all of
     // which only darkens. The room reflection is the glass pane below.
@@ -1625,6 +1702,10 @@ export class AmbientTvs implements StoreFixture {
       // against the shape actually on screen now.
       this.screenAspect = SCREEN_W / newH;
       this.refitVideoCrop?.();
+      for (const feed of this.feeds) {
+        feed.screenAspect = this.screenAspect;
+        feed.refitVideoCrop?.();
+      }
     }
 
     // Recompute the frustum-gating spheres for the reshaped screens.
@@ -1657,26 +1738,26 @@ export class AmbientTvs implements StoreFixture {
     return this.screenPoses;
   }
 
-  // The title currently streaming to every set, or null with no stream
-  // (dead glass) or the harness test card. Used by the TV peek's Select
-  // action to jump to that title's box.
-  getPlayingMovie(): Movie | null {
+  // Resolve the title on the selected physical screen for TV peek.
+  getPlayingMovie(screen = 0): Movie | null {
+    if (this.feeds.length) return this.screenFeeds[screen]?.getPlayingMovie() ?? null;
+    if (this.feed?.program.mode === 'movie' && this.pictureSource !== 'stream') return null;
     return this.playingMovie;
   }
 
   /** Live inspectable status structure for overhead TV playback diagnostics. */
-  getStatus(): AmbientTvStatus {
-    return getAmbientTvStatus();
+  getStatus(screen = 0): AmbientTvStatus {
+    return this.feeds.length ? this.screenFeeds[screen]?.getStatus() ?? this.status : { ...this.status };
   }
 
   /** Last stream failure reason, if any. */
   getLastFailureReason(): string | null {
-    return this.lastFailureReason;
+    return this.feeds.length ? this.screenFeeds[0]?.getLastFailureReason() ?? null : this.lastFailureReason;
   }
 
   /** Current picture source ('stream' | 'loop' | 'dead'). */
   getPictureSource(): AmbientTvSource {
-    return this.pictureSource;
+    return this.feeds.length ? this.screenFeeds[0]?.getPictureSource() ?? 'dead' : this.pictureSource;
   }
 
   // Per-frame: sync the Web Audio listener with the camera, and force the
@@ -1690,7 +1771,7 @@ export class AmbientTvs implements StoreFixture {
 
     this._projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._projScreen);
-    if (ambientReceiverInFrustum(this.ctx.scene, this._frustum)) return true;
+    if ((!this.feed || this.feed.primary) && ambientReceiverInFrustum(this.ctx.scene, this._frustum)) return true;
 
     for (let i = 0; i < this.tvWorldSpheres.length; i++) {
       if (this._frustum.intersectsSphere(this.tvWorldSpheres[i])) {
@@ -1713,6 +1794,7 @@ export class AmbientTvs implements StoreFixture {
   // VideoTexture upload (requestVideoFrameCallback chain can break after a seek
   // in Tauri's webview, so we drive needsUpdate manually).
   update(_timeMs: number): void {
+    for (const feed of this.feeds) feed.update(_timeMs);
     if (this.videoTex && this.video && !this.video.paused) {
       this.checkFrustumTransitions();
     }
@@ -1752,6 +1834,7 @@ export class AmbientTvs implements StoreFixture {
   // even when nothing else moves. A paused/ended/unbuffered video reports false so
   // the scene can drop to the idle heartbeat.
   isPlaying(): boolean {
+    if (this.feeds.length) return this.feeds.some(feed => feed.isPlaying());
     const videoPlaying = this.forcePlaying ||
       !!(this.video && !this.video.paused && !this.video.ended && this.video.readyState >= 2);
     if (!videoPlaying) return false;
@@ -1789,6 +1872,7 @@ export class AmbientTvs implements StoreFixture {
   }
 
   pause(): void {
+    for (const feed of this.feeds) feed.pause();
     if (isExternalGameActive()) { this.hls?.stopLoad(); this.clearStreamWatchdog(); this.clearLivenessWatchdog(); }
     this.video?.pause();
     // Screensaver/occlusion idle path: this AudioContext isn't reached by
@@ -1802,6 +1886,7 @@ export class AmbientTvs implements StoreFixture {
   }
 
   resume(): void {
+    for (const feed of this.feeds) feed.resume();
     if (isExternalGameActive()) return;
     this.hls?.startLoad();
     this.video?.play().catch(() => {});
@@ -1836,6 +1921,11 @@ export class AmbientTvs implements StoreFixture {
       this.videoTex = null;
     }
     this.refitVideoCrop = null;
+    if (this.gestureUnlock) {
+      window.removeEventListener('pointerdown', this.gestureUnlock, true);
+      window.removeEventListener('keydown', this.gestureUnlock, true);
+      this.gestureUnlock = null;
+    }
     if (this.audioCtx) {
       this.audioCtx.close().catch(() => {});
       this.audioCtx = null;
@@ -1843,7 +1933,10 @@ export class AmbientTvs implements StoreFixture {
   }
 
   dispose(): void {
-    publishAmbientPicture(this.ctx.scene, null);
+    for (const feed of this.feeds) feed.dispose();
+    this.feeds = [];
+    this.screenFeeds = [];
+    this.publishPicture(null);
     this.disposed = true; // gates the async GLB upgrade against a dead scene
     if (this.gestureUnlock) {
       window.removeEventListener('pointerdown', this.gestureUnlock, true);

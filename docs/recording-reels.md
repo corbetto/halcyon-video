@@ -21,9 +21,17 @@ L1 keeps its normal put-back action when Reel Recording Mode is off.
 
 The interface and floating selection markers disappear during recording.
 Recordings contain only the store canvas, with no microphone, system audio,
-browser chrome or desktop capture. Overhead movie screens and movie playback
-are disabled in this mode. Compose your shot and let nearby artwork load
+browser chrome or desktop capture. Overhead TVs keep playing in this mode;
+full-screen movie playback is disabled. Compose your shot and let nearby artwork load
 before starting a take.
+
+At the counter terminal, open **Overhead TV Programs**. Pick each screen, choose
+a movie, then **Save TV Choices**. Type to search or use left/right to page through
+the library. A fixed movie repeats when it ends; **Automatic** restores the normal
+rotation, **House Promo** plays the bundled loop, and **Off** leaves that screen dark.
+Choices survive reloads. If a fixed movie disappears or cannot play, its screen
+stays dark instead of choosing a different film. Screens showing the same choice
+share one feed; different movies can require separate server transcodes.
 
 Stopping a take downloads a video and leaves a **Save last take** link in case
 the browser blocks the automatic download. The recorder prefers MP4 when the

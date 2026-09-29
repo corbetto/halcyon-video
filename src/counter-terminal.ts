@@ -45,13 +45,14 @@ export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   // CRT-only row (#42): opens the BIOS-style date sub-screen that pins the
   // catalog to a rolling point in time (counter-terminal-flow.ts).
   'btn-media-date': 'MEDIA RELEASE DATE (PIN CATALOG)',
+  'btn-overhead-tvs': 'OVERHEAD TV PROGRAMS',
   'btn-cancel': 'RETURN TO STORE',
 };
 
 /** The home screen omits Help (inside Settings) and the retired staff page. */
 export function counterTerminalRows(powerRows: string[]): string[] {
   const rows = powerRows.filter((id) => id !== 'btn-controls' && id !== 'btn-service');
-  rows.splice(rows.indexOf('btn-cancel'), 0, 'btn-streaming', 'btn-media-date');
+  rows.splice(rows.indexOf('btn-cancel'), 0, 'btn-overhead-tvs', 'btn-streaming', 'btn-media-date');
   return rows;
 }
 
@@ -63,12 +64,15 @@ export function counterTerminalLines(ids: string[], selectedIndex: number): {
   lines: string[];
   cursorLine: number;
 } {
-  const lines = ['STORE TERMINAL — SYSTEM CONTROL', ''];
-  ids.forEach((id, idx) => {
+  const start = Math.floor(selectedIndex / 9) * 9;
+  const lines = ['STORE TERMINAL — SYSTEM CONTROL', ids.length > 9
+    ? 'PAGE ' + (Math.floor(start / 9) + 1) + '/' + Math.ceil(ids.length / 9) : ''];
+  ids.slice(start, start + 9).forEach((id, offset) => {
+    const idx = start + offset;
     lines.push(`${idx === selectedIndex ? '>' : ' '} ${COUNTER_TERMINAL_LABELS[id] ?? id}`);
   });
   // Two header rows precede the options, so the cursor tracks the selection.
-  return { lines, cursorLine: 2 + selectedIndex };
+  return { lines, cursorLine: 2 + selectedIndex - start };
 }
 
 // #77: drawTerminal (entrance/index.ts) seats the body between the title bar

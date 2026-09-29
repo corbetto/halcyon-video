@@ -37,9 +37,9 @@ test('idle screen keeps the default pitch', () => {
 
 test('the full manager ring seats without clipping (#77)', () => {
   const ids = Object.keys(COUNTER_TERMINAL_LABELS).filter((id) => id !== 'btn-project');
-  assert.equal(ids.length, 9); // distinct actions plus streaming and date
+  assert.equal(ids.length, 10); // distinct actions plus streaming and date
   const { lines, cursorLine } = counterTerminalLines(ids, ids.length - 1);
-  assert.equal(lines.length, 11); // 2 header rows + 9 buttons
+  assert.equal(lines.length, 3); // 2 header rows + 9 buttons
   assert.equal(lines[lines.length - 1], '> RETURN TO STORE');
   assert.equal(cursorLine, lines.length - 1);
   const { lineH, maxLines } = fitTerminalPitch(lines.length, LINE_H, FONT_PX, BODY_SPAN);
@@ -51,9 +51,9 @@ test('the full manager ring seats without clipping (#77)', () => {
 
 test('the demo manager ring seats without clipping (#133)', () => {
   const ids = Object.keys(COUNTER_TERMINAL_LABELS).filter((id) => id !== 'btn-logout' && id !== 'btn-exit');
-  assert.equal(ids.length, 8); // demo: logout/exit replaced by project link
+  assert.equal(ids.length, 9); // demo: logout/exit replaced by project link
   const { lines, cursorLine } = counterTerminalLines(ids, ids.length - 1);
-  assert.equal(lines.length, 10); // 2 header rows + 8 buttons
+  assert.equal(lines.length, 11); // 2 header rows + 8 buttons
   assert.equal(lines[lines.length - 1], '> RETURN TO STORE');
   assert.equal(cursorLine, lines.length - 1);
   const { lineH, maxLines } = fitTerminalPitch(lines.length, LINE_H, FONT_PX, BODY_SPAN);
@@ -64,7 +64,7 @@ test('the demo manager ring seats without clipping (#133)', () => {
 
 test('the home screen folds help into settings and retires the staff shortcut', () => {
   const rows = counterTerminalRows(['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-service', 'btn-cancel']);
-  assert.deepEqual(rows, ['btn-settings', 'btn-flat-mode', 'btn-streaming', 'btn-media-date', 'btn-cancel']);
+  assert.deepEqual(rows, ['btn-settings', 'btn-flat-mode', 'btn-overhead-tvs', 'btn-streaming', 'btn-media-date', 'btn-cancel']);
 });
 
 test('a list too long even at floor pitch reports a smaller maxLines', () => {

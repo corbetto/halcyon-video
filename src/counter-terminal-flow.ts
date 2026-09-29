@@ -12,6 +12,9 @@
 // main.ts wires it once via initCounterTerminalFlow(deps) and forwards its
 // input callbacks; nothing here touches DOM state beyond a keyboard listener
 // for typed digits while the date screen is up.
+import { loadTvPrograms, TV_PROGRAM_KEY } from './ambient-tv-program';
+import { initTvProgramScreen, tvProgramKey, tvProgramLines, tvProgramSearch, type TvProgramScreen } from './tv-program-screen';
+import type { Movie } from './jellyfin';
 import { counterTerminalLines } from './counter-terminal';
 import { SetupScreen, setupScreenKey, setupScreenLines } from './store-setup-screens';
 import {
@@ -49,6 +52,8 @@ export const MEDIA_DATE_BUTTON_ID = 'btn-media-date';
 export const STREAMING_BUTTON_ID = 'btn-streaming';
 
 interface TerminalScene {
+  readonly ambientTvs?: { getScreenLabels(): string[] } | null;
+  readonly libraries?: { movies: Movie[] }[];
   readonly checkoutRunning?: boolean;
   readonly launchAnim?: unknown;
   readonly checkoutExit?: unknown;
@@ -74,10 +79,11 @@ export interface CounterTerminalDeps {
 }
 
 let deps: CounterTerminalDeps | null = null;
-let mode: 'menu' | 'date' | 'streaming' = 'menu';
+let mode: 'menu' | 'date' | 'streaming' | 'tvs' = 'menu';
 let menuIndex = 0;
 let dateState: MediaDateScreenState | null = null;
 let streamingState: SetupScreen | null = null;
+let tvState: TvProgramScreen | null = null;
 
 export function initCounterTerminalFlow(d: CounterTerminalDeps): void {
   deps = d;
@@ -87,7 +93,10 @@ function render(): void {
   if (!deps) return;
   const scene = deps.scene();
   if (!scene) return;
-  if (mode === 'date' && dateState) {
+  if (mode === 'tvs' && tvState) {
+    const { lines, cursorLine } = tvProgramLines(tvState);
+    scene.setTerminalText(lines, cursorLine);
+  } else if (mode === 'date' && dateState) {
     const { lines, cursorLine } = mediaDateScreenLines(dateState, loadMediaReleasePin(), new Date());
     scene.setTerminalText(lines, cursorLine);
   } else if (mode === 'streaming' && streamingState) {
@@ -104,6 +113,27 @@ function render(): void {
 // Typed digits are keyboard-only sugar for the date fields; the remote path
 // is entirely arrows + OK. Capture-phase so the store's own key handling
 // never sees them while the screen is up.
+function onTvSearchKey(e: KeyboardEvent): void {
+  if (mode !== 'tvs' || !tvState || tvState.screen === null || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key !== 'Backspace' && e.key.length !== 1) return;
+  tvState = tvProgramSearch(tvState, e.key);
+  render();
+  e.preventDefault();
+  e.stopImmediatePropagation();
+}
+function enterTvScreen(): void {
+  mode = 'tvs';
+  const scene = deps?.scene();
+  tvState = initTvProgramScreen(loadTvPrograms(), scene?.ambientTvs?.getScreenLabels() ?? [],
+    scene?.libraries?.flatMap(lib => lib.movies) ?? []);
+  window.addEventListener('keydown', onTvSearchKey, true);
+  render();
+}
+function leaveTvScreen(): void {
+  mode = 'menu';
+  tvState = null;
+  window.removeEventListener('keydown', onTvSearchKey, true);
+}
 function onDigitKey(e: KeyboardEvent): void {
   if (mode !== 'date' || !dateState || !/^[0-9]$/.test(e.key)) return;
   dateState = mediaDateScreenDigit(dateState, e.key);
@@ -148,6 +178,7 @@ function leaveStreamingScreen(): void {
 function leaveSubScreens(): void {
   leaveDateScreen();
   leaveStreamingScreen();
+  leaveTvScreen();
 }
 
 export function counterTerminalOpen(): void {
@@ -222,6 +253,22 @@ async function saveStreamingChoice(s: SetupScreen): Promise<void> {
 export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
   if (!deps || !deps.ui.isCounterTerminalOpen) return;
 
+  if (mode === 'tvs' && tvState) {
+    deps.keyClick();
+    const { state, action } = tvProgramKey(tvState, kind);
+    tvState = state;
+    if (action === 'save') {
+      try { localStorage.setItem(TV_PROGRAM_KEY, JSON.stringify(state.programs)); }
+      catch { deps.log('[Terminal] TV choices could not be saved.'); return; }
+      counterTerminalClose();
+      await flushConfigPush();
+      await deps.rebuild();
+      return;
+    }
+    if (action === 'back') leaveTvScreen();
+    render();
+    return;
+  }
   if (mode === 'streaming' && streamingState) {
     deps.keyClick();
     // Back belongs to this file, not the reducer: on opening day the picker
@@ -265,6 +312,11 @@ export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
     }
     case 'ok': {
       const btnId = deps.buttons[menuIndex];
+      if (btnId === 'btn-overhead-tvs') {
+        deps.keyClick();
+        enterTvScreen();
+        return;
+      }
       if (btnId === MEDIA_DATE_BUTTON_ID) {
         deps.keyClick();
         enterDateScreen();
