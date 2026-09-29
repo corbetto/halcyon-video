@@ -326,6 +326,8 @@ export class AmbientTvs implements StoreFixture {
   // video so the tube treatment is verifiable without a Jellyfin stream.
   private testCardTex: THREE.CanvasTexture | null = null;
   private disposed = false;
+  private bodyDetailLifetime = new AbortController();
+  private cancelBodyDetail: (() => void) | undefined;
   // The movie on this feed. Explicit screen programs create child feeds,
   // shared by screens assigned the same program. TV peek resolves its own feed.
   private playingMovie: Movie | null = null;
@@ -1399,7 +1401,9 @@ export class AmbientTvs implements StoreFixture {
     // T24: swap the procedural shells for the real CRT GLB once it loads.
     // Fire-and-forget — if models/tv_ceiling.glb hasn't been downloaded yet
     // (Sketchfab needs a human login), the procedural bodies above simply stay.
-    void this.upgradeToGlbBodies();
+    const upgrade = () => this.upgradeToGlbBodies();
+    this.cancelBodyDetail = this.ctx.scheduleDetailLoad?.(upgrade);
+    if (!this.ctx.scheduleDetailLoad) void upgrade();
 
     // Positional audio: route video through two PannerNodes at each TV's world position.
     // The listener position is updated every frame in update() so it tracks the camera.
@@ -1674,8 +1678,21 @@ export class AmbientTvs implements StoreFixture {
         // bring its front face up to the video plane.
         wrapper.position.set(0, -handle.size.y / 2 * extra, (planeZ - 0.02) - handle.size.z / 2 * extra);
       }
+      // The existing cabinet stays visible while deferred detail prepares its
+      // actual room-lighting programs and maps. A resumed walk pauses that
+      // preparation through the same interaction gate as other fixtures.
+      wrapper.visible = !this.ctx.prepareDetailModel;
       part.tvG.add(wrapper);
       markPatchLayer(wrapper); // the real tube joins the partial-composite patch
+      try {
+        if (this.ctx.prepareDetailModel) await this.ctx.prepareDetailModel(wrapper, this.bodyDetailLifetime.signal);
+      } catch (error) {
+        wrapper.removeFromParent();
+        if (!this.disposed) this.ctx.log(`TV detail preparation failed; keeping built-in cabinet. ${String(error)}`, 'system');
+        return;
+      }
+      if (this.disposed) { wrapper.removeFromParent(); return; }
+      wrapper.visible = true;
 
       // Retire the procedural shell. (addCollider only registers the mesh —
       // nothing raycasts the list — so removing it here is safe.)
@@ -1691,6 +1708,8 @@ export class AmbientTvs implements StoreFixture {
           m.geometry = makeCurvedScreenGeometry(SCREEN_W, newH, SCREEN_BULGE);
         }
       }
+      this.ctx.requestShadowRefresh();
+      this.ctx.requestRender();
     }
     this.bodyMat?.dispose();
     this.bodyMat = null;
@@ -1938,6 +1957,8 @@ export class AmbientTvs implements StoreFixture {
     this.screenFeeds = [];
     this.publishPicture(null);
     this.disposed = true; // gates the async GLB upgrade against a dead scene
+    this.cancelBodyDetail?.();
+    this.bodyDetailLifetime.abort();
     if (this.gestureUnlock) {
       window.removeEventListener('pointerdown', this.gestureUnlock, true);
       window.removeEventListener('keydown', this.gestureUnlock, true);
