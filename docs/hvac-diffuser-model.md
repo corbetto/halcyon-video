@@ -42,4 +42,4 @@ anchors remain unchanged.
 
 Verification photographs and run notes are kept privately in
 `scratch/publicity-kits/cecil-vent-model` so public builds do not carry
-synthetic-library imagery. 
+synthetic-library imagery.
