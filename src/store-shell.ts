@@ -10,6 +10,7 @@ import { buildClubhouseSoffit, clubhouseSoffitPolygon } from './clubhouse-soffit
 import { CLUBHOUSE } from './fixtures/clubhouse-layout';
 import { NR_RUN_DEPTH } from './store-layout';
 import { installCeilingGrid } from './ceiling-grid';
+import { installHvacDiffusers } from './hvac-diffuser-model';
 import { moduleGridPlan } from './ceiling-grid-plan';
 import { installMarqueeModel } from './marquee-bulb-model';
 import { installPosterFrame } from './poster-frame-model';
@@ -1005,6 +1006,9 @@ export function buildStore(scene: StoreScene) {
     scene.scene.add(ventFrameMesh);
     scene.scene.add(ventFaceMesh);
     gridFallback.push(ventFrameMesh);
+    installHvacDiffusers(scene.fixtureContext(), scene.scene,
+      ventSpots.map(spot => ({ x: spot.x, y: ceilingY - 0.03, z: spot.z })),
+      [ventFrameMesh, ventFaceMesh]);
   }
 
   if (gridSpots.length) installCeilingGrid({

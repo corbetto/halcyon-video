@@ -6,6 +6,7 @@ import { installPriceLabelGun } from '../fixtures/price-label-gun';
 import { counterOfficeKitAnchor, priceLabelGunAnchor } from '../store-fixtures-config';
 import { finishEquipmentSurfaces } from '../fixtures/equipment-surfaces';
 import { disposeDetachedModel } from '../model-resources';
+import { installHvacDiffusers } from '../hvac-diffuser-model';
 import { selfLit } from '../material-lighting';
 // Front entrance vestibule + walk-in checkout desk, modelled on the classic
 // Entrance airlock. Self-contained fixture: owns the glazed chamber, the
@@ -557,6 +558,7 @@ export class EntranceCheckout implements StoreFixture {
         });
         const ventW = Math.min(boxDepth * 0.6, 2.0);
         const ventH = ventW / 2; // matches the texture's 256x128 (2:1) aspect
+        const ventFallback: THREE.Object3D[] = [];
         [cx + boxW / 4, cx - boxW / 4].forEach((vx) => {
           const vent = new THREE.Mesh(new THREE.PlaneGeometry(ventW, ventH), ventMat);
           // Just BELOW the cap's own bottom face (which sits exactly at wallH) —
@@ -565,7 +567,12 @@ export class EntranceCheckout implements StoreFixture {
           vent.position.set(vx, wallH - 0.01, (frontZ + backZ) / 2);
           vent.rotation.x = Math.PI / 2; // normal points down, into the chamber below
           group.add(vent);
+          ventFallback.push(vent);
         });
+        installHvacDiffusers(this.ctx, group,
+          [cx + boxW / 4, cx - boxW / 4].map(vx => ({
+            x: vx, y: wallH - 0.01, z: (frontZ + backZ) / 2, scale: ventW / 5,
+          })), ventFallback);
       }
 
       // ----- Vestibule ceiling -----

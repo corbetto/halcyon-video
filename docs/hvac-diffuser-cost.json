@@ -1,0 +1,109 @@
+{
+  "units": "store feet",
+  "store_bounds_feet": {
+    "x": [
+      -2.485,
+      2.485
+    ],
+    "y": [
+      -0.215,
+      0.015
+    ],
+    "z": [
+      -1.235,
+      1.235
+    ]
+  },
+  "parts": {
+    "DiffuserFrame": {
+      "material": "PaintedSteel",
+      "triangles": 64,
+      "vertices": 32,
+      "manifold": true
+    },
+    "RecessPan": {
+      "material": "RecessShadow",
+      "triangles": 12,
+      "vertices": 8,
+      "manifold": true
+    },
+    "DirectionalLouvers": {
+      "material": "LouverMetal",
+      "triangles": 132,
+      "vertices": 88,
+      "manifold": true
+    }
+  },
+  "total_triangles": 208,
+  "glb_bytes": 17016,
+  "textures": 0,
+  "material_roles": [
+    "PaintedSteel",
+    "RecessShadow",
+    "LouverMetal"
+  ],
+  "exported_glb": {
+    "triangles": 208,
+    "vertices": 384,
+    "parts": {
+      "DiffuserFrame": {
+        "triangles": 64,
+        "vertices": 96,
+        "uvs": 96,
+        "material": "PaintedSteel",
+        "bounds_min": [
+          -2.485,
+          -0.185,
+          -1.235
+        ],
+        "bounds_max": [
+          2.485,
+          0.015,
+          1.235
+        ]
+      },
+      "DirectionalLouvers": {
+        "triangles": 132,
+        "vertices": 264,
+        "uvs": 264,
+        "material": "LouverMetal",
+        "bounds_min": [
+          -2.2,
+          -0.215,
+          -0.92
+        ],
+        "bounds_max": [
+          2.2,
+          -0.073,
+          0.92
+        ]
+      },
+      "RecessPan": {
+        "triangles": 12,
+        "vertices": 24,
+        "uvs": 24,
+        "material": "RecessShadow",
+        "bounds_min": [
+          -2.225,
+          -0.035,
+          -0.975
+        ],
+        "bounds_max": [
+          2.225,
+          -0.005,
+          0.975
+        ]
+      }
+    },
+    "bounds_min": [
+      -2.485,
+      -0.215,
+      -1.235
+    ],
+    "bounds_max": [
+      2.485,
+      0.015,
+      1.235
+    ]
+  }
+}
