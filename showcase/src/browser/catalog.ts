@@ -20,7 +20,9 @@ refreshDates();document.addEventListener('visibilitychange',()=>{if(!document.hi
 const back=document.querySelector<HTMLAnchorElement>('[data-browse-return]');
 if(back){
   const ref=safeReturnPath(document.referrer,location.origin);
-  if(ref){back.href=ref;back.addEventListener('click',event=>{if(!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&event.button===0&&history.length>1){event.preventDefault();history.back();}});}
+  const saved=safeReturnPath(typeof history.state?.catalogBrowseReturn==='string'?history.state.catalogBrowseReturn:null,location.origin);
+  if(ref)try{history.replaceState({...history.state,catalogBrowseReturn:ref},'',location.href);}catch{/* ordinary links still work */}
+  if(ref||saved){back.href=ref||saved!;back.addEventListener('click',event=>{if(ref&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&event.button===0&&history.length>1){event.preventDefault();history.back();}});}
 }
 
 const catalog=document.querySelector<HTMLElement>('[data-catalog]');

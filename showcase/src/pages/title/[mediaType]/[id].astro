@@ -4,9 +4,11 @@ import Poster from '../../../components/Poster.astro';
 import {snapshot} from '../../../catalog/load';
 import {services} from '../../../catalog/services';
 import {watchRows} from '../../../catalog/presentation';
+import {serializeHandoff} from '../../../../../src/catalog-handoff';
 export function getStaticPaths(){return snapshot.titles.map(title=>({params:{mediaType:title.mediaType,id:String(title.tmdbId)},props:{title}}));}
 const {title}=Astro.props;
 const offers=watchRows(title,snapshot.source);
+const context=new URLSearchParams({catalog:serializeHandoff({version:1,mediaType:title.mediaType,tmdbId:title.tmdbId,region:'US'})}).toString();
 ---
 <Page title={title.title} description={title.synopsis}>
   <a class="back-link" data-browse-return href="/browse/">Back to browse</a>
@@ -17,5 +19,5 @@ const offers=watchRows(title,snapshot.source);
     {snapshot.source==='fixture'&&<p class="feedback">These are fictional test records. External watch links are disabled in this preview.</p>}
     {offers.length?<ul class="offers">{offers.map(offer=><li data-offer data-checked={offer.checkedAt} data-link-kind={offer.kind}><strong>{services.find(s=>s.id===offer.serviceId)?.name??offer.serviceId}</strong><p>{offer.type==='subscription'?'Subscription listing':offer.type==='rent'?'Rental listing':'Purchase listing'} · checked {offer.checkedAt.slice(0,10)}</p>{offer.url?<a href={offer.url} rel="external noreferrer">{offer.label}</a>:<span class="fixture-link">{snapshot.source==='fixture'?'Sample link disabled':'Provider link is no longer current'}</span>}<small>{offer.kind==='verified-provider'?'Provider link verified at the recorded check.':'TMDB watch-options page; not a verified direct provider link.'}</small></li>)}</ul>:<p>No recorded offers for this title. That does not mean it is unavailable everywhere.</p>}
   </details>
-  <p><a class="back-link" href="/store/">Explore the separate 3D store</a></p>
+  <nav class="continuation" aria-label="Optional experiences"><a href={'/store/?'+context}>Explore the 3D store</a><a href={'/self-host/?'+context}>Make it your own</a></nav>
 </Page>

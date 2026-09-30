@@ -1,4 +1,19 @@
 ---
 import Page from '../layouts/Page.astro';
+import {HOSTED_STORE_URL} from '../../../src/catalog-handoff';
+import storeStill from '../assets/store-original.webp';
 ---
-<Page title="Step into the store."><h1>Step into the store.</h1><p>Explore Halcyon as an immersive 3D video store. It loads only when you choose to enter, and may take longer on a phone.</p><p><a class="button" href="https://halcyon-video.github.io/halcyon-video/">Enter the 3D store</a></p><p><a href="/browse/">Keep browsing here</a></p></Page>
+<Page title="Step into the store."><div data-handoff-page data-source="fixture">
+  <a class="back-link" data-context-return href="/browse/">Keep browsing the catalog</a>
+  <h1>Step into the store.</h1>
+  <p class="lead">A room to wander, shelves to browse, and a counter to check out. The hosted store works without a media server, account setup or API key.</p>
+  <figure class="store-still"><img src={storeStill.src} width="960" height="540" alt="Halcyon’s blue counter facing movie shelves in a brightly lit video store"/><figcaption>Halcyon’s 3D layout, shown with sample shelf art. Stock and appearance vary. <a href="https://github.com/halcyon-video/halcyon-video/blob/dev/public/demo-posters/ATTRIBUTION.md" rel="external noreferrer">Sample poster sources and credits</a></figcaption></figure>
+  <p id="handoff-context" class="feedback">This preview uses fictional titles. Entering the real 3D store opens its overview, not one of these sample titles.</p>
+  <p>The 3D store loads only after you choose to enter. It uses more data and graphics power than this catalog and may take longer on a phone.</p>
+  <p><a data-store-entry data-cta="store_entry" class="button" href={HOSTED_STORE_URL} rel="external noreferrer">Enter the 3D store</a></p>
+  <p>The currently hosted version may not yet understand catalog title links. Its own service selection and counter checkout stay in charge; entering never starts playback or promises that a movie is available.</p>
+  <p>Use your browser’s Back button to return here with your catalog history intact.</p>
+  <section class="continuation" aria-labelledby="continue-heading"><h2 id="continue-heading">Continue on a bigger screen</h2><p>Copy this catalog stop to a TV or computer. No pairing or account is needed.</p><label for="continue-link">Link to this catalog stop</label><input id="continue-link" data-share-link type="url" readonly aria-describedby="share-note"/><button type="button" data-copy-link hidden>Copy link</button><p data-copy-status role="status"></p><p id="share-note" class="muted">A development-preview link works only where this preview is reachable. No public catalog address has been configured.</p></section>
+  <p><a class="back-link" data-self-host href="/self-host/">Make it your own</a></p>
+  <noscript><p>JavaScript is off. The 3D entry still works; it opens the overview. To share this page, copy its address from your browser.</p></noscript>
+</div></Page>

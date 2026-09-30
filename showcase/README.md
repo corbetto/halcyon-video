@@ -6,6 +6,10 @@ now support the fixture-based mobile browse/search/title increment for
 public launch: live-source permission, real poster/offer acceptance and physical
 phone trials remain open. See [BROWSE.md](BROWSE.md) for behavior and evidence.
 
+Optional 3D entry, title handoff, sharing and the installation checklist are
+documented in [HANDOFF.md](HANDOFF.md). Fixture identities never select real
+movie stock, and neither path is required to keep browsing.
+
 ```sh
 cd showcase
 npm ci

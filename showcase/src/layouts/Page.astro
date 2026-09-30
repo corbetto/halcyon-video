@@ -12,5 +12,5 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : undefin
   <header class="masthead"><a class="brand" href="/" aria-label="Halcyon Video home">HALCYON <span>VIDEO</span></a><nav aria-label="Main"><a href="/browse/">Browse</a><a href="/about/">About</a><a href="/store/">3D store</a></nav></header>
   <main id="main" tabindex="-1"><p class="preview">Development preview · fictional sample titles</p><slot /></main>
   <footer><p>Curated selection · United States</p><p>Fixture date: <time datetime={snapshot.checkedAt}>{snapshot.checkedAt.slice(0,10)}</time>. No live availability claims.</p><a href="/self-host/">Make it your own</a></footer>
-  <script>import '../browser/catalog';</script>
+  <script>import '../browser/catalog';import '../browser/handoff';</script>
 </body></html>

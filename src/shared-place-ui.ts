@@ -18,6 +18,7 @@
 import type { StoreScene } from './three-scene';
 import { applySharedPlaceFromUrl, captureSharedPlace } from './store-camera';
 import { buildShareUrl } from './shared-place';
+import { initCatalogHandoff } from './catalog-handoff-ui';
 
 let bootApplied = false;
 let keybindingInstalled = false;
@@ -36,7 +37,8 @@ export function initSharedPlace(
   isBlocked: () => boolean,
   showToast: ShowToast,
 ): void {
-  if (!bootApplied && !setupPending) {
+  const catalogHandled = initCatalogHandoff(scene, setupPending);
+  if (!bootApplied && !setupPending && !catalogHandled) {
     bootApplied = true;
     applySharedPlaceFromUrl(scene);
   }
