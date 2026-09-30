@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { Movie, Episode } from './jellyfin';
 import { requestHeroFrontDetail } from './hero-front-detail';
+import { createInspectionMesh, setInspectionGeometry } from './inspection-mesh';
 import { posterQueue, CASE_MEDIUM, leftmostColorCache, posterPixelCache, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, createHeroRentalMaterials, applyGameCaseArt, backCoverRegions, getSeriesBoxsetGeometry, createHeroSeriesBoxsetMaterials, drawSeriesBrandPanel, drawSeriesEpisodeBackCover, drawSeriesSeasonPanel, gameCaseDims, gameRentalDims } from './video-case';
 import { isWhiteClamshell } from './packaging-formats';
 import { detailedCaseGeometry, withCaseConstructionMaterials } from './packaging-model';
@@ -607,8 +608,8 @@ export function updateBackCoverHighlight(scene: StoreScene) {
 
   // Flipping changes the pose, never the physical rental construction.
   if (scene.heroBackMesh) {
-    scene.heroBackMesh.geometry = detailedCaseGeometry(getRentalCaseGeometry(false,
-      movie.game ? gameRentalDims(movie.platform) : undefined));
+    setInspectionGeometry(scene.heroBackMesh, detailedCaseGeometry(getRentalCaseGeometry(false,
+      movie.game ? gameRentalDims(movie.platform) : undefined)));
   }
 }
 
@@ -628,8 +629,8 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
   if (!scene.heroFrontMesh || !scene.heroBackMesh) {
     const geoFront = getCaseGeometry(isAnimated, gameDims);
     const geoBack = getRentalCaseGeometry(false, shellDims);
-    const front = new THREE.Mesh(geoFront, createHeroJellyfinMaterials(movie, undefined, false, false, probeIdx));
-    const back = new THREE.Mesh(geoBack, createHeroRentalMaterials(movie, false, probeIdx));
+    const front = createInspectionMesh(geoFront, createHeroJellyfinMaterials(movie, undefined, false, false, probeIdx));
+    const back = createInspectionMesh(geoBack, createHeroRentalMaterials(movie, false, probeIdx));
     [front, back].forEach((m) => {
       m.castShadow = true;
       m.receiveShadow = true;
@@ -655,8 +656,8 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     scene.heroMovieId = movie.id;
     heroWasNRCase = nrCase;
     heroDetailKey = wantDetail;
-    scene.heroFrontMesh.geometry = movie.isSeries && !movie.streaming ? getSeriesBoxsetGeometry() : detailedCaseGeometry(getCaseGeometry(isAnimated, gameDims));
-    scene.heroBackMesh.geometry = detailedCaseGeometry(getRentalCaseGeometry(false, shellDims));
+    setInspectionGeometry(scene.heroFrontMesh, movie.isSeries && !movie.streaming ? getSeriesBoxsetGeometry() : detailedCaseGeometry(getCaseGeometry(isAnimated, gameDims)));
+    setInspectionGeometry(scene.heroBackMesh, detailedCaseGeometry(getRentalCaseGeometry(false, shellDims)));
     scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
     scene.applyNrBayWash?.(scene.heroFrontMesh);
     // Jewel-case platforms carry their clear-lid dressing on the hero mesh;

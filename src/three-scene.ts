@@ -164,6 +164,7 @@ import { ShelfClasps, type ClaspTarget } from './fixtures/shelf-clasp';
 import { requestMovie } from './jellyseerr';
 import { displayHz, computeFpsCap } from './display-hz';
 import * as resolution from './store-resolution';
+import { disposeInspectionMesh } from './inspection-mesh';
 import { RES_SCALE_MAX } from './store-resolution';
 import { type LibraryIndex } from './recommend-why';
 import type { ClerkSuggestion } from './clerk-interaction';
@@ -5935,8 +5936,8 @@ export class StoreScene {
 
     // Hero cases + person endcap live outside this.meshes (shared geometry /
     // cached materials), so detach them explicitly.
-    if (this.heroFrontMesh) { this.scene.remove(this.heroFrontMesh); this.heroFrontMesh = null; }
-    if (this.heroBackMesh) { this.scene.remove(this.heroBackMesh); this.heroBackMesh = null; }
+    if (this.heroFrontMesh) { this.scene.remove(this.heroFrontMesh); disposeInspectionMesh(this.heroFrontMesh); this.heroFrontMesh = null; }
+    if (this.heroBackMesh) { this.scene.remove(this.heroBackMesh); disposeInspectionMesh(this.heroBackMesh); this.heroBackMesh = null; }
     this.heroMovieId = null;
     this.heroSlotKey = null;
     // Clasps own their geometry, materials and canvas textures outright (the
