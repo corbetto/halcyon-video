@@ -1,6 +1,6 @@
 ---
 import Page from '../layouts/Page.astro';
-import Titles from '../components/Titles.astro';
-import { pages } from '../catalog/load';
+import Catalog from '../components/Catalog.astro';
+import {pages,snapshot} from '../catalog/load';
 ---
-<Page title="Your next good watch"><p class="meta">THE HALCYON SELECTION</p><h1>A good night starts with a good story.</h1><p class="lead">Explore movies and series, find your next watch, and take a little of the video-store feeling with you.</p><Titles titles={pages[0].titles} /><a class="button" href="/browse/">Browse the selection</a></Page>
+<Page title="Browse movies and series"><h1>Find your next good watch.</h1><Catalog titles={pages[0].titles} total={pages.length} count={snapshot.titles.length}/></Page>

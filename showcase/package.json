@@ -13,6 +13,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "check": "npm run typecheck && npm test && npm run build && npm run test:artifact",
     "test:artifact": "node --test tests/artifact.test.mjs",
+    "test:browser": "playwright test",
     "publish:fixture": "node --experimental-strip-types tools/publish-fixture.ts",
     "typecheck": "astro check"
   },
@@ -22,6 +23,8 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "22.19.0",
     "typescript": "6.0.3"
   }

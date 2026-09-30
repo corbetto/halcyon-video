@@ -102,10 +102,18 @@ region, last check, coverage, counts and artifact URLs. Every JSON page/search
 index repeats the identity envelope. Data paths include version plus hash;
 they cannot collide when a version name is accidentally reused with new bytes.
 
-The search index contains only key, title, media type, year, genres and route.
-#355 loads it on search intent, checks the envelope against the current manifest,
-and preserves URL filters, Back and scroll state. No eager index download,
-no all-catalog DOM mount. Movie and TV pages are readable with JavaScript off.
+Artifact format 2 adds subscription-service IDs and the nullable poster path to
+the compact index's key, title, media type, year, genres and route. Its envelope
+declares `artifactVersion: 2`; paths append `-a2` after the snapshot/hash identity,
+so changed derived bytes never overwrite a previous immutable URL. The snapshot
+input schema remains version 1. The publisher still verifies and rolls back old
+format-1 retained artifacts, while new writes always use format 2. The index is
+rejected before publication when it exceeds 250 KiB gzip.
+
+#355 loads the index on search/filter intent, checks its envelope against the
+current manifest and page, and preserves URL filters, Back and scroll state.
+No eager index download, no all-catalog DOM mount. Movies/series pages, bounded
+pagination and title reading remain available with JavaScript off.
 Real snapshots, secrets, caches and third-party posters are not committed;
 `input/` and environment files are ignored. Only original synthetic fixtures ship.
 

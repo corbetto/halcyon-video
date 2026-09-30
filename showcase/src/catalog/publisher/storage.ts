@@ -7,7 +7,7 @@ import { snapshotSchema, type Snapshot } from '../schema.ts';
 
 const hash = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
 const encode = (value: unknown) => `${JSON.stringify(value)}\n`;
-const safeRoot = /^[a-z0-9][a-z0-9-]{0,79}-[a-f0-9]{12}$/;
+const safeRoot = /^[a-z0-9][a-z0-9-]{0,79}-[a-f0-9]{12}(?:-a2)?$/;
 interface Pointer { schemaVersion: 1; root: string; snapshotHash: string }
 async function readPointer(directory: string): Promise<Pointer | undefined> {
   let text: string;
@@ -23,7 +23,9 @@ async function verifyVersion(directory: string, root: string, expectedHash: stri
   const bytes = await readFile(join(folder, 'snapshot.json'), 'utf8');
   if (hash(bytes) !== expectedHash) throw new Error('Immutable snapshot hash mismatch');
   const snapshot = snapshotSchema.parse(JSON.parse(bytes));
-  const artifacts = buildCatalogArtifacts(snapshot, expectedHash);
+  // Old retained artifacts remain readable/rollbackable; new writes always use
+  // the current format's distinct immutable URL namespace.
+  const artifacts = buildCatalogArtifacts(snapshot, expectedHash,root.endsWith('-a2')?2:1);
   if (artifacts.dataRoot !== `/data/${root}`) throw new Error('Immutable artifact path mismatch');
   const expected = new Map<string, unknown>([['snapshot.json', snapshot], ['manifest.json', artifacts.manifest], ['search.json', artifacts.search], ...artifacts.pages.map(page => [`page-${page.page}.json`, page] as [string, unknown])]);
   const names = await readdir(folder);

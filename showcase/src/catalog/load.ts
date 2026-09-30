@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { snapshotSchema } from './schema.ts';
 import { buildCatalogArtifacts } from './artifacts.ts';
 
-const input = process.env.SHOWCASE_SNAPSHOT || 'fixtures/catalog.json';
+const input = process.env.SHOWCASE_SNAPSHOT || 'fixtures/browse.json';
 const bytes = readFileSync(input);
 export const snapshot = snapshotSchema.parse(JSON.parse(bytes.toString()));
 // Public upstream artifacts remain gated until #354 records source permission.

@@ -3,3 +3,6 @@
 .env.*
 !.env.example
 input/
+test-results/
+playwright-report/
+.lighthouseci/

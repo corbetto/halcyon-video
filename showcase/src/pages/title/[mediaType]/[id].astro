@@ -1,7 +1,21 @@
 ---
 import Page from '../../../layouts/Page.astro';
-import { snapshot } from '../../../catalog/load';
-export function getStaticPaths() { return snapshot.titles.map(title => ({ params: { mediaType: title.mediaType, id: String(title.tmdbId) }, props: { title } })); }
-const { title } = Astro.props;
+import Poster from '../../../components/Poster.astro';
+import {snapshot} from '../../../catalog/load';
+import {services} from '../../../catalog/services';
+import {watchRows} from '../../../catalog/presentation';
+export function getStaticPaths(){return snapshot.titles.map(title=>({params:{mediaType:title.mediaType,id:String(title.tmdbId)},props:{title}}));}
+const {title}=Astro.props;
+const offers=watchRows(title,snapshot.source);
 ---
-<Page title={title.title} description={title.synopsis}><a href="/browse/">Back to browse</a><p class="meta">{title.mediaType === 'tv' ? 'Series' : 'Movie'} · {title.year} · {title.genres.join(', ')}</p><h1>{title.title}</h1><p class="lead">{title.synopsis}</p>{title.runtimeMinutes && <p>{title.runtimeMinutes} minutes</p>}{title.seasonCount && <p>{title.seasonCount} seasons · Series availability does not guarantee every season.</p>}<details><summary>Watch options</summary><p>No live watch options in this sample. Real availability will show the region and date checked. A service may require its own subscription and sign-in.</p></details><p><a href="/store/">Explore the 3D store</a> · <a href="/self-host/">Make it your own</a></p></Page>
+<Page title={title.title} description={title.synopsis}>
+  <a class="back-link" data-browse-return href="/browse/">Back to browse</a>
+  <h1>{title.title}</h1>
+  <div class="detail-grid"><Poster title={title} source={snapshot.source} priority/><dl class="facts"><div><dt>Format</dt><dd>{title.mediaType==='tv'?'Series':'Movie'}</dd></div><div><dt>Year</dt><dd>{title.year??'Unknown'}</dd></div><div><dt>Genre</dt><dd>{title.genres.join(', ')||'Not listed'}</dd></div>{title.runtimeMinutes&&<div><dt>Running time</dt><dd>{title.runtimeMinutes} minutes</dd></div>}{title.seasonCount&&<div><dt>Series</dt><dd>{title.seasonCount} seasons{title.episodeCount?` · ${title.episodeCount} episodes`:''}</dd></div>}{title.rating&&<div><dt>TMDB rating</dt><dd>{title.rating.value}/10 · {title.rating.votes.toLocaleString('en-US')} votes</dd></div>}</dl></div>
+  <h2>The story</h2><p class="synopsis">{title.synopsis}</p>
+  <details class="watch-options"><summary>Watch options</summary><p>United States · recorded check: <time datetime={snapshot.checkedAt}>{snapshot.checkedAt.slice(0,10)}</time></p><p data-freshness data-checked={snapshot.checkedAt} class="availability-status">Date-qualified records, not a promise of current availability.</p><p>A provider may require its own subscription or sign-in. This catalog does not play films.</p>{title.mediaType==='tv'&&<p>Series-level availability does not guarantee every season or episode.</p>}
+    {snapshot.source==='fixture'&&<p class="feedback">These are fictional test records. External watch links are disabled in this preview.</p>}
+    {offers.length?<ul class="offers">{offers.map(offer=><li data-offer data-checked={offer.checkedAt} data-link-kind={offer.kind}><strong>{services.find(s=>s.id===offer.serviceId)?.name??offer.serviceId}</strong><p>{offer.type==='subscription'?'Subscription listing':offer.type==='rent'?'Rental listing':'Purchase listing'} · checked {offer.checkedAt.slice(0,10)}</p>{offer.url?<a href={offer.url} rel="external noreferrer">{offer.label}</a>:<span class="fixture-link">{snapshot.source==='fixture'?'Sample link disabled':'Provider link is no longer current'}</span>}<small>{offer.kind==='verified-provider'?'Provider link verified at the recorded check.':'TMDB watch-options page; not a verified direct provider link.'}</small></li>)}</ul>:<p>No recorded offers for this title. That does not mean it is unavailable everywhere.</p>}
+  </details>
+  <p><a class="back-link" href="/store/">Explore the separate 3D store</a></p>
+</Page>

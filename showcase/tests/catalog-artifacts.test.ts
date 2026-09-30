@@ -26,6 +26,8 @@ test('envelope equality across manifest, pages and search', () => {
   };
 
   assert.equal(artifacts.manifest.schemaVersion, envelope.schemaVersion);
+  assert.equal(artifacts.manifest.artifactVersion,2);
+  assert.equal(artifacts.search.artifactVersion,2);
   assert.equal(artifacts.manifest.snapshotVersion, envelope.snapshotVersion);
   assert.equal(artifacts.manifest.snapshotHash, envelope.snapshotHash);
   assert.equal(artifacts.manifest.region, envelope.region);
@@ -109,8 +111,8 @@ test('different hashes yield different data roots and artifact URLs', () => {
   const artifactsB = buildCatalogArtifacts(snapshot, validHashB);
 
   assert.notEqual(artifactsA.dataRoot, artifactsB.dataRoot);
-  assert.equal(artifactsA.dataRoot, `/data/${snapshot.snapshotVersion}-0123456789ab`);
-  assert.equal(artifactsB.dataRoot, `/data/${snapshot.snapshotVersion}-fedcba987654`);
+  assert.equal(artifactsA.dataRoot, `/data/${snapshot.snapshotVersion}-0123456789ab-a2`);
+  assert.equal(artifactsB.dataRoot, `/data/${snapshot.snapshotVersion}-fedcba987654-a2`);
 
   assert.notEqual(artifactsA.manifest.search, artifactsB.manifest.search);
   assert.notEqual(artifactsA.manifest.pages[0], artifactsB.manifest.pages[0]);
@@ -141,7 +143,7 @@ test('load.ts exports match buildCatalogArtifacts outputs', () => {
   assert.equal(loaded.pageSize, 24);
   assert.equal(typeof loaded.snapshotHash, 'string');
   assert.equal(loaded.snapshotHash.length, 64);
-  assert.equal(loaded.dataRoot, `/data/${loaded.snapshot.snapshotVersion}-${loaded.snapshotHash.slice(0, 12)}`);
+  assert.equal(loaded.dataRoot, `/data/${loaded.snapshot.snapshotVersion}-${loaded.snapshotHash.slice(0, 12)}-a2`);
   assert.equal(loaded.manifest.count, loaded.snapshot.titles.length);
   assert.equal(loaded.manifest.snapshotHash, loaded.snapshotHash);
   assert.equal(loaded.search.snapshotHash, loaded.snapshotHash);

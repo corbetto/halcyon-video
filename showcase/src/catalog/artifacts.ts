@@ -1,4 +1,6 @@
 import { snapshotSchema, titleKey, titlePath, type Snapshot } from './schema.ts';
+import { gzipSync } from 'node:zlib';
+import { ARTIFACT_VERSION } from './browse.ts';
 
 export const pageSize = 24;
 
@@ -7,6 +9,7 @@ export interface CatalogArtifacts {
   dataRoot: string;
   pages: Array<{
     schemaVersion: number;
+    artifactVersion?: number;
     snapshotVersion: string;
     snapshotHash: string;
     region: string;
@@ -16,6 +19,7 @@ export interface CatalogArtifacts {
   }>;
   search: {
     schemaVersion: number;
+    artifactVersion?: number;
     snapshotVersion: string;
     snapshotHash: string;
     region: string;
@@ -27,10 +31,13 @@ export interface CatalogArtifacts {
       year: number | null;
       genres: string[];
       path: string;
+      services?: string[];
+      posterPath?: string|null;
     }>;
   };
   manifest: {
     schemaVersion: number;
+    artifactVersion?: number;
     snapshotVersion: string;
     snapshotHash: string;
     region: string;
@@ -45,16 +52,19 @@ export interface CatalogArtifacts {
   };
 }
 
-export function buildCatalogArtifacts(snapshot: unknown, snapshotHash: string): CatalogArtifacts {
+export function buildCatalogArtifacts(snapshot: unknown, snapshotHash: string, format: 1|2 = ARTIFACT_VERSION): CatalogArtifacts {
   if (typeof snapshotHash !== 'string' || !/^[0-9a-f]{64}$/.test(snapshotHash)) {
     throw new Error('Expected a 64-character lowercase SHA-256 hex hash');
   }
 
   const parsedSnapshot = snapshotSchema.parse(snapshot);
 
-  const dataRoot = `/data/${parsedSnapshot.snapshotVersion}-${snapshotHash.slice(0, 12)}`;
+  // Derived bytes change when the search contract changes, even for identical
+  // snapshot bytes. A format suffix prevents overwriting old immutable URLs.
+  const dataRoot = `/data/${parsedSnapshot.snapshotVersion}-${snapshotHash.slice(0, 12)}${format===1?'':'-a'+format}`;
   const envelope = {
     schemaVersion: parsedSnapshot.schemaVersion,
+    ...(format===2?{artifactVersion:format}:{}),
     snapshotVersion: parsedSnapshot.snapshotVersion,
     snapshotHash,
     region: parsedSnapshot.region,
@@ -79,6 +89,7 @@ export function buildCatalogArtifacts(snapshot: unknown, snapshotHash: string): 
       year: title.year,
       genres: title.genres,
       path: titlePath(title),
+      ...(format===2?{services: [...new Set(title.offers.filter(offer => offer.type === 'subscription').map(offer => offer.serviceId))],posterPath:title.posterPath}:{}),
     })),
   };
 
@@ -92,6 +103,9 @@ export function buildCatalogArtifacts(snapshot: unknown, snapshotHash: string): 
     pages: pages.map((page) => `${dataRoot}/page-${page.page}.json`),
     search: `${dataRoot}/search.json`,
   };
+
+  if (format===2 && gzipSync(JSON.stringify(search)).length > 250 * 1024)
+    throw new Error('Search index exceeds the 250 KiB gzip budget');
 
   return {
     pageSize,

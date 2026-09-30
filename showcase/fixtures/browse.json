@@ -1,0 +1,902 @@
+{
+  "schemaVersion": 1,
+  "snapshotVersion": "fixture-browse-v1",
+  "region": "US",
+  "generatedAt": "2026-09-29T12:00:00Z",
+  "checkedAt": "2026-09-29T12:00:00Z",
+  "source": "fixture",
+  "selection": "curated",
+  "perProviderMediaLimit": 120,
+  "coverage": [
+    {
+      "serviceId": "netflix",
+      "mediaType": "movie",
+      "providerIds": [
+        8
+      ],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "netflix",
+      "mediaType": "tv",
+      "providerIds": [
+        8
+      ],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "prime",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "prime",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "disney",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "disney",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "hulu",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "hulu",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "max",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "max",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "appletv",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "appletv",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "paramount",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "paramount",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "peacock",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "peacock",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    }
+  ],
+  "titles": [
+    {
+      "mediaType": "movie",
+      "tmdbId": 1,
+      "title": "The Last Picture House",
+      "synopsis": "An original fictional catalog sample. A neighborhood cinema brings a scattered community together for one final screening. This is not a real film or an availability claim.",
+      "year": 2001,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 88,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/1/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 1,
+      "title": "Midnight Matinee",
+      "synopsis": "An original fictional catalog sample. A night-shift crew discovers an unexpected story in the quiet hours. This is not a real film or an availability claim.",
+      "year": 2002,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 9,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/1/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 2,
+      "title": "A Map of Small Wonders",
+      "synopsis": "An original fictional catalog sample. An unlikely friendship turns a familiar journey into a small adventure. This is not a real film or an availability claim.",
+      "year": 2003,
+      "genres": [
+        "Science Fiction"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 90,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/2/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 2,
+      "title": "The Quiet Orbit",
+      "synopsis": "An original fictional catalog sample. An ordinary discovery asks its finder to see the world differently. This is not a real film or an availability claim.",
+      "year": 2004,
+      "genres": [
+        "Science Fiction"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 4,
+      "episodeCount": 11,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/2/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 3,
+      "title": "Corner Shop Summer",
+      "synopsis": "An original fictional catalog sample. A neighborhood cinema brings a scattered community together for one final screening. This is not a real film or an availability claim.",
+      "year": 2005,
+      "genres": [
+        "Comedy"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 92,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/3/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 3,
+      "title": "Signals from Tuesday",
+      "synopsis": "An original fictional catalog sample. A night-shift crew discovers an unexpected story in the quiet hours. This is not a real film or an availability claim.",
+      "year": 2006,
+      "genres": [
+        "Comedy"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 13,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/3/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 4,
+      "title": "The Paper Astronaut",
+      "synopsis": "An original fictional catalog sample. An unlikely friendship turns a familiar journey into a small adventure. This is not a real film or an availability claim.",
+      "year": 2007,
+      "genres": [
+        "Mystery"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 94,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": []
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 4,
+      "title": "After the Last Train",
+      "synopsis": "An original fictional catalog sample. An ordinary discovery asks its finder to see the world differently. This is not a real film or an availability claim.",
+      "year": 2008,
+      "genres": [
+        "Mystery"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 4,
+      "episodeCount": 15,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/4/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 5,
+      "title": "North Window",
+      "synopsis": "An original fictional catalog sample. A neighborhood cinema brings a scattered community together for one final screening. This is not a real film or an availability claim.",
+      "year": 2009,
+      "genres": [
+        "Adventure"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 96,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/5/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 5,
+      "title": "The Lantern Club",
+      "synopsis": "An original fictional catalog sample. A night-shift crew discovers an unexpected story in the quiet hours. This is not a real film or an availability claim.",
+      "year": 2010,
+      "genres": [
+        "Adventure"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 17,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/5/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 6,
+      "title": "One More Weekend",
+      "synopsis": "An original fictional catalog sample. An unlikely friendship turns a familiar journey into a small adventure. This is not a real film or an availability claim.",
+      "year": 2011,
+      "genres": [
+        "Documentary"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 98,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/6/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 6,
+      "title": "Portrait of a Cloud",
+      "synopsis": "An original fictional catalog sample. An ordinary discovery asks its finder to see the world differently. This is not a real film or an availability claim.",
+      "year": 2012,
+      "genres": [
+        "Documentary"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 4,
+      "episodeCount": 19,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/6/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 7,
+      "title": "The Ninth Platform",
+      "synopsis": "An original fictional catalog sample. A neighborhood cinema brings a scattered community together for one final screening. This is not a real film or an availability claim.",
+      "year": 2013,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 100,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/7/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 7,
+      "title": "All the Way Home",
+      "synopsis": "An original fictional catalog sample. A night-shift crew discovers an unexpected story in the quiet hours. This is not a real film or an availability claim.",
+      "year": 2014,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 21,
+      "rating": null,
+      "offers": []
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 8,
+      "title": "The Clockmaker's Garden",
+      "synopsis": "An original fictional catalog sample. An unlikely friendship turns a familiar journey into a small adventure. This is not a real film or an availability claim.",
+      "year": 2015,
+      "genres": [
+        "Science Fiction"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 102,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/8/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 8,
+      "title": "Harbor after Rain",
+      "synopsis": "An original fictional catalog sample. An ordinary discovery asks its finder to see the world differently. This is not a real film or an availability claim.",
+      "year": 2016,
+      "genres": [
+        "Science Fiction"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 4,
+      "episodeCount": 23,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/8/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 9,
+      "title": "The Longest Shortcut",
+      "synopsis": "An original fictional catalog sample. A neighborhood cinema brings a scattered community together for one final screening. This is not a real film or an availability claim.",
+      "year": 2017,
+      "genres": [
+        "Comedy"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 104,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/9/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 9,
+      "title": "Starlight Repair Shop",
+      "synopsis": "An original fictional catalog sample. A night-shift crew discovers an unexpected story in the quiet hours. This is not a real film or an availability claim.",
+      "year": 2018,
+      "genres": [
+        "Comedy"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 25,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/9/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 10,
+      "title": "A Small Unlikely Voyage",
+      "synopsis": "An original fictional catalog sample. An unlikely friendship turns a familiar journey into a small adventure. This is not a real film or an availability claim.",
+      "year": 2019,
+      "genres": [
+        "Mystery"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 106,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/10/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 10,
+      "title": "The Spare Room",
+      "synopsis": "An original fictional catalog sample. An ordinary discovery asks its finder to see the world differently. This is not a real film or an availability claim.",
+      "year": 2020,
+      "genres": [
+        "Mystery"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 4,
+      "episodeCount": 27,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/10/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 11,
+      "title": "Radio at the End of Town",
+      "synopsis": "An original fictional catalog sample. A neighborhood cinema brings a scattered community together for one final screening. This is not a real film or an availability claim.",
+      "year": 2021,
+      "genres": [
+        "Adventure"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 108,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": []
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 11,
+      "title": "The Invisible Orchestra",
+      "synopsis": "An original fictional catalog sample. A night-shift crew discovers an unexpected story in the quiet hours. This is not a real film or an availability claim.",
+      "year": 2022,
+      "genres": [
+        "Adventure"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 29,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/11/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 12,
+      "title": "Summer in Reverse",
+      "synopsis": "An original fictional catalog sample. An unlikely friendship turns a familiar journey into a small adventure. This is not a real film or an availability claim.",
+      "year": 2023,
+      "genres": [
+        "Documentary"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 110,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/12/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 12,
+      "title": "The Blue Hour Archive",
+      "synopsis": "An original fictional catalog sample. An ordinary discovery asks its finder to see the world differently. This is not a real film or an availability claim.",
+      "year": 2024,
+      "genres": [
+        "Documentary"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 4,
+      "episodeCount": 31,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/12/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 13,
+      "title": "Notes from Elsewhere",
+      "synopsis": "An original fictional catalog sample. A neighborhood cinema brings a scattered community together for one final screening. This is not a real film or an availability claim.",
+      "year": 2025,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 112,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/13/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 13,
+      "title": "The Midnight Mechanic",
+      "synopsis": "An original fictional catalog sample. A night-shift crew discovers an unexpected story in the quiet hours. This is not a real film or an availability claim.",
+      "year": 2026,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 33,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/13/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "movie",
+      "tmdbId": 14,
+      "title": "Every Other Sunday",
+      "synopsis": "An original fictional catalog sample. An unlikely friendship turns a familiar journey into a small adventure. This is not a real film or an availability claim.",
+      "year": 2027,
+      "genres": [
+        "Science Fiction"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 114,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-29T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/14/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 14,
+      "title": "The River Keeps a Secret",
+      "synopsis": "An original fictional catalog sample. An ordinary discovery asks its finder to see the world differently. This is not a real film or an availability claim.",
+      "year": 2028,
+      "genres": [
+        "Science Fiction"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 4,
+      "episodeCount": 35,
+      "rating": null,
+      "offers": []
+    }
+  ]
+}

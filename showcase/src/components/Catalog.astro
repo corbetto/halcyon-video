@@ -1,0 +1,25 @@
+---
+import Titles from './Titles.astro';
+import {snapshot,manifest} from '../catalog/load';
+import {services} from '../catalog/services';
+import type {CatalogTitle} from '../catalog/schema';
+import {browseBase,type BrowseState} from '../catalog/browse';
+interface Props {titles:CatalogTitle[];kind?:BrowseState['kind'];page?:number;total?:number;count?:number;}
+const {titles,kind='all',page=1,total=1,count=snapshot.titles.length}=Astro.props;
+const genres=[...new Set(snapshot.titles.flatMap(t=>t.genres))].sort();
+const years=[...new Set(snapshot.titles.flatMap(t=>t.year?[t.year]:[]))].sort((a,b)=>b-a);
+const base=browseBase(kind);
+---
+<section data-catalog data-version={manifest.snapshotVersion} data-hash={manifest.snapshotHash} data-checked={manifest.checkedAt} data-count={manifest.count} data-index={manifest.search} data-source={snapshot.source} aria-label="Title selection">
+  <nav class="media-tabs" aria-label="Title type"><a href="/browse/" data-kind="all" aria-current={kind==='all'?'page':undefined}>All titles</a><a href="/browse/movies/" data-kind="movie" aria-current={kind==='movie'?'page':undefined}>Movies</a><a href="/browse/tv/" data-kind="tv" aria-current={kind==='tv'?'page':undefined}>Series</a></nav>
+  <form class="search-form" id="catalog-search" action={base} method="get"><fieldset id="catalog-controls" disabled><legend class="sr-only">Search and filters</legend>
+    <div class="search-row"><label for="query">Find a title<input id="query" name="q" type="search" maxlength="120" autocomplete="off" placeholder="Search movies and series" /></label><button type="submit">Search</button></div>
+    <details class="filters"><summary>Filter selection</summary><div class="filter-grid"><label for="genre">Genre<select id="genre" name="genre"><option value="">Any genre</option>{genres.map(genre=><option>{genre}</option>)}</select></label><label for="year">Year<select id="year" name="year"><option value="">Any year</option>{years.map(year=><option>{year}</option>)}</select></label><label for="service">Subscription service<select id="service" name="service"><option value="">Any service</option>{services.map(service=><option value={service.id}>{service.name}</option>)}</select></label></div><button class="quiet-button" type="reset">Reset search and filters</button></details>
+  </fieldset></form>
+  <noscript><p class="noscript">Search and filters need JavaScript. You can still browse every page and read every title.</p></noscript>
+  <div class="feedback" id="catalog-error" role="alert" hidden><p></p><button type="button" id="catalog-retry">Try search again</button></div>
+  <div class="results-heading"><p id="catalog-status" role="status" aria-live="polite" aria-atomic="true">{count} fictional titles · page {page} of {total}</p></div>
+  <Titles titles={titles}/>
+  <div class="empty" id="catalog-empty" hidden><h2>No titles found.</h2><p>Try another title or remove a filter.</p><button type="button" id="catalog-clear">Clear search and filters</button></div>
+  <nav class="pagination" id="catalog-pagination" aria-label="Catalog pages">{page>1&&<a rel="prev" href={page===2?base:`${base}${page-1}/`}>Previous page</a>}<span>Page {page} of {total}</span>{page<total&&<a rel="next" href={`${base}${page+1}/`}>Next page</a>}</nav>
+</section>

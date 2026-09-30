@@ -1,0 +1,8 @@
+---
+import type {CatalogTitle,Snapshot} from '../catalog/schema';
+import {posterImages} from '../catalog/presentation';
+interface Props {title:CatalogTitle;source:Snapshot['source'];priority?:boolean;}
+const {title,source,priority=false}=Astro.props;
+const image=posterImages(title.posterPath,source);
+---
+<div class="poster" aria-hidden="true"><div class="poster-fallback"><b>HALCYON</b><span>Artwork unavailable</span></div>{image&&<img data-poster src={image.src} srcset={image.srcset} sizes="(max-width: 639px) calc((100vw - 48px) / 2), 180px" width="300" height="450" alt="" loading={priority?'eager':'lazy'} fetchpriority={priority?'high':'auto'} decoding="async" />}</div>

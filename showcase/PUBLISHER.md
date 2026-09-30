@@ -27,6 +27,12 @@ artifact with `readCurrent()`; it checks the full snapshot hash and every derive
 file before returning. `rollbackSnapshot()` explicitly selects a retained version
 and verifies the whole artifact, without changing its successful check time.
 
+The mobile-consumer increment adds artifact format 2: `artifactVersion: 2` in
+the envelope, a `-a2` immutable-directory suffix, and service/poster fields in the
+compact index. Old format-1 artifacts remain readable and rollbackable without
+changing their bytes. New publication always emits format 2 and enforces the
+250 KiB gzip search budget. Snapshot input schema version 1 is unchanged.
+
 ## Implemented safeguards
 
 - The reusable artifact builder now drives both the existing Astro build and the

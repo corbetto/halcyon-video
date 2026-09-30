@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, readdir, mkdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { buildCatalogArtifacts } from '../src/catalog/artifacts.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { publishSnapshot, readCurrent, rollbackSnapshot } from '../src/catalog/publisher/storage.ts';
@@ -70,4 +72,18 @@ test('the storage API also blocks a first live publication, not just the CLI', a
   for (const title of live.titles) for (const offer of title.offers) offer.provenance = 'tmdb-justwatch';
   await assert.rejects(publishSnapshot(dir, live), /project-specific permission/);
   assert.equal(await readCurrent(dir), undefined);
+});
+test('prior immutable artifact format is read and rolled back without overwriting its bytes',async t=>{
+  const dir=await directory(t),candidate=await fixture(),encode=(value:unknown)=>JSON.stringify(value)+'\n';
+  const bytes=encode(candidate),hash=createHash('sha256').update(bytes).digest('hex');
+  const legacy=buildCatalogArtifacts(candidate,hash,1),root=legacy.dataRoot.slice('/data/'.length),folder=join(dir,'data',root);
+  assert.equal(legacy.manifest.artifactVersion,undefined);assert.equal(legacy.search.titles[0].services,undefined);
+  await mkdir(folder,{recursive:true});
+  const oldFiles=new Map<string,unknown>([['snapshot.json',candidate],['manifest.json',legacy.manifest],['search.json',legacy.search],...legacy.pages.map(page=>[`page-${page.page}.json`,page] as [string,unknown])]);
+  for(const [name,value]of oldFiles)await writeFile(join(folder,name),encode(value));
+  const previous={schemaVersion:1,root,snapshotHash:hash};await writeFile(join(dir,'current.json'),encode(previous));
+  assert.deepEqual((await readCurrent(dir))?.pointer,previous);
+  const current=await publishSnapshot(dir,candidate);assert.equal(current.root,root+'-a2');
+  for(const [name,value]of oldFiles)assert.equal(await readFile(join(folder,name),'utf8'),encode(value));
+  await rollbackSnapshot(dir,root,hash);assert.deepEqual((await readCurrent(dir))?.pointer,previous);
 });

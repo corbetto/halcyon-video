@@ -1,8 +1,14 @@
 ---
 import Page from '../../layouts/Page.astro';
-import Titles from '../../components/Titles.astro';
-import { pages } from '../../catalog/load';
-export function getStaticPaths() { return pages.map((page, index) => ({ params: { page: index ? String(index + 1) : undefined }, props: { page, total: pages.length } })); }
-const { page, total } = Astro.props;
+import Catalog from '../../components/Catalog.astro';
+import {snapshot} from '../../catalog/load';
+import {PAGE_SIZE} from '../../catalog/browse';
+export function getStaticPaths(){
+  return (['all','movie','tv'] as const).flatMap(kind=>{
+    const titles=snapshot.titles.filter(title=>kind==='all'||title.mediaType===kind),total=Math.max(1,Math.ceil(titles.length/PAGE_SIZE));
+    return Array.from({length:total},(_,i)=>({params:{page:[kind==='movie'?'movies':kind==='tv'?'tv':'',i?String(i+1):''].filter(Boolean).join('/')||undefined},props:{titles:titles.slice(i*PAGE_SIZE,(i+1)*PAGE_SIZE),kind,page:i+1,total,count:titles.length}}));
+  });
+}
+const {titles,kind,page,total,count}=Astro.props;
 ---
-<Page title="Browse"><h1>Browse the selection.</h1><p class="lead">Movies and series in one place. This preview contains fictional sample titles.</p><Titles titles={page.titles} /><nav aria-label="Catalog pages">{page.page > 1 && <a href={page.page === 2 ? '/browse/' : `/browse/${page.page - 1}/`}>Previous page</a>}<span>Page {page.page} of {total}</span>{page.page < total && <a href={`/browse/${page.page + 1}/`}>Next page</a>}</nav></Page>
+<Page title={kind==='movie'?'Movies':kind==='tv'?'Series':'Browse movies and series'}><h1>Find your next good watch.</h1><Catalog titles={titles} kind={kind} page={page} total={total} count={count}/></Page>

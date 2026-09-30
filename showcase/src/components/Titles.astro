@@ -1,7 +1,9 @@
 ---
 import type { CatalogTitle } from '../catalog/schema';
-interface Props { titles: CatalogTitle[]; }
 import { titlePath } from '../catalog/schema';
+import { snapshot } from '../catalog/load';
+import Poster from './Poster.astro';
+interface Props { titles: CatalogTitle[]; }
 const { titles } = Astro.props;
 ---
-<ul class="cards">{titles.map(title => <li><a class="card" href={titlePath(title)}><div class="poster" aria-hidden="true">{title.title}</div><h2>{title.title}</h2><p class="meta">{title.mediaType === 'tv' ? 'Series' : 'Movie'} · {title.year ?? 'Year unknown'}</p></a></li>)}</ul>
+<ul class="cards" id="catalog-results">{titles.map((title,index)=><li><a class="card" data-title-key={`${title.mediaType}:${title.tmdbId}`} href={titlePath(title)}><Poster title={title} source={snapshot.source} priority={index<2}/><h2>{title.title}</h2><p class="meta">{title.mediaType==='tv'?'Series':'Movie'} · {title.year??'Year unknown'}</p></a></li>)}</ul>
