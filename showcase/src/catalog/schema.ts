@@ -59,7 +59,8 @@ export const snapshotSchema = z.strictObject({
       if (Date.parse(offer.checkedAt) > generated || Date.parse(offer.checkedAt) < Date.parse(snapshot.checkedAt)) problem('Offer check is outside snapshot check window');
       if (offer.link.kind === 'tmdb-watch-page') {
         const url = new URL(offer.link.url);
-        if (url.hostname !== 'www.themoviedb.org' || url.port || url.pathname !== `/${title.mediaType}/${title.tmdbId}/watch` || url.searchParams.get('locale') !== 'US') problem('Watch-page link must match title identity and region');
+        const path = new RegExp(`^/${title.mediaType}/${title.tmdbId}(?:-[A-Za-z0-9%_-]+)?/watch$`);
+        if (url.hostname !== 'www.themoviedb.org' || url.port || url.hash || !path.test(url.pathname) || url.searchParams.getAll('locale').length !== 1 || url.searchParams.get('locale') !== 'US' || [...url.searchParams.keys()].some(key => key !== 'locale')) problem('Watch-page link must match title identity and region');
       } else if (Date.parse(offer.link.verifiedAt) > generated) problem('Provider verification is later than generation');
     }
   }

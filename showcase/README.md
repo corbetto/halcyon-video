@@ -35,3 +35,9 @@ reuses the existing pure store definitions without importing its startup graph.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the contract, launch gates, source
 references, deployment/rollback design and next implementation boundaries.
+
+The guarded data-publisher increment for #354 is documented in
+[PUBLISHER.md](PUBLISHER.md). `npm run publish:fixture` creates immutable local
+artifacts with atomic promotion and rollback safeguards. Its transport and
+collector are tested against synthetic responses; live collection, daily jobs,
+source permission and production publication remain explicitly gated.

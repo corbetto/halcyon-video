@@ -23,6 +23,22 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: "1"
       - run: npm run check
+  showcase-fixtures:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: showcase
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: showcase/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm run publish:fixture
+        # Offline original fixtures only; no live source credentials or deploy.
   native-security:
     runs-on: ubuntu-24.04
     steps:
