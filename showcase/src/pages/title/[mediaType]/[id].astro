@@ -10,7 +10,7 @@ const {title}=Astro.props;
 const offers=watchRows(title,snapshot.source);
 const context=new URLSearchParams({catalog:serializeHandoff({version:1,mediaType:title.mediaType,tmdbId:title.tmdbId,region:'US'})}).toString();
 ---
-<Page title={title.title} description={title.synopsis}>
+<Page title={`${title.title} · ${title.mediaType==='tv'?'Series':'Movie'} · ${title.year??'Year unknown'}`} description={title.synopsis}>
   <a class="back-link" data-browse-return href="/browse/">Back to browse</a>
   <h1>{title.title}</h1>
   <div class="detail-grid"><Poster title={title} source={snapshot.source} priority/><dl class="facts"><div><dt>Format</dt><dd>{title.mediaType==='tv'?'Series':'Movie'}</dd></div><div><dt>Year</dt><dd>{title.year??'Unknown'}</dd></div><div><dt>Genre</dt><dd>{title.genres.join(', ')||'Not listed'}</dd></div>{title.runtimeMinutes&&<div><dt>Running time</dt><dd>{title.runtimeMinutes} minutes</dd></div>}{title.seasonCount&&<div><dt>Series</dt><dd>{title.seasonCount} seasons{title.episodeCount?` · ${title.episodeCount} episodes`:''}</dd></div>}{title.rating&&<div><dt>TMDB rating</dt><dd>{title.rating.value}/10 · {title.rating.votes.toLocaleString('en-US')} votes</dd></div>}</dl></div>

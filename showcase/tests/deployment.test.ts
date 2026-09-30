@@ -130,6 +130,7 @@ test('artifact workflow is parseable, pinned, secret-free and cannot deploy',asy
   assert.equal(steps[0].with['persist-credentials'],false);
   assert.doesNotMatch(text,/secrets\.|wrangler-action|pages deploy|id-token:|deployments:|pages: write|pull_request_target/);
   const upload=steps.find((step:any)=>step.uses?.startsWith('actions/upload-artifact@'));assert.match(upload.if,/event_name != 'pull_request'/);assert.match(upload.if,/actor == 'devbjackson'/);
-  assert.equal(upload.with.path,'showcase/input/deployment/bundles/');assert.equal(steps.find((step:any)=>step.env?.SOURCE_COMMIT)?.env.SOURCE_COMMIT,'${{ github.sha }}');
+  assert.deepEqual(upload.with.path.trim().split('\n'),['showcase/input/deployment/bundles/','showcase/input/readiness/metadata.json','showcase/input/readiness/reports/']);assert.equal(steps.find((step:any)=>step.env?.SOURCE_COMMIT)?.env.SOURCE_COMMIT,'${{ github.sha }}');
+  const readiness=steps.find((step:any)=>step.name==='Write readiness receipts and prove the launch gate stays closed');assert.match(readiness.run,/--require-launch-ready/);assert.match(readiness.run,/-eq 75/);
   assert(steps.findIndex((step:any)=>step.run==='npm run test:browser')<steps.findIndex((step:any)=>step.name==='Package verified fixture output'));
 });

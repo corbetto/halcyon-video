@@ -45,9 +45,11 @@ This catalog is a separate entry point, not a fix for WebGL performance.
 | `/store/` | Explicit entry into existing 3D deployment; no prefetch or automatic navigation |
 | `/404.html` | Real not-found response on Pages, not an SPA fallback |
 
-`SHOWCASE_ORIGIN` is a validated optional HTTPS origin. Canonicals are omitted
-when absent; no owned domain is assumed. Preview HTML, robots and HTTP headers
-all say noindex. #356 owns production canonical redirects and indexing enablement.
+`SHOWCASE_ORIGIN` is a validated optional HTTPS origin, not publication authority.
+Fixture previews omit public canonicals even when it is supplied. HTML and HTTP
+headers send noindex; robots permits crawling so supporting crawlers can read
+that rule. No public sitemap or unapproved URL/image identity is emitted. See
+`READINESS.md`; #356 owns approved production identity and indexing enablement.
 
 ## Catalog version 1
 

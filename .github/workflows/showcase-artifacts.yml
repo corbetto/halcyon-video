@@ -41,11 +41,25 @@ jobs:
         run: npm run package:preview -- "$SOURCE_COMMIT"
         env:
           SOURCE_COMMIT: ${{ github.sha }}
+      - name: Write readiness receipts and prove the launch gate stays closed
+        run: |
+          READINESS_AS_OF="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          npm run readiness:report -- "$SOURCE_COMMIT" "$READINESS_AS_OF"
+          if npm run readiness:report -- "$SOURCE_COMMIT" "$READINESS_AS_OF" --require-launch-ready; then
+            exit 1
+          else
+            test "$?" -eq 75
+          fi
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
       - name: Retain trusted build receipt and static bundle
         if: success() && github.event_name != 'pull_request' && github.repository == 'halcyon-video/halcyon-video' && github.actor == 'devbjackson'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: showcase-fixture-${{ github.sha }}-${{ github.run_attempt }}
-          path: showcase/input/deployment/bundles/
+          path: |
+            showcase/input/deployment/bundles/
+            showcase/input/readiness/metadata.json
+            showcase/input/readiness/reports/
           if-no-files-found: error
           retention-days: 14

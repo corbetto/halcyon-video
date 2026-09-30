@@ -3,4 +3,4 @@ import Page from '../layouts/Page.astro';
 import Catalog from '../components/Catalog.astro';
 import {pages,snapshot} from '../catalog/load';
 ---
-<Page title="Browse movies and series"><h1>Find your next good watch.</h1><Catalog titles={pages[0].titles} total={pages.length} count={snapshot.titles.length}/></Page>
+<Page title="Your next movie-store discovery"><h1>Find your next good watch.</h1><Catalog titles={pages[0].titles} total={pages.length} count={snapshot.titles.length}/></Page>

@@ -15,6 +15,7 @@
     "test:artifact": "node --test tests/artifact.test.mjs",
     "test:browser": "playwright test",
     "package:preview": "node --experimental-strip-types tools/package-preview.ts",
+    "readiness:report": "node --experimental-strip-types tools/readiness-report.ts",
     "deployment:plan": "node --experimental-strip-types tools/deployment-plan.ts",
     "publish:fixture": "node --experimental-strip-types tools/publish-fixture.ts",
     "typecheck": "astro check"

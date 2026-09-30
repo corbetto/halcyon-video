@@ -1,2 +1,4 @@
 User-agent: *
-Disallow: /
+Allow: /
+# Preview HTML and response headers carry noindex, nofollow.
+# Crawlers must be able to read that rule. This is not access control.

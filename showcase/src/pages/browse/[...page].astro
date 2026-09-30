@@ -11,4 +11,4 @@ export function getStaticPaths(){
 }
 const {titles,kind,page,total,count}=Astro.props;
 ---
-<Page title={kind==='movie'?'Movies':kind==='tv'?'Series':'Browse movies and series'}><h1>Find your next good watch.</h1><Catalog titles={titles} kind={kind} page={page} total={total} count={count}/></Page>
+<Page title={`${kind==='movie'?'Movies':kind==='tv'?'Series':'Browse movies and series'}${page>1?' — Page '+page:''}`}><h1>Find your next good watch.</h1><Catalog titles={titles} kind={kind} page={page} total={total} count={count}/></Page>

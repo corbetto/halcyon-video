@@ -10,6 +10,10 @@ Optional 3D entry, title handoff, sharing and the installation checklist are
 documented in [HANDOFF.md](HANDOFF.md). Fixture identities never select real
 movie stock, and neither path is required to keep browsing.
 
+[READINESS.md](READINESS.md) describes the offline launch preflight, metadata
+validation, synthetic first-week metrics and explicit owner-held launch gates.
+Passing fixture CI does not mean the public beta is ready or that analytics is active.
+
 ```sh
 cd showcase
 npm ci
@@ -26,8 +30,9 @@ The two-record `fixtures/catalog.json` remains the original contract/publisher
 fixture. Both deliberately share numeric IDs across movie and TV; no watch links
 or third-party poster requests are activated. All routes remain noindex.
 
-`SHOWCASE_ORIGIN=https://your-owned-host.example` configures canonicals only;
-leave it unset until a real host is selected. This example implies no ownership.
+`SHOWCASE_ORIGIN` validates an optional HTTPS origin but does not publish it;
+leave it unset until a real host is selected. Fixture previews always omit public
+canonical, URL/image identity and sitemap claims; the setting is not release authority.
 `SHOWCASE_SNAPSHOT` selects a local fixture snapshot. Non-fixture data and
 `SHOWCASE_DEPLOY_TARGET=production` deliberately fail until the source publication
 and deployment gates are implemented in #354 and #356. Do not remove these gates
