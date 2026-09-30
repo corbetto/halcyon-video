@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { compileProgramsInStages, prepareStaticTextures, yieldForPrograms } from '../src/program-warmup.ts';
+import { createInspectionProgramProbe } from '../src/inspection-mesh.ts';
 
 function fixture(parallel = true) {
   const signal = new AbortController();
@@ -155,6 +156,36 @@ test('ordinary and instanced meshes sharing geometry/material keep distinct shad
   assert.deepEqual(submitted, [ordinary, instanced]);
   assert.equal(instanced.parent, f.scene);
   f.checkRestored();
+});
+
+test('an invisible priority probe retains its prepared program across later room and probe passes', async () => {
+  const f = fixture(), ordinary = f.scene.children[0] as THREE.Mesh;
+  const probe = createInspectionProgramProbe(ordinary.geometry, [ordinary.material as THREE.Material]);
+  probe.visible = false; f.scene.add(probe);
+  const programs = new Map<boolean, object>(), submitted: THREE.Object3D[] = [];
+  let bindings = 0, gates = 0;
+  f.renderer.compile = (batch: THREE.Group) => {
+    for (const object of batch.children) {
+      submitted.push(object);
+      const instanced = !!(object as THREE.InstancedMesh).isInstancedMesh;
+      if (!programs.has(instanced)) {
+        const program = {program: {}, getUniforms: () => {bindings++;}, getAttributes: () => {}};
+        programs.set(instanced, program); f.renderer.info.programs.push(program);
+      }
+    }
+  };
+  const prepare = (roots: THREE.Object3D) => compileProgramsInStages(
+    f.renderer as unknown as THREE.WebGLRenderer, f.scene, f.camera, f.target,
+    f.signal.signal, roots, undefined, {batchSize: 1, beforeWork: async () => {gates++;}});
+  await prepare(probe);
+  assert.equal(bindings, 1); assert.equal(probe.count, 0); assert.equal(probe.visible, false);
+  f.scene.remove(probe); // room traversal must not include dummy texture maps
+  await prepare(f.scene); await prepare(probe);
+  assert.deepEqual(submitted, [probe, ordinary, probe]);
+  assert.equal(bindings, 2, 'the later probe pass reuses its prepared bindings');
+  assert.equal(f.renderer.info.programs.length, 2); assert.ok(gates >= 3);
+  assert.equal(ordinary.parent, f.scene); assert.equal(probe.parent, null);
+  f.checkRestored(); probe.dispose();
 });
 
 function textureFixture() {

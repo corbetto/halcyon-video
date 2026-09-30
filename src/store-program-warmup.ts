@@ -43,23 +43,17 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
   // Explicit High keeps the complete depth-of-field/hero draw preparation.
   // Automatic phone tiers can prepare inspection materials after room entry.
   const background = (isPublicDemo || mobileStoreActive()) && scene.effectiveQuality !== 'high';
-  const options = background ? backgroundOptions(scene, signal) : {};
+  const options = background ? backgroundOptions(scene, signal) : undefined;
   const instancedProbes: THREE.InstancedMesh[] = [];
+  let firstInspectionProbe: THREE.InstancedMesh | undefined;
   let geo: THREE.BoxGeometry | undefined;
   let warmScene: THREE.Group | undefined;
   const bokehEnabled = scene.bokehPass?.enabled;
   try {
-    // Let the newly interactive public overview paint before allocating probes.
+    // Paint the interactive view, then respect held input before making canvases
+    // or probes too. Driver operations retain this same gate below.
     if (background) {
-      await yieldForPrograms(signal);
-      // Preserve preparation for later browsing, without making off-camera room
-      // materials part of the initial entrance gate. This never draws the scene.
-      if (stagedInitialRooms.has(scene)) {
-        await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-          scene.composer?.readBuffer ?? null, signal, scene.scene, undefined, options);
-        await prepareStaticTextures(scene.renderer, scene.scene, signal, backgroundOptions(scene, signal).beforeWork);
-        stagedInitialRooms.delete(scene);
-      }
+      await options?.beforeWork();
     }
     geo = new THREE.BoxGeometry(0.01, 0.01, 0.01);
     warmScene = new THREE.Group();
@@ -79,7 +73,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
     }
     const movie = firstWithPoster ?? scene.libraries[0]?.movies[0];
     if (!movie) {
-      if (background) return;
+      if (background) { await prepareRemainingRoom(); return; }
       await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
         scene.composer?.readBuffer ?? null, signal);
       return;
@@ -106,6 +100,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
       // prepare that distinct program. Keep ordinary variants for carried cases.
       if (!mats.every(material => warm.unmodifiedMaterials.includes(material))) {
         const probe = createInspectionProgramProbe(geo, mats);
+        firstInspectionProbe ??= probe;
         instancedProbes.push(probe);
         warmScene.add(probe);
       }
@@ -135,6 +130,16 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
       material.onBeforeCompile = compile;
       material.customProgramCacheKey = key;
       material.needsUpdate = true;
+    }
+    if (background && stagedInitialRooms.has(scene)) {
+      // The first factory case is the next likely view. Prepare its existing
+      // identity-instance variant before off-camera room families, not at entry.
+      if (firstInspectionProbe) await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
+        scene.composer?.readBuffer ?? null, signal, firstInspectionProbe, undefined, options);
+      // Keep dummy poster maps out of the room's texture-upload snapshot. The
+      // detached probes retain decoration and can still compile against its lights.
+      scene.scene.remove(warmScene);
+      await prepareRemainingRoom();
     }
     const t0 = performance.now();
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
@@ -191,6 +196,16 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
     geo?.dispose();
     if (!background && scene.bokehPass && bokehEnabled !== undefined) scene.bokehPass.enabled = bokehEnabled;
     if (!background) scene.hideHeroCases();
+  }
+
+  async function prepareRemainingRoom() {
+    if (!stagedInitialRooms.has(scene)) return;
+    // Preserve all room preparation and the existing full-readiness/fixture
+    // release promise, including an opening-day store with no titles to inspect.
+    await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
+      scene.composer?.readBuffer ?? null, signal, scene.scene, undefined, options);
+    await prepareStaticTextures(scene.renderer, scene.scene, signal, options?.beforeWork);
+    stagedInitialRooms.delete(scene);
   }
 }
 
