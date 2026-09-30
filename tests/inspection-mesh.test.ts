@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {createInspectionMesh, setInspectionGeometry, disposeInspectionMesh} from '../src/inspection-mesh.ts';
+import {createInspectionMesh, createInspectionProgramProbe, setInspectionGeometry, disposeInspectionMesh} from '../src/inspection-mesh.ts';
 
 test('inspection uses one identity instance and borrows the exact materials and geometry', () => {
   const geometry = new THREE.BoxGeometry(1, 2, .2), materials = [new THREE.MeshPhysicalMaterial()];
@@ -59,4 +59,23 @@ test('teardown releases instance resources without disposing shared case assets'
   disposeInspectionMesh(mesh); disposeInspectionMesh(null); disposeInspectionMesh(new THREE.Mesh(geometry, material));
   assert.equal(instances, 1); assert.equal(assets, 0);
   geometry.dispose(); material.dispose();
+});
+
+test('preparation matches hero instancing and decorated materials without a visible instance', () => {
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshPhysicalMaterial();
+  material.customProgramCacheKey = () => 'room-decoration';
+  const materials = [material], probe = createInspectionProgramProbe(geometry, materials);
+  const hero = createInspectionMesh(geometry, materials);
+  assert.equal(probe.isInstancedMesh, hero.isInstancedMesh);
+  assert.equal(probe.count, 0); assert.equal(hero.count, 1);
+  assert.equal(probe.instanceColor, hero.instanceColor);
+  assert.equal(probe.material, materials); assert.equal(probe.geometry, geometry);
+  assert.equal(material.customProgramCacheKey(), 'room-decoration');
+  assert.equal(probe.parent, null, 'probe creation never mutates the live tree');
+  let assets = 0;
+  geometry.addEventListener('dispose', () => { assets++; });
+  material.addEventListener('dispose', () => { assets++; });
+  disposeInspectionMesh(probe); assert.equal(assets, 0);
+  assert.equal(hero.count, 1); assert.equal(hero.material, materials);
+  disposeInspectionMesh(hero); geometry.dispose(); material.dispose();
 });

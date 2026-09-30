@@ -1,6 +1,7 @@
 import { getLastUserActivity } from './user-activity';
 import { updateStoreLoading } from './store-loading';
 import { initialProgramObjects } from './initial-programs';
+import { createInspectionProgramProbe } from './inspection-mesh';
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
 import type { Movie } from './providers/media-source-provider';
@@ -100,6 +101,14 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
       const mesh = new THREE.Mesh(geo, mats.length === 1 ? mats[0] : mats);
       mesh.frustumCulled = false;
       warmScene.add(mesh);
+      // Factory fronts keep the room's bay-wash decoration. Heroes now use
+      // identity instancing too; the undecorated poster probes below cannot
+      // prepare that distinct program. Keep ordinary variants for carried cases.
+      if (!mats.every(material => warm.unmodifiedMaterials.includes(material))) {
+        const probe = createInspectionProgramProbe(geo, mats);
+        instancedProbes.push(probe);
+        warmScene.add(probe);
+      }
     }
     // Shelf batches need the instanced variant of the same undecorated
     // poster finishes. Zero instances prepare it without drawing a probe.

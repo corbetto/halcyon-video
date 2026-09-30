@@ -10,6 +10,15 @@ export function createInspectionMesh(
   return new THREE.InstancedMesh(geometry, material, 1);
 }
 
+/** Match the live hero's shader flags without drawing or borrowing its state. */
+export function createInspectionProgramProbe(
+  geometry: THREE.BufferGeometry, materials: THREE.Material[],
+): THREE.InstancedMesh {
+  const probe = createInspectionMesh(geometry, materials);
+  probe.count = 0;
+  return probe;
+}
+
 /** InstancedMesh caches object-local bounds independently of its geometry.
  * A movie/game/series shape swap must invalidate those bounds for culling and hits.
  */
