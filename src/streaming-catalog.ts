@@ -140,9 +140,9 @@ export function resolveEnabledServices(overrideCsv: string | undefined | null): 
 export const ALL_DEFAULT_STREAMING_SERVICES_CSV = DEFAULT_STREAMING_SERVICES.map((d) => d.id).join(',');
 
 /**
- * A non-demo local build defaults to no streaming choices. Its mobile first
- * visit intentionally skips setup and enters the ready-made streaming store,
- * so an absent preference needs a concrete catalog before that boot fetches.
+ * A hosted or explicitly requested demo needs a concrete starting catalog.
+ * Ordinary local entry, including phones, does not call this for a missing
+ * preference: no chosen services means an opening-day empty store.
  * Presence matters: an explicitly saved empty string means "none" and must
  * not be replaced.
  */

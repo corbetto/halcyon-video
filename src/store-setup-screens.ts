@@ -15,6 +15,8 @@ export type SetupKey = 'up' | 'down' | 'left' | 'right' | 'ok' | 'back';
 export type SetupAction =
   | 'connect'       // home: dial the typed address
   | 'demo'          // stock the demo store instead
+  | 'choose-streaming' // choose services without a media-server session
+  | 'leave-empty'   // leave setup without choosing demo inventory
   | 'retry'         // notice: retry the saved server now
   | 'change-server' // notice: drop the saved server, back to a blank home
   | 'open-store'    // libraries: choices made, sync + stock
@@ -69,7 +71,7 @@ export function initialHomeScreen(savedAddress?: string | null, providerKind = '
 }
 
 // Home rows: 0 DISTRIBUTOR / 1 SERVER ADDRESS / 2 CONNECT / 3 TRY A DEMO STORE
-const HOME_ROWS = 4;
+const HOME_ROWS = 5;
 // Manual-auth rows: 0 MEMBER NAME / 1 PASSWORD / 2 SIGN IN / 3 BACK
 const AUTH_ROWS = 4;
 // Notice rows: 0 RETRY NOW / 1 CHANGE SERVER / 2 TRY A DEMO STORE / 3 COPY REPORT
@@ -99,7 +101,7 @@ export function setupScreenBackspace(s: SetupScreen): SetupScreen {
 export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScreen; action?: SetupAction } {
   switch (s.kind) {
     case 'home': {
-      const rowsCount = s.error ? 5 : HOME_ROWS;
+      const rowsCount = s.error ? HOME_ROWS + 1 : HOME_ROWS;
       if (key === 'up' || key === 'down') {
         const row = (s.row + (key === 'up' ? -1 : 1) + rowsCount) % rowsCount;
         return { state: { ...s, row } };
@@ -119,7 +121,8 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
           return { state: s, action: 'connect' };
         }
         if (s.row === 3) return { state: s, action: 'demo' };
-        if (s.row === 4) return { state: { ...s, copied: true }, action: 'copy-report' };
+        if (s.row === 4) return { state: s, action: 'choose-streaming' };
+        if (s.row === 5) return { state: { ...s, copied: true }, action: 'copy-report' };
         return { state: s };
       }
       // left/right on the DISTRIBUTOR row cycle the available providers.
@@ -128,7 +131,7 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
         return { state: { ...s, provider: (s.provider + (key === 'left' ? -1 : 1) + n) % n } };
       }
       if (key === 'back') {
-        return { state: s, action: 'demo' };
+        return { state: s, action: 'leave-empty' };
       }
       return { state: s };
     }
@@ -201,7 +204,7 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
         if (s.row === 3) return { state: { ...s, copied: true }, action: 'copy-report' };
       }
       if (key === 'back') {
-        return { state: s, action: 'demo' };
+        return { state: s, action: 'leave-empty' };
       }
       return { state: s };
     }
@@ -277,19 +280,20 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
       // yet; once a connect has come back with a reason, the reason is what
       // the screen is for, and the three rows it frees are what let the reason
       // reach its second sentence — the one saying what to do about it.
-      const intro = s.error ? [] : ['BARE SHELVES, NO STOCK. PICK A', 'DISTRIBUTOR TO SUPPLY THIS STORE.', ''];
+      const intro = s.error ? [] : ['BARE SHELVES, NO STOCK. CHOOSE', 'STREAMING APPS OR A DISTRIBUTOR.', ''];
       const menuRows = [
         sel(s.row === 0, `DISTRIBUTOR  ${provider}`),
         sel(s.row === 1, `ADDRESS      ${addr}`),
         sel(s.row === 2, 'CONNECT'),
         sel(s.row === 3, 'TRY A DEMO STORE'),
+        sel(s.row === 4, 'CHOOSE STREAMING SERVICES'),
       ];
       if (s.error) {
-        menuRows.push(sel(s.row === 4, s.copied ? 'REPORT COPIED' : 'COPY REPORT'));
+        menuRows.push(sel(s.row === 5, s.copied ? 'REPORT COPIED' : 'COPY REPORT'));
       }
       const lines = [
         'NEW STORE SETUP — OPENING DAY',
-        '',
+        ...(s.error ? [] : ['']),
         ...intro,
         ...menuRows,
       ];

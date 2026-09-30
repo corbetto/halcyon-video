@@ -306,16 +306,16 @@ test('a long reason wraps into terminal rows instead of being clipped to 40', as
 
 test('the home screen makes room for a real failure, and is untouched without one', () => {
   const clean = setupScreenLines(initialHomeScreen('http://'));
-  assert.equal(clean.lines.length, 9);
+  assert.equal(clean.lines.length, 10);
   assert.equal(clean.cursorLine, 6, 'row 1 (ADDRESS) is where the cursor starts');
-  assert.ok(clean.lines.includes('BARE SHELVES, NO STOCK. PICK A'));
+  assert.ok(clean.lines.includes('BARE SHELVES, NO STOCK. CHOOSE'));
 
   const failed = setupScreenLines({
     ...initialHomeScreen('http://192.168.1.50:32400'), row: 1,
     error: wrapSetupError('x '.repeat(120)),
   });
   assert.ok(failed.lines.length <= 12, 'drawTerminal seats 12 rows');
-  assert.ok(!failed.lines.includes('BARE SHELVES, NO STOCK. PICK A'), 'intro copy steps aside');
+  assert.ok(!failed.lines.includes('BARE SHELVES, NO STOCK. CHOOSE'), 'intro copy steps aside');
   assert.equal(failed.lines[failed.cursorLine].includes('ADDRESS'), true,
     'the cursor still points at the row the person needs to edit');
 });

@@ -104,11 +104,13 @@ export function initBootFlow(d: BootFlowDeps): void {
     keyClick: d.keyClick,
     callbacks: {
       tryDemo: () => {
+        cancelRetryHook?.();
         hideLoginOverlay();
         closeMembershipCardPicker();
         showBootOverlay();
         startDemoAndLoad();
       },
+      leaveEmpty: () => { cancelRetryHook?.(); },
       sync: syncForSetup,
       openStore: () => {
         showBootOverlay();
@@ -687,11 +689,9 @@ export async function startDemoAndLoad() {
     // and no synthetic movie/game artwork belongs on its critical path.
     deps.setLibraries([]);
     deps.setGames([]);
-    // A local build normally defaults to no chosen services, but its mobile
-    // first-run path deliberately enters this ready-made demo instead of the
-    // counter setup flow. Give only a truly unset browser the same useful
-    // starting catalog as the hosted build; an explicit empty choice remains
-    // the user's choice.
+    // Hosted entry and an explicitly chosen demo receive useful defaults.
+    // Ordinary local entry reaches this loader only with saved service choices;
+    // an unset local browser belongs in the opening-day store on every device.
     seedAutomaticDemoStreamingServices(localStorage);
     await deps.loadStreaming();
     deps.launchStore();
@@ -984,8 +984,9 @@ export async function checkCredentialsAndLoad() {
             noticeShown = true;
             document.removeEventListener('keydown', bootEscape);
             document.removeEventListener('click', bootEscape);
-            if (mobileStoreActive()) {
-              d.log('[System] Mobile touch visitor: auto-login failed. Stocking streaming demo store immediately.', 'system');
+            if (mobileStoreActive() && getSetting<boolean>('bb_streaming_enabled')
+                && resolveEnabledServices(getSetting<string>('bb_streaming_services')).length > 0) {
+              d.log('[System] Auto-login failed. Restoring the chosen streaming services.', 'system');
               void startDemoAndLoad();
               return;
             }
@@ -1082,11 +1083,6 @@ export async function checkCredentialsAndLoad() {
     if (getSetting<string>('bb_render_mode') === 'flat') {
       d.log('[System] No saved credentials. Showing Login screen.', 'system');
       setTimeout(() => { hideBootOverlay(); showLoginOrCards(); }, 500);
-      return;
-    }
-    if (mobileStoreActive()) {
-      d.log('[System] First run on mobile — stocking streaming demo store immediately.', 'system');
-      void startDemoAndLoad();
       return;
     }
     d.log('[System] First run — opening day. Setting up at the counter terminal.', 'system');

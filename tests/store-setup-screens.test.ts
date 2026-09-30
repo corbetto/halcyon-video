@@ -27,14 +27,14 @@ test('home: starts on the address row with the saved address prefilled', () => {
   assert.match(lines(s)[0], /NEW STORE SETUP/);
 });
 
-test('home: up/down wrap through the four rows', () => {
+test('home: up/down wrap through all five rows', () => {
   let s = initialHomeScreen();
   s = setupScreenKey(s, 'down').state as typeof s;
   assert.equal((s as any).row, 2);
-  s = setupScreenKey(setupScreenKey(s, 'down').state, 'down').state as typeof s;
-  assert.equal((s as any).row, 0); // wrapped past TRY A DEMO STORE
+  for (let i = 0; i < 3; i++) s = setupScreenKey(s, 'down').state as typeof s;
+  assert.equal((s as any).row, 0); // wrapped past streaming services
   s = setupScreenKey(s, 'up').state as typeof s;
-  assert.equal((s as any).row, 3);
+  assert.equal((s as any).row, 4);
 });
 
 test('home: typing lands in the address only while its row is focused', () => {
@@ -60,6 +60,13 @@ test('home: CONNECT with an address emits connect; demo row emits demo', () => {
   assert.equal(setupScreenKey(s, 'ok').action, 'connect');
   s = { ...s, row: 3 };
   assert.equal(setupScreenKey(s, 'ok').action, 'demo');
+});
+
+test('home: streaming services are reachable without typing a server address', () => {
+  const s: SetupScreen = { ...initialHomeScreen(), row: 4 };
+  assert.equal(setupScreenKey(s, 'ok').action, 'choose-streaming');
+  assert.match(lines(s).join('\n'), /CHOOSE STREAMING SERVICES/);
+  assert.equal(lines(s).length, 10, 'opening-day menu fits its existing line budget');
 });
 
 test('home: OK on the distributor/address rows advances BIOS-style', () => {
@@ -154,12 +161,12 @@ test('notice: rows emit retry / change-server / demo / copy-report', () => {
   assert.match(lines(copyRes.state).join('\n'), /REPORT COPIED/);
 });
 
-test('home with error: offers COPY REPORT on row 4 and wraps navigation', () => {
-  let s: SetupScreen = { ...initialHomeScreen('http://tv:8096'), row: 3, error: 'CONNECTION FAILED.' };
+test('home with error: offers COPY REPORT on row 5 and wraps navigation', () => {
+  let s: SetupScreen = { ...initialHomeScreen('http://tv:8096'), row: 4, error: 'CONNECTION FAILED.' };
   assert.match(lines(s).join('\n'), /COPY REPORT/);
-  // down from row 3 goes to row 4 (COPY REPORT)
+  // down from streaming services goes to COPY REPORT
   s = setupScreenKey(s, 'down').state;
-  assert.equal((s as any).row, 4);
+  assert.equal((s as any).row, 5);
   const copyRes = setupScreenKey(s, 'ok');
   assert.equal(copyRes.action, 'copy-report');
   assert.equal((copyRes.state as any).copied, true);
@@ -231,12 +238,12 @@ test('Emby setup keeps its provider through retries and requires a server addres
   assert.equal(initialHomeScreen(null, 'unrecognized').provider, 0);
 });
 
-test('notice: back key emits demo action', () => {
+test('notice: Back leaves the empty store without choosing demo services', () => {
   const base: SetupScreen = { kind: 'notice', address: 'http://tv:8096', detail: 'NO ANSWER', row: 0 };
-  assert.equal(setupScreenKey(base, 'back').action, 'demo');
+  assert.equal(setupScreenKey(base, 'back').action, 'leave-empty');
 });
 
-test('home: back key emits demo action', () => {
+test('home: Back leaves the empty store without choosing demo services', () => {
   const base: SetupScreen = initialHomeScreen('http://tv:8096');
-  assert.equal(setupScreenKey(base, 'back').action, 'demo');
+  assert.equal(setupScreenKey(base, 'back').action, 'leave-empty');
 });

@@ -83,6 +83,8 @@ import {
 } from './setup-failure-report';
 
 export interface SetupTerminalScene {
+  isWalkAroundMode: boolean;
+  toggleWalkAround(): void;
   setTerminalText(lines: string[] | null, cursorLine?: number): void;
   enterSearchMode(): void;
   exitSearchMode(): void;
@@ -97,6 +99,8 @@ export interface SetupFlowDeps {
   callbacks: {
     /** TRY A DEMO STORE — boot-flow's demo path (scene rebuilds stocked). */
     tryDemo(): void;
+    /** Leave the empty store's terminal and stop a failed connection retry. */
+    leaveEmpty(): void;
     /**
      * Full catalog sync for the chosen server/member, honoring the carried-
      * library exclusions just persisted. Progress lands back on the CRT via
@@ -213,7 +217,11 @@ function openWith(s: SetupScreen): void {
   if (!deps.ui.isSetupOpen) {
     deps.ui.isSetupOpen = true;
     window.addEventListener('keydown', onTypedKey, true);
-    deps.scene()?.enterSearchMode(); // camera dock only — the text is ours
+    const scene = deps.scene();
+    // Walking otherwise owns both the camera and the directional callbacks,
+    // leaving an opening-day phone unable to see or operate this terminal.
+    if (scene?.isWalkAroundMode) scene.toggleWalkAround();
+    scene?.enterSearchMode(); // camera dock only — the text is ours
   }
   render();
 }
@@ -684,6 +692,11 @@ function runDemo(): void {
 /** One remote/keyboard press while the setup terminal is up. */
 export async function setupTerminalInput(kind: SetupKey): Promise<void> {
   if (!deps?.ui.isSetupOpen || isMembershipPickerOpen()) return;
+  if (screen.kind === 'streaming' && !pendingSession && kind === 'back') {
+    screen = initialHomeScreen();
+    render();
+    return;
+  }
   if (isSourceScreen(screen)) {
     await sourceTerminalInput(screen, kind);
     return;
@@ -713,6 +726,18 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
     case 'demo':
       runDemo();
       return;
+    case 'choose-streaming':
+      // This route makes no request to a distributor. A previous wizard's
+      // transient login must not turn service selection into a server gate.
+      pendingSession = null;
+      pendingUrl = '';
+      screen = initialStreamingScreen();
+      render();
+      return;
+    case 'leave-empty':
+      closeSetupTerminal();
+      deps.callbacks.leaveEmpty();
+      return;
     case 'sign-in':
       await manualSignIn();
       return;
@@ -735,6 +760,7 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
       }
       if (screen.kind === 'streaming') {
         persistStreamingChoice(screen.rows);
+        if (!pendingSession) { runDemo(); return; }
         await runSync();
       }
       return;
