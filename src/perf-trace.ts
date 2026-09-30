@@ -192,6 +192,10 @@ class PerfTrace {
     wrap('compileShader', 'glCompileMs', 'glCompileN');
     wrap('linkProgram', 'glLinkMs', 'glLinkN');
     wrap('getProgramParameter', 'glProgQMs', 'glProgQN');
+    // Three's first-use diagnostics also synchronize with the driver; a long
+    // binding task otherwise looks unowned even with deep GL tracing enabled.
+    wrap('getProgramInfoLog', 'glProgLogMs', 'glProgLogN');
+    wrap('getShaderInfoLog', 'glShaderLogMs', 'glShaderLogN');
     wrap('bufferData', 'glBufDataMs', 'glBufDataN');
     wrap('bufferSubData', 'glBufSubMs', 'glBufSubN');
     wrap('readPixels', 'glReadPxMs', 'glReadPxN');

@@ -23,6 +23,7 @@ export async function compileProgramsInStages(
   progress?: (fraction: number, detail: string) => void,
   options: { batchSize?: number; beforeWork?: () => Promise<void> } = {},
 ): Promise<void> {
+  signal.throwIfAborted();
   const maxBatchSize = options.batchSize ?? 32;
   const beforeWork = options.beforeWork ?? (() => yieldForPrograms(signal));
   const gl = renderer.getContext();
@@ -52,13 +53,14 @@ export async function compileProgramsInStages(
   let submitted = 0;
   let lastYield = -Infinity;
   for (let i = 0; i < objects.length; i += batchSize) {
-    // Background callers submit one drawable at a time. Cached programs can
+    // Background material warmups can submit one drawable at a time. Cached programs can
     // share a short task; a driver operation that exhausts the budget yields
     // before the next drawable, even when parallel compilation is available.
     if ((extension && maxBatchSize > 1) || performance.now() - lastYield >= 8) {
       await beforeWork();
       lastYield = performance.now();
     }
+    signal.throwIfAborted();
     if (gl.isContextLost()) return;
     const previous = renderer.getRenderTarget();
     const face = renderer.getActiveCubeFace(), mip = renderer.getActiveMipmapLevel();
@@ -112,6 +114,7 @@ export async function compileProgramsInStages(
     if (extension) {
       while (pending.length) {
         await beforeWork();
+        signal.throwIfAborted();
         if (gl.isContextLost()) return;
         for (let j = pending.length - 1; j >= 0; j--) {
           if (!pending[j].program || gl.getProgramParameter(pending[j].program as WebGLProgram, extension.COMPLETION_STATUS_KHR)) pending.splice(j, 1);

@@ -19,8 +19,11 @@ export async function captureCubeInSlices(
     compileScene.environmentIntensity = scene.environmentIntensity;
   });
   await wait();
+  // Completion and first-use binding queries can block the driver too. Keep
+  // those operations behind the same live-input/invalidation gate as the faces.
+  // Retain bounded parallel batches so an idle capture can still finish promptly.
   await compileProgramsInStages(renderer, compileScene, camera.children[0] as THREE.Camera,
-    camera.renderTarget, signal);
+    camera.renderTarget, signal, compileScene, undefined, {beforeWork: wait});
   for (let face = 0; face < 6; face++) {
     await wait(); signal.throwIfAborted();
     const target = renderer.getRenderTarget();
