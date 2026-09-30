@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "halcyon-showcase",
+  "networkPublishingEnabled": false,
+  "canonicalHost": null,
+  "cloudflareAccountId": null,
+  "cloudflareProjectName": null,
+  "sourcePermissionReference": null,
+  "approvedMasterSha": null,
+  "monthlyHostingCeilingUsd": 5,
+  "previewProtection": "unconfigured",
+  "dailyRefreshEnabled": false
+}

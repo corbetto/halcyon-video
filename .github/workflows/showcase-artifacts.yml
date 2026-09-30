@@ -1,0 +1,51 @@
+name: Verify showcase artifacts
+
+on:
+  push:
+    branches: [dev, master]
+    paths: ['showcase/**', 'src/streaming-catalog.ts', '.github/workflows/showcase-artifacts.yml']
+  pull_request:
+    branches: [dev, master]
+    paths: ['showcase/**', 'src/streaming-catalog.ts', '.github/workflows/showcase-artifacts.yml']
+  workflow_dispatch:
+
+# This workflow has no hosting credentials, deployment job or write permission.
+permissions:
+  contents: read
+concurrency:
+  group: showcase-artifact-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: showcase
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.19.0'
+          cache: npm
+          cache-dependency-path: showcase/package-lock.json
+      - run: npm ci --no-fund
+      - run: npm audit --audit-level=low
+      - run: npm run check
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Package verified fixture output
+        run: npm run package:preview -- "$SOURCE_COMMIT"
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+      - name: Retain trusted build receipt and static bundle
+        if: success() && github.event_name != 'pull_request' && github.repository == 'halcyon-video/halcyon-video' && github.actor == 'devbjackson'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: showcase-fixture-${{ github.sha }}-${{ github.run_attempt }}
+          path: showcase/input/deployment/bundles/
+          if-no-files-found: error
+          retention-days: 14

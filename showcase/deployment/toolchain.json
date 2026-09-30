@@ -1,0 +1,6 @@
+{
+  "buildNode": "22.19.0",
+  "astro": "7.3.3",
+  "wrangler": "4.144.0",
+  "wranglerStatus": "planned-not-invoked; activation requires a fresh compatibility and permission review"
+}

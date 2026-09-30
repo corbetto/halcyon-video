@@ -46,3 +46,8 @@ The guarded data-publisher increment for #354 is documented in
 artifacts with atomic promotion and rollback safeguards. Its transport and
 collector are tested against synthetic responses; live collection, daily jobs,
 source permission and production publication remain explicitly gated.
+
+The #356 [deployment foundation](DEPLOYMENT.md) adds a verified static bundle,
+source/snapshot receipts, secret-free artifact CI and local rollback simulation.
+It does not register a project/domain or publish a Cloudflare preview/production
+site. Network publishing and scheduled live refresh remain hard-disabled.

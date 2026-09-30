@@ -1,12 +1,12 @@
 ---
-import { snapshot } from '../catalog/load';
+import { snapshot, snapshotHash } from '../catalog/load';
 import '../styles/catalog.css';
 interface Props { title: string; description?: string; }
 const { title, description = 'Browse the Halcyon Video selection of films and series.' } = Astro.props;
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : undefined;
 ---
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{title} · Halcyon Video</title><meta name="description" content={description} /><meta name="robots" content="noindex, nofollow" />{canonical && <link rel="canonical" href={canonical} />}</head>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{title} · Halcyon Video</title><meta name="description" content={description} /><meta name="robots" content="noindex, nofollow" /><meta name="halcyon-snapshot" content={snapshotHash} />{canonical && <link rel="canonical" href={canonical} />}</head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
   <header class="masthead"><a class="brand" href="/" aria-label="Halcyon Video home">HALCYON <span>VIDEO</span></a><nav aria-label="Main"><a href="/browse/">Browse</a><a href="/about/">About</a><a href="/store/">3D store</a></nav></header>
