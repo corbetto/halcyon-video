@@ -6,7 +6,8 @@ export const REEL_MIME_TYPES = [
   'video/mp4;codecs=avc1.640034', 'video/mp4',
   'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm',
 ];
-export interface ReelResult { blob: Blob; extension: string; reason: string; }
+import type {ReelCaptureFacts} from './reel-receipt';
+export interface ReelResult { blob: Blob; extension: string; reason: string; capture:ReelCaptureFacts; }
 export class ReelCapture {
   private recorder: MediaRecorder | null = null;
   private stream: MediaStream | null = null;
@@ -15,6 +16,10 @@ export class ReelCapture {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private reason = '';
   private finishing = false;
+  private startedAt = '';
+  private startedMs = 0;
+  private width = 0;
+  private height = 0;
   private readonly onResult: (result: ReelResult) => void;
   private readonly onError: (message: string) => void;
   constructor(onResult: (result: ReelResult) => void, onError: (message: string) => void) {
@@ -28,6 +33,7 @@ export class ReelCapture {
       throw new Error('Recording is unavailable in this browser. Open Halcyon in Chrome or Edge.');
     }
     this.chunks = []; this.bytes = 0; this.reason = ''; this.finishing = false;
+    this.width=canvas.width;this.height=canvas.height;
     try {
       this.stream = canvas.captureStream(60);
       let lastError: unknown;
@@ -52,10 +58,13 @@ export class ReelCapture {
       recorder.onstop = () => {
         const blob = new Blob(this.chunks, { type: recorder.mimeType || this.chunks[0]?.type || 'video/webm' });
         const reason = this.reason;
+        const capture={width:this.width,height:this.height,startedAt:this.startedAt,wallDurationMs:Math.max(0,performance.now()-this.startedMs),requestedFps:60,
+          audioTracks:this.stream?.getTracks().filter(track=>track.kind==='audio').length??0};
         this.cleanup();
-        if (blob.size) this.onResult({ blob, reason, extension: blob.type.includes('mp4') ? 'mp4' : 'webm' });
+        if (blob.size) this.onResult({ blob, reason, capture, extension: blob.type.includes('mp4') ? 'mp4' : 'webm' });
         else this.onError(reason || 'No video frames were captured. Please try again.');
       };
+      this.startedAt=new Date().toISOString();this.startedMs=performance.now();
       recorder.start(1000);
       this.timer = setTimeout(() => this.stop('Two-minute clip saved. You can start another take.'), REEL_MAX_MS);
     } catch (error) {

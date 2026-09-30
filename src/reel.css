@@ -7,6 +7,7 @@
 #reel-controls[hidden], #reel-controls [hidden] { display: none; }
 #reel-controls p { margin: 6px 0 10px; font-size: 16px; }
 #reel-controls button, #reel-controls a {
+  min-height:44px;box-sizing:border-box;
   display: inline-block; padding: 9px 12px; margin: 4px 8px 0 0;
   border: 1px solid #c8b382; background: #292e37; color: #fff3cf;
   font: inherit; text-decoration: none; cursor: pointer;

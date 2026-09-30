@@ -1,4 +1,5 @@
 import { ReelCapture, type ReelResult } from './reel-capture';
+import {createReelReceipt,reelBuildSource,type ReelBuildSource} from './reel-receipt';
 import { resetReelFlight, toggleReelFlight } from './store-reel-flight';
 import { hideReelObject } from './reel-visibility';
 import { markUserActivity } from './user-activity';
@@ -13,6 +14,9 @@ let panel: HTMLElement | null = null;
 let status: HTMLElement | null = null;
 let download: HTMLAnchorElement | null = null;
 let objectUrl = '';
+let receiptUrl = '';
+let receiptDownload:HTMLAnchorElement|null=null;
+let captureSource:ReelBuildSource={revision:null,clean:false,bundled:false};
 let originalTitle = '';
 let recordingSize = '';
 let starting = false;
@@ -44,6 +48,12 @@ function finish(result: ReelResult): void {
   download.download = 'halcyon-reel-' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + result.extension;
   download.hidden = false;
   download.textContent = 'Save last take (' + (result.blob.size / 1024 / 1024).toFixed(1) + ' MB)';
+  if(receiptDownload){
+    if(receiptUrl)URL.revokeObjectURL(receiptUrl);
+    const receipt=createReelReceipt({filename:download.download,bytes:result.blob.size,mime:result.blob.type,capture:result.capture,source:captureSource,stoppedEarly:!!result.reason});
+    receiptUrl=URL.createObjectURL(new Blob([JSON.stringify(receipt,null,2)+'\n'],{type:'application/json'}));
+    receiptDownload.href=receiptUrl;receiptDownload.download=download.download+'.json';receiptDownload.hidden=false;
+  }
   notify((result.reason ? result.reason + ' ' : '') + recordingSize + ' · Silent video · Ready for another take.');
   // Keep the link until the next completed take in case automatic downloads
   // need a mouse gesture or are disabled by the browser.
@@ -68,6 +78,7 @@ export function toggleReelRecording(): boolean {
   try {
     if (scene.renderer.getContext().isContextLost()) throw new Error('The graphics context is unavailable.');
     starting = true;
+    captureSource=reelBuildSource();
     markUserActivity();
     const canvas = scene.renderer.domElement;
     recordingSize = canvas.width + ' × ' + canvas.height + ' · 60 fps target';
@@ -117,7 +128,8 @@ export function installReelRecorder(scene: () => StoreScene | null, allowed: () 
   const flight = document.createElement('button'); flight.textContent = 'Fly camera · R1 / F';
   flight.onclick = () => { flight.blur(); toggleReelCamera(); };
   download = document.createElement('a'); download.hidden = true;
-  panel.append(heading, status, record, flight, download); document.body.append(panel);
+  receiptDownload=document.createElement('a');receiptDownload.id='reel-receipt-download';receiptDownload.hidden=true;receiptDownload.textContent='Save take details for review';
+  panel.append(heading, status, record, flight, download,receiptDownload); document.body.append(panel);
   window.addEventListener('keydown', event => {
     if (event.key !== 'F9' || event.ctrlKey || event.metaKey || keyboardOwnedByControl()) return;
     if (!getScene()?.reelMode) return;

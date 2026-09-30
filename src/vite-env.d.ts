@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __HALCYON_BUILD_SOURCE__: {revision:string|null;clean:boolean;bundled:boolean};
+
 interface ImportMetaEnv {
   readonly VITE_DEMO?: string;
   readonly VITE_JELLYFIN_URL?: string;
@@ -14,4 +16,3 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
-

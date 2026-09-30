@@ -1,4 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
+// @ts-expect-error plain JavaScript build helper, not browser code
+import { buildSourcePlugin } from "./tools/build-source.mjs";
 // @ts-expect-error node:fs/node:path have no type declarations without @types/node
 // (not installed; vite.config.ts is outside tsconfig's "include" so this never
 // hits the `npm run build` gate, only editor intellisense).
@@ -561,6 +563,7 @@ function clientErrorRelayPlugin() {
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [
+    buildSourcePlugin(import.meta.dirname),
     // First: everything below it answers only to an allowed Host header.
     hostGuardPlugin(),
     localEndpointGuardPlugin(),

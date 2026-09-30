@@ -59,7 +59,7 @@ test('recorder drains final chunk once, closes tracks and allows another take', 
     }
   }
   globalThis.MediaRecorder = FakeRecorder as any;
-  const canvas = { captureStream(fps: number) { assert.equal(fps, 60); return { getTracks: () => [{ stop: () => stoppedTracks++ }] }; } } as any;
+  const canvas = { width:1920,height:1080,captureStream(fps: number) { assert.equal(fps, 60); return { getTracks: () => [{ kind:'video',stop: () => stoppedTracks++ }] }; } } as any;
   try {
     const capture = new ReelCapture(result => results.push(result), message => assert.fail(message));
     capture.start(canvas); capture.start(canvas);
@@ -69,6 +69,8 @@ test('recorder drains final chunk once, closes tracks and allows another take', 
     await new Promise(resolve => queueMicrotask(resolve as any));
     assert.equal(await results[0].blob.text(), 'firstlast');
     assert.equal(results[0].extension, 'webm');
+    assert.equal(results[0].capture.width,1920);assert.equal(results[0].capture.height,1080);assert.equal(results[0].capture.audioTracks,0);assert.equal(results[0].capture.requestedFps,60);
+    assert.ok(Number.isFinite(Date.parse(results[0].capture.startedAt)));assert.ok(results[0].capture.wallDurationMs>=0);
     assert.equal(stoppedTracks, 1); assert.equal(capture.busy, false);
     capture.start(canvas); capture.stop('Window resized');
     await new Promise(resolve => queueMicrotask(resolve as any));
