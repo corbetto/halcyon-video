@@ -1853,7 +1853,7 @@ export class StoreScene {
     // shadows + SSAO). Default THOSE to 'medium' — an explicit bb_quality
     // pick always wins, this only changes the first-run default. Discrete
     // parts (GeForce/Radeon RX/Arc) keep defaulting to 'high'.
-    const integratedGL = /intel.*(uhd|hd graphics|iris)|iris ?xe|radeon\(tm\) graphics|vega \d|\bmali\b|adreno/i.test(gpuName)
+    const integratedGL = /intel.*(uhd|hd graphics|iris)|iris ?xe|radeon\(tm\) graphics|radeon \d\d\dm|radeon.*m graphics|vega \d|\bmali\b|adreno/i.test(gpuName)
       && !/arc|rtx|gtx|geforce|radeon rx/i.test(gpuName);
     console.log(`[GPU] WebGL renderer: ${gpuName}${softwareGL ? ' — SOFTWARE RENDERING, no GPU acceleration; clamping quality to low' : integratedGL ? ' — integrated GPU, defaulting quality to medium' : ''}`);
     // Three-way waterfall (src/quality-calibrate.ts): explicit bb_quality
@@ -5150,10 +5150,13 @@ export class StoreScene {
     // this function) for as long as it's selected even after its pop settles.
     let movingSlots = 0;
     const admitPlacement = placementBudget();
+    let hasDeferredPlacement = false;
     for (const slot of this.dirtySlots) {
-      if (slot.needsInitialMatrixUpdate && slot.key !== activeKey && !admitPlacement()) {
-        this.requestRender(); // Continue the next chunk, even with a stationary camera.
-        continue;
+      if (slot.needsInitialMatrixUpdate && slot.key !== activeKey) {
+        if (!admitPlacement()) {
+          hasDeferredPlacement = true;
+          continue;
+        }
       }
       if (this.launchAnim && slot === this.launchAnim.slot) continue;
       const isSelected = (slot.key === activeKey) && !(mobileStoreActive() && this.mode === 'browse');
@@ -5460,6 +5463,9 @@ export class StoreScene {
     // Remove settled non-selected slots from dirty set so they aren't iterated next frame
     for (const slot of settledSlots) {
       this.dirtySlots.delete(slot);
+    }
+    if (hasDeferredPlacement) {
+      this.requestRender();
     }
     perfTrace.end(SP_SLOTS);
 

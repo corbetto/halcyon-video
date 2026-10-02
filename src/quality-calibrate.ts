@@ -68,7 +68,7 @@ export interface CalibratedQuality {
 // exist — there is no shared renderer to read the name off of yet. Keep in
 // sync if the regexes there ever change.
 const SOFTWARE_RE = /swiftshader|llvmpipe|softpipe|software|basic render|warp/i;
-const INTEGRATED_RE = /intel.*(uhd|hd graphics|iris)|iris ?xe|radeon\(tm\) graphics|vega \d|\bmali\b|adreno/i;
+const INTEGRATED_RE = /intel.*(uhd|hd graphics|iris)|iris ?xe|radeon\(tm\) graphics|radeon \d\d\dm|radeon.*m graphics|vega \d|\bmali\b|adreno/i;
 const INTEGRATED_EXCLUDE_RE = /arc|rtx|gtx|geforce|radeon rx/i;
 
 // ─── Benchmark workload constants (deterministic — same on every machine) ──
@@ -514,8 +514,10 @@ export async function calibrateQualityIfNeeded(): Promise<QualityTier | null> {
     disposeProbe(probe);
 
     if (score == null) {
-      console.log(`[calibrate] ${gpuName} — benchmark inconclusive after ${elapsedMs.toFixed(0)}ms, falling back to renderer-name detection`);
-      return null;
+      const integratedGL = INTEGRATED_RE.test(gpuName) && !INTEGRATED_EXCLUDE_RE.test(gpuName);
+      const fallbackTier: QualityTier = integratedGL ? 'medium' : 'high';
+      console.log(`[calibrate] ${gpuName} — benchmark inconclusive after ${elapsedMs.toFixed(0)}ms, falling back to renderer-name detection (${fallbackTier})`);
+      return fallbackTier;
     }
 
     const integratedGL = INTEGRATED_RE.test(gpuName) && !INTEGRATED_EXCLUDE_RE.test(gpuName);
