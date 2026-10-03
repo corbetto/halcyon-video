@@ -22,6 +22,7 @@
 // the plaque is lit by the room and goes dark with it at night.
 import * as THREE from 'three';
 import { installClaspHardware } from './clasp-hardware';
+import { mergeAdjacentMaterialGroups } from '../material-groups';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 
 /** Face: 0.95ft x 0.19ft — a small plaque, not a shelf-talker card. */
@@ -133,6 +134,8 @@ export class ShelfClasps {
     this.hotFaceMaterial.color.set(0xffd54a);
     this.hotEdgeMaterial = this.edgeMaterial.clone();
     this.hotEdgeMaterial.color = new THREE.Color(0xffd54a);
+    // The five acrylic edge faces are contiguous and share a finish.
+    mergeAdjacentMaterialGroups(this.geometry, this.materials());
   }
 
   /** BoxGeometry material order is +X,-X,+Y,-Y,+Z,-Z; the print is on +X. */
