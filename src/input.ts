@@ -18,7 +18,7 @@ export interface InputCallbacks {
   onIdle: () => void;      // Trigger screensaver
   onToggleWalkAround?: () => void; // Toggle first-person walk mode
   onCheckout?: () => void;     // T22: jump to the front-counter checkout point
-  onReturnTape?: () => void;   // T22: put the top carried tape back on its shelf
+  onReturnTape?: (fromKeyboard?: boolean) => void;   // T22: put the top carried tape back on its shelf
   onNotInterested?: () => void; // "not interested" on an inspected missing-entry case
   // Hold-select-to-checkout: while this returns true (a tape is in hand and a
   // checkout is possible), pressing the select control (Enter/Space/E or
@@ -313,7 +313,7 @@ export class InputManager {
           // T22: put the top carried tape back.
           if (this.callbacks.onReturnTape) {
             e.preventDefault();
-            this.callbacks.onReturnTape();
+            this.callbacks.onReturnTape(true);
           }
           break;
         case 'x':

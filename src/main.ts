@@ -2304,8 +2304,10 @@ function updateSearchResults() {
 function handleSearchKeydown(e: KeyboardEvent) {
   if (!ui.isSearchOpen) return;
   if (getSetting<string>('bb_render_mode') === 'flat') return;
+  // The dedicated record key still stops a take while search owns typing.
+  if (e.key === 'F9' && !e.ctrlKey && !e.metaKey) return;
   e.preventDefault();
-  e.stopPropagation();
+  e.stopImmediatePropagation();
 
   if (e.key === 'Escape') {
     closeSearch();
@@ -2637,7 +2639,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       if (action === 'inspect') {
         updateMovieHUD(movie || null);
       } else if (action === 'play' && movie) {
-        if (storeScene?.reelMode) { stopReelRecording(); showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
+        if (storeScene?.reelMode) { showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
         // Version choice resolves before the candy checkout / flourish — see
         // the onEnter play path.
         const version = await resolvePlayVersion(movie);
@@ -2667,7 +2669,8 @@ async function initializeStoreScene(preservePosterCache = false) {
     // T22 checkout at the front counter: starts playback or reveals game demo beat.
     scene.onCheckoutComplete = (items) => {
       logToConsole(`[System] Checkout complete: ${items.length} title(s) rented (${items.join(', ')}).`, 'system');
-      if (scene.rentalMode || items.length === 0) return;
+      // A reel records the complete checkout ritual without launching a film/game.
+      if (scene.reelMode || scene.rentalMode || items.length === 0) return;
       const movie = findTitleByCarryId(storeLibraries, items[0])
         ?? storeGameMovies.find((g) => g.id === items[0]);
       if (!movie) {
@@ -3274,7 +3277,7 @@ function finishPlayback(movie: Movie, fromCouch: boolean): void {
 }
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
-  if (storeScene?.reelMode) { stopReelRecording(); showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
+  if (storeScene?.reelMode) { showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
   if (movie.streaming) {
     handleStreamingLaunch(movie);
     return;
@@ -4010,7 +4013,7 @@ async function main() {
       if (action === 'inspect') {
         updateMovieHUD(movie || null);
       } else if (action === 'play' && movie) {
-        if (storeScene?.reelMode) { stopReelRecording(); showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
+        if (storeScene?.reelMode) { showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
         // Multi-version titles (4K + 1080p) pick their quality FIRST — before
         // the candy checkout and the play flourish — so backing out of the
         // picker leaves the store untouched.
@@ -4110,7 +4113,6 @@ async function main() {
       }
     },
     onPower: () => {
-      if (stopReelRecording()) return;
       if (storeScene?.isWalkAroundMode) return;
       // Same hard-stop the power key gives the real player.
       if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
@@ -4149,7 +4151,8 @@ async function main() {
       }
     },
     onSearch: () => {
-      if (stopReelRecording()) return;
+      // Slash must not stop a take or replace the menu being recorded.
+      if (reelRecordingActive()) return;
       if (storeScene?.isWalkAroundMode) return;
       // / while search is up closes it, from anywhere.
       if (ui.isSearchOpen) { closeSearch(); return; }
@@ -4232,7 +4235,9 @@ async function main() {
       }
       storeScene?.enterCheckout();
     },
-    onReturnTape: () => {
+    onReturnTape: (fromKeyboard = false) => {
+      // L1 is a dedicated record control; bare R belongs to the active menu.
+      if (fromKeyboard && !shortcutsAllowed()) return;
       if (toggleReelRecording()) return;
       if (!shortcutsAllowed()) return;
       storeScene?.returnCarriedTape();

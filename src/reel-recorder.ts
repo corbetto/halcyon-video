@@ -1,7 +1,6 @@
 import { ReelCapture, type ReelResult } from './reel-capture';
 import {createReelReceipt,reelBuildSource,type ReelBuildSource} from './reel-receipt';
 import { resetReelFlight, toggleReelFlight } from './store-reel-flight';
-import { hideReelObject } from './reel-visibility';
 import { markUserActivity } from './user-activity';
 import { keyboardOwnedByControl } from './text-entry-focus';
 import type { StoreScene } from './three-scene';
@@ -27,12 +26,7 @@ const capture = new ReelCapture(finish, fail);
 function notify(message: string): void {
   if (status) status.textContent = message;
 }
-function setSceneUiHidden(scene: StoreScene, hidden: boolean): void {
-  hideReelObject(scene.selectionArrow, hidden);
-  scene.overviewCursors?.setCaptureHidden(hidden);
-}
 function restore(): void {
-  if (activeScene) setSceneUiHidden(activeScene, false);
   if (activeScene) { activeScene.reelRecording = false; activeScene.renderer.domElement.removeAttribute('data-reel-canvas'); }
   activeScene = null;
   document.body.classList.remove('reel-recording');
@@ -83,14 +77,13 @@ export function toggleReelRecording(): boolean {
     const canvas = scene.renderer.domElement;
     recordingSize = canvas.width + ' × ' + canvas.height + ' · 60 fps target';
     activeScene = scene;
-    setSceneUiHidden(scene, true);
     originalTitle = document.title;
     document.title = 'Recording — ' + originalTitle;
     canvas.setAttribute('data-reel-canvas', '');
     document.body.classList.add('reel-recording');
     scene.reelRecording = true;
     scene.requestRender();
-    scene.composer.render(); // first encoded frame already has clean scene layers
+    scene.composer.render(); // include the current navigation cursor in the first frame
     capture.start(canvas);
     starting = false;
   } catch (error) {

@@ -12,5 +12,8 @@
   border: 1px solid #c8b382; background: #292e37; color: #fff3cf;
   font: inherit; text-decoration: none; cursor: pointer;
 }
-body.reel-recording * { visibility: hidden !important; }
-body.reel-recording canvas[data-reel-canvas] { visibility: visible !important; cursor: none !important; }
+/* Keep menus, touch navigation and in-scene cursors available throughout a take.
+   Only the recorder panel and walking/flight chrome leave the composition. */
+body.reel-recording :is(#reel-controls, #walk-hud, #walk-crosshair, #whiteout-overlay, #store-touch-walk, #store-touch-stick),
+body.reel-recording :is(#reel-controls, #walk-hud, #store-touch-stick) * { visibility: hidden !important; }
+body.reel-recording canvas[data-reel-canvas] { cursor: none !important; }

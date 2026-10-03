@@ -638,3 +638,31 @@ test('printed metadata window keeps all service rows inside it and preserves cro
   assert.equal(state.selectedIndex,6);
   cancelStreamingServiceChoice(scene);
 });
+
+
+test('a filmed streaming checkout returns to browsing without leaving the recorder', () => {
+  const scene = createMockScene({ reelMode: true }), movie = createMockMovie();
+  const physical = createMockMovie({ id: 'physical-tape', streaming: false });
+  scene.carried.take(physical);
+  const navigations: string[] = [];
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true,
+    value: { location: { assign: (url: string) => navigations.push(url) } } });
+  try {
+    startStreamingServiceChoice(scene, movie);
+    confirmStreamingServiceChoice(scene);
+    scene.checkoutRunning = true;
+    scene.checkoutExit = { start: 0, ids: [] };
+    assert.equal(completeStreamingCheckout(scene), true);
+    assert.deepEqual(navigations, [], 'provider departure would destroy the active take');
+    assert.deepEqual(scene.carried.ids(), [physical.id]);
+    assert.equal(scene.mode, 'overview');
+    assert.equal(scene.checkoutRunning, false);
+    assert.equal(scene.checkoutExit, null);
+    assert.equal(getStreamingCheckoutMovie(scene), null);
+    assert.equal(completeStreamingCheckout(scene), false);
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
+    else Reflect.deleteProperty(globalThis, 'window');
+  }
+});

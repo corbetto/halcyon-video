@@ -231,6 +231,8 @@ export function completeStreamingCheckout(scene: StoreScene): boolean {
   scene.requestRender();
   // Same-tab navigation works after the animation without popup permission,
   // and browser Back brings the visitor back to their store.
+  // Keep the store and its recorder alive after the filmed exit walk.
+  if (scene.reelMode) return true;
   try { window.location.assign(url); }
   catch { scene.onConsoleLog(`[System] Couldn't open the streaming service for "${movie.title}".`, 'system'); }
   return true;

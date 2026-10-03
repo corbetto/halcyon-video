@@ -475,6 +475,7 @@ export function finishCheckout(scene: StoreScene, ids: string[]): void {
   }
   scene.checkoutRunning = false;
   scene.checkoutExit = null;
+  if (scene.reelMode) scene.whiteoutEl()?.classList.remove('active', 'instant');
   scene.carried?.clearAll(true);
   scene.entrance?.hideBag();
   scene.clerk?.releaseFromRegister();
