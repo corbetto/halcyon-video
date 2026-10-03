@@ -47,27 +47,8 @@ export function aniso(desired: number): number {
   return Math.min(desired, maxAnisotropy);
 }
 
-// Stamp a procedural feature with wrap-around so the canvas tiles seamlessly.
-// `draw(ctx)` paints one feature at its natural coordinates; we repaint it at the
-// 8 neighbouring tile offsets too, so anything crossing an edge reappears on the
-// opposite edge. Without this, every feature clipped at a boundary becomes a hard
-// seam once the texture is RepeatWrapping'd. One-time init cost, so the brute
-// 3x3 stamp is fine.
-export function stampTiled(
-  ctx: CanvasRenderingContext2D,
-  sizeX: number,
-  draw: (ctx: CanvasRenderingContext2D) => void,
-  sizeY: number = sizeX,
-) {
-  for (let ox = -sizeX; ox <= sizeX; ox += sizeX) {
-    for (let oy = -sizeY; oy <= sizeY; oy += sizeY) {
-      ctx.save();
-      ctx.translate(ox, oy);
-      draw(ctx);
-      ctx.restore();
-    }
-  }
-}
+import { stampTiled } from './texture-tiling';
+export { stampTiled } from './texture-tiling';
 
 // Convert a grayscale height canvas into a tangent-space normal map texture via a
 // Sobel gradient. Normals derived from a real height field read far more
@@ -1114,7 +1095,7 @@ export function createAcousticPanelTexture(): THREE.CanvasTexture {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, Math.random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(120,116,104,0.05)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(ctx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(ctx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, S, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Worm fissures: short dark meandering strokes.
   for (let i = 0; i < 380; i++) {
@@ -1286,7 +1267,7 @@ export function createCarpetTextures(palette = getActiveTheme().palette): {
     const roll = Math.random();
     g.addColorStop(0, roll > 0.62 ? 'rgba(255,255,255,0.05)' : `rgba(0,0,0,${0.08 + roll * 0.06})`);
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(carpCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(carpCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, CARPET, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Mid-frequency dye mottle so large areas vary in tone.
   for (let i = 0; i < 40; i++) {
@@ -1294,14 +1275,14 @@ export function createCarpetTextures(palette = getActiveTheme().palette): {
     const g = carpCtx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, Math.random() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.12)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(carpCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(carpCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, CARPET, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Fine fibre fleck.
   for (let i = 0; i < 6000; i++) {
     const v = Math.random();
     const col = v > 0.5 ? 'rgba(0,0,0,0.2)' : (v > 0.2 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)');
     const x = Math.random() * CARPET, y = Math.random() * CARPET, fh = Math.random() * 3 + 1;
-    stampTiled(carpCtx, CARPET, (c) => { c.fillStyle = col; c.fillRect(x, y, 1, fh); });
+    stampTiled(carpCtx, CARPET, (c) => { c.fillStyle = col; c.fillRect(x, y, 1, fh); }, CARPET, { x: x, y: y, width: 1, height: fh });
   }
   const carpetTex = new THREE.CanvasTexture(carpetCanvas);
   carpetTex.colorSpace = THREE.SRGBColorSpace;
@@ -1322,7 +1303,7 @@ export function createCarpetTextures(palette = getActiveTheme().palette): {
     stampTiled(chCtx, CARPET, (c) => {
       c.strokeStyle = col;
       c.beginPath(); c.moveTo(x, y); c.lineTo(x + dx, y + dy); c.stroke();
-    });
+    }, CARPET, { x: x + Math.min(0, dx) - 1, y: y - 1, width: Math.abs(dx) + 2, height: dy + 2 });
   }
   const carpetNormTex = heightToNormalTexture(carpetHeight, 1.4);
   carpetNormTex.anisotropy = aniso(16);
@@ -1341,14 +1322,14 @@ export function createCarpetTextures(palette = getActiveTheme().palette): {
     const x = Math.random() * CARPET, y = Math.random() * CARPET, r = 90 + Math.random() * 150;
     const g = crCtx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, 'rgba(112,112,112,0.55)'); g.addColorStop(1, 'rgba(236,236,236,0)');
-    stampTiled(crCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(crCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, CARPET, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Finer scattered burnish so the shimmer has grain, not just broad pools.
   for (let i = 0; i < 30; i++) {
     const x = Math.random() * CARPET, y = Math.random() * CARPET, r = 30 + Math.random() * 90;
     const g = crCtx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, 'rgba(150,150,150,0.5)'); g.addColorStop(1, 'rgba(236,236,236,0)');
-    stampTiled(crCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(crCtx, CARPET, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, CARPET, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   const carpetRoughTex = new THREE.CanvasTexture(carpetRough);
   carpetRoughTex.wrapS = carpetRoughTex.wrapT = THREE.RepeatWrapping;
@@ -1376,13 +1357,13 @@ export function createWallTextures(palette: Partial<{ wall: string }> = getActiv
     const g = wallCtx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, Math.random() > 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.12)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(wallCtx, WALLT, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(wallCtx, WALLT, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, WALLT, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Fine stipple grain.
   for (let i = 0; i < 4000; i++) {
     const col = Math.random() > 0.5 ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)';
     const x = Math.random() * WALLT, y = Math.random() * WALLT;
-    stampTiled(wallCtx, WALLT, (c) => { c.fillStyle = col; c.fillRect(x, y, 1.5, 1.5); });
+    stampTiled(wallCtx, WALLT, (c) => { c.fillStyle = col; c.fillRect(x, y, 1.5, 1.5); }, WALLT, { x: x, y: y, width: 1.5, height: 1.5 });
   }
   const wallTex = new THREE.CanvasTexture(wallCanvas);
   wallTex.colorSpace = THREE.SRGBColorSpace;
@@ -1401,7 +1382,7 @@ export function createWallTextures(palette: Partial<{ wall: string }> = getActiv
     const v = 110 + Math.floor(Math.random() * 70);
     const g = whCtx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, `rgba(${v},${v},${v},0.6)`); g.addColorStop(1, 'rgba(128,128,128,0)');
-    stampTiled(whCtx, WALLT, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(whCtx, WALLT, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, WALLT, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   const wallNormTex = heightToNormalTexture(wallHeight, 1.0);
 
@@ -1420,7 +1401,7 @@ export function createWallTextures(palette: Partial<{ wall: string }> = getActiv
     const glossier = Math.random() > 0.45;
     g.addColorStop(0, glossier ? 'rgba(140,140,140,0.4)' : 'rgba(210,210,210,0.35)');
     g.addColorStop(1, 'rgba(184,184,184,0)');
-    stampTiled(wrCtx, WALLT, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(wrCtx, WALLT, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, WALLT, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   const wallRoughTex = new THREE.CanvasTexture(wallRough);
   wallRoughTex.wrapS = wallRoughTex.wrapT = THREE.RepeatWrapping;
@@ -1446,7 +1427,7 @@ export function createStuccoTexture(): {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, Math.random() > 0.5 ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(ctx, SIZE, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(ctx, SIZE, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, SIZE, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
 
   const map = new THREE.CanvasTexture(canvas);
@@ -1465,7 +1446,7 @@ export function createStuccoTexture(): {
     g.addColorStop(0, `rgba(${v},${v},${v},0.4)`);
     g.addColorStop(1, 'rgba(128,128,128,0)');
     hCtx.fillStyle = g;
-    stampTiled(hCtx, SIZE, (c) => { c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(hCtx, SIZE, (c) => { c.fillRect(x - r, y - r, r * 2, r * 2); }, SIZE, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   const normalMap = heightToNormalTexture(heightCanvas, 0.8);
 
@@ -1532,7 +1513,7 @@ export function createBrickTexture(bond: 'running' | 'soldier' = 'running'): {
     const v = random();
     ctx.fillStyle = v > 0.5 ? 'rgba(40,15,10,0.12)' : 'rgba(200,150,120,0.10)';
     const x = random() * SIZE, y = random() * SIZE;
-    stampTiled(ctx, SIZE, (c) => c.fillRect(x, y, 1.5, 1.5));
+    stampTiled(ctx, SIZE, (c) => c.fillRect(x, y, 1.5, 1.5), SIZE, { x: x, y: y, width: 1.5, height: 1.5 });
   }
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
@@ -1621,14 +1602,14 @@ export function createAsphaltTexture(stallTopFrac = 0.12, stallBottomFrac = 0.92
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, Math.random() > 0.5 ? 'rgba(60,60,60,0.25)' : 'rgba(10,10,10,0.3)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(ctx, W, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, H);
+    stampTiled(ctx, W, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, H, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Fine aggregate speckle.
   for (let i = 0; i < 5000; i++) {
     const g = 20 + Math.floor(Math.random() * 45);
     ctx.fillStyle = `rgb(${g},${g},${g})`;
     const x = Math.random() * W, y = Math.random() * H;
-    stampTiled(ctx, W, (c) => c.fillRect(x, y, 1.5, 1.5), H);
+    stampTiled(ctx, W, (c) => c.fillRect(x, y, 1.5, 1.5), H, { x: x, y: y, width: 1.5, height: 1.5 });
   }
   // Hairline crack for grit (a few faint dark squiggles).
   ctx.strokeStyle = 'rgba(0,0,0,0.35)';
@@ -1727,7 +1708,7 @@ export function createShelfTextures(): {
     const warm = Math.random() > 0.45;
     g.addColorStop(0, warm ? 'rgba(232,222,205,0.05)' : 'rgba(206,212,222,0.04)');
     g.addColorStop(1, 'rgba(255,255,255,0)');
-    stampTiled(aCtx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(aCtx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, S, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Horizontal wipe-down streaks (stockers dust shelves along their length).
   for (let i = 0; i < 26; i++) {
@@ -1783,7 +1764,7 @@ export function createShelfTextures(): {
     g.addColorStop(0, `rgba(${v},${v},${v},0.35)`);
     g.addColorStop(1, 'rgba(166,166,166,0)');
     rCtx.fillStyle = g;
-    stampTiled(rCtx, S, (c) => { c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(rCtx, S, (c) => { c.fillRect(x - r, y - r, r * 2, r * 2); }, S, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
 
   // Fine noise / grain in roughness
@@ -1792,7 +1773,7 @@ export function createShelfTextures(): {
     rCtx.fillStyle = `rgba(${v},${v},${v},0.15)`;
     const x = Math.random() * S;
     const y = Math.random() * S;
-    stampTiled(rCtx, S, (c) => { c.fillRect(x, y, 1.5, 1.5); });
+    stampTiled(rCtx, S, (c) => { c.fillRect(x, y, 1.5, 1.5); }, S, { x: x, y: y, width: 1.5, height: 1.5 });
   }
 
   const roughnessMap = new THREE.CanvasTexture(roughCanvas);
@@ -1817,7 +1798,7 @@ export function createShelfTextures(): {
     g.addColorStop(0, `rgba(${v},${v},${v},0.4)`);
     g.addColorStop(1, 'rgba(128,128,128,0)');
     hCtx.fillStyle = g;
-    stampTiled(hCtx, S, (c) => { c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(hCtx, S, (c) => { c.fillRect(x - r, y - r, r * 2, r * 2); }, S, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
 
   // Convert height map to normal map
@@ -2077,14 +2058,14 @@ export function createConcreteSidewalkTexture(): THREE.CanvasTexture {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, Math.random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(40,38,34,0.08)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(ctx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(ctx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, S, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   // Fine aggregate speckle.
   for (let i = 0; i < 2600; i++) {
     const v = 120 + Math.floor(Math.random() * 70);
     const a = 0.08 + Math.random() * 0.12;
     const x = Math.random() * S, y = Math.random() * S;
-    stampTiled(ctx, S, (c) => { c.fillStyle = `rgba(${v},${v},${v - 6},${a})`; c.fillRect(x, y, 1.3, 1.3); });
+    stampTiled(ctx, S, (c) => { c.fillStyle = `rgba(${v},${v},${v - 6},${a})`; c.fillRect(x, y, 1.3, 1.3); }, S, { x: x, y: y, width: 1.3, height: 1.3 });
   }
   // Faint broom-finish striations across the slab (perpendicular to the curb).
   for (let y = 0; y < S; y += 2) {
@@ -2163,7 +2144,7 @@ export function createWalkOffMatTexture(): { map: THREE.CanvasTexture; normalMap
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, Math.random() > 0.4 ? 'rgba(70,66,58,0.12)' : 'rgba(255,255,255,0.03)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    stampTiled(ctx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+    stampTiled(ctx, S, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }, S, { x: x - r, y: y - r, width: r * 2, height: r * 2 });
   }
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
