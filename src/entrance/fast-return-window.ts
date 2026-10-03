@@ -6,28 +6,12 @@ import { BB_ARCHIVO_BLACK, ensureBundledFont } from '../bundled-fonts';
 import { onBrandChange } from '../brand-live';
 import { getActiveTheme } from '../themes';
 
-/** Glazing infill over the receiving well; the millwork owns the through-wall hood. */
+/** Window vinyl over the receiving well; the glazing stays uninterrupted. */
 export function addFastReturnWindow(ctx: FixtureContext, root: THREE.Group, scale: number) {
   const group = new THREE.Group(); group.name = 'fast-return-window';
-  // Counter-local glass plane is z=.18. The outer face of the .05-ft infill
-  // finishes exactly 1 mm beyond it (pin 217).
+  // Keep the outward vinyl just clear of the glazing to avoid z-fighting.
   group.position.set(quickDrop.receiverX*scale,0,quickDrop.glassOffset + quickDrop.faceClearance - .025); root.add(group);
-  const metal = new THREE.MeshStandardMaterial({color:0xd5d4ce,roughness:.58,metalness:.15});
-  const flapMaterial = new THREE.MeshStandardMaterial({color:0x454749,roughness:.7});
   const geometries: THREE.BufferGeometry[]=[];
-  const box=(w:number,h:number,x:number,y:number,material:THREE.Material)=>{
-    const geo=new THREE.BoxGeometry(w*scale,h,.05);geometries.push(geo);
-    const mesh=new THREE.Mesh(geo,material);mesh.position.set(x*scale,y,0);group.add(mesh);
-    mesh.castShadow=mesh.receiveShadow=true;return mesh;
-  };
-  // Two-foot tape aperture is genuinely open between the infill rails.
-  // A shallow metal flap sits above the glass lettering. There is no tall
-  // infill plate hiding the clear window between it and the white receiver.
-  box(2.3,.08,0,quickDrop.slotTop+.04,metal);
-  box(2.3,.08,0,quickDrop.slotBottom-.04,metal);
-  box(.16,quickDrop.slotTop-quickDrop.slotBottom,-1.07,quickDrop.slotCenter,metal);
-  box(.16,quickDrop.slotTop-quickDrop.slotBottom,1.07,quickDrop.slotCenter,metal);
-  const flap=box(1.96,.32,0,quickDrop.slotCenter,flapMaterial);flap.position.z=-.07;flap.rotation.x=-.12;
   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=200;
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
   const labelMat=new THREE.MeshStandardMaterial({map:texture,transparent:true,depthWrite:true,alphaTest:.1,side:THREE.DoubleSide,roughness:.8,metalness:0});
@@ -45,5 +29,5 @@ export function addFastReturnWindow(ctx: FixtureContext, root: THREE.Group, scal
   };
   ensureBundledFont(BB_ARCHIVO_BLACK,paint);paint();const unsubscribe=onBrandChange(paint);
   return ()=>{disposed=true;unsubscribe();geometries.forEach(g=>g.dispose());
-    metal.dispose();flapMaterial.dispose();labelMat.dispose();texture.dispose();group.removeFromParent();};
+    labelMat.dispose();texture.dispose();group.removeFromParent();};
 }

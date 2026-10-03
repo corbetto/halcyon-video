@@ -4,8 +4,8 @@
     11.68328084,
     3.55
   ],
-  "parts": 14,
-  "triangles": 4476,
+  "parts": 17,
+  "triangles": 4656,
   "allSolidPartsManifold": true,
   "worktopHeightFeet": 2.82,
   "staffOpeningFeet": 6.05,
@@ -21,5 +21,6 @@
   "rampOutletHeightFeet": 2.2,
   "rearBlueRim": false,
   "whiteWorktopMeetsGlass": true,
+  "whiteBacksplashHeightFeet": 0.25,
   "receiverHeightAboveWorktopFeet": 0.73
 }

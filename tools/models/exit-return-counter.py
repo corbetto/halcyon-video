@@ -14,7 +14,7 @@ SPEC=json.loads((ROOT/'src/exit-return-spec.json').read_text())
 RECEIVER_X=SPEC['receiverX']
 HALF=SPEC['receiverWidth']/2
 OPEN_HALF=HALF-.09
-# The rear is a single white worktop against the glazing, not a raised blue rim.
+# The rear is a white worktop with a low white backsplash against the glazing.
 # Retain the customer-side enclosure; its finished end meets the white bench.
 parts.append(sweep('Blue customer-side enclosure',[(-7.75,-2.2),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8))
 BACK=SPEC['glassOffset'];BENCH_D=BACK-SPEC['worktopFront']
@@ -34,7 +34,7 @@ def solid(name,outline,z0,z1,mat):
  parts.append(ob);return ob
 FRONT=SPEC['glassOffset']+SPEC['faceClearance']
 # The reference shows a compact low receiver on the white rear worktop.
-# Its narrow rear throat accepts tapes from the window; the ramp feeds the cabinet.
+# The low enclosure and its internal ramp retain their approved shape.
 def channel(name,x0,x1,yz):
  verts=[(x,-z,y) for x in (x0,x1) for y,z in yz];n=len(yz)
  faces=[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
@@ -45,8 +45,24 @@ def channel(name,x0,x1,yz):
  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT');ob.select_set(False)
  parts.append(ob)
 Y=SPEC['worktopHeight'];H_BACK=SPEC['hoodBackHeight'];H_FRONT=SPEC['hoodFrontHeight'];Z_FRONT=SPEC['hoodFront']
+# Fitted laminate backsplash boards meet the worktop and receiver cheeks.
+# The eased cap is authored into each closed profile, with no floating trim.
+BH=SPEC['backsplashHeight'];BD=SPEC['backsplashDepth'];R=.012
+profile=[(Y,BACK-BD),(Y+BH-R,BACK-BD)]
+for step in range(1,7):
+ angle=math.pi-step*math.pi/12
+ profile.append((Y+BH-R+R*math.sin(angle),BACK-BD+R+R*math.cos(angle)))
+profile.append((Y+BH,BACK-R))
+for step in range(1,7):
+ angle=math.pi/2-step*math.pi/12
+ profile.append((Y+BH-R+R*math.sin(angle),BACK-R+R*math.cos(angle)))
+profile.append((Y,BACK))
+for name,x0,x1 in [('left',-7.75,RECEIVER_X-HALF),
+ ('receiver',RECEIVER_X-OPEN_HALF,RECEIVER_X+OPEN_HALF),
+ ('right',RECEIVER_X+HALF,7.75)]:
+ channel('White window backsplash '+name,x0,x1,profile)
 # A squat, enclosed white receiver with a gently raked removable lid. The
-# narrow rear throat remains open beneath the window flap and feeds the ramp.
+# narrow rear throat remains open beneath the lid and feeds the ramp.
 cheek=[(Y,FRONT),(H_BACK,FRONT),(H_FRONT,Z_FRONT),(Y,Z_FRONT)]
 channel('Quick return receiver left cheek',RECEIVER_X-HALF,RECEIVER_X-OPEN_HALF,cheek)
 channel('Quick return receiver right cheek',RECEIVER_X+OPEN_HALF,RECEIVER_X+HALF,cheek)
@@ -75,7 +91,7 @@ bpy.context.view_layer.objects.active=parts[0]
 for screen in bpy.data.screens:
  for area in screen.areas:
   if area.type=='VIEW_3D':area.spaces.active.region_3d.view_distance=22;area.spaces.active.region_3d.view_location=(0,3.5,1.6)
-metrics={'boundsFeet':[15.5,11.5+FRONT,H_BACK],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':round(math.hypot(7.75-3.25,6.25-2.2),2),'staffOpeningSide':'vestibule (+X)','vestibuleStubDepthFeet':0,'receiverCenterXFeet':RECEIVER_X,'receiverFrontBeyondGlassFeet':.00328084,'worktopOpeningFeet':[2*OPEN_HALF,BENCH_D],'hasSlopingRamp':True,'rampOutletHeightFeet':2.20,'rearBlueRim':False,'whiteWorktopMeetsGlass':True,'receiverHeightAboveWorktopFeet':H_BACK-Y}
+metrics={'boundsFeet':[15.5,11.5+FRONT,H_BACK],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':round(math.hypot(7.75-3.25,6.25-2.2),2),'staffOpeningSide':'vestibule (+X)','vestibuleStubDepthFeet':0,'receiverCenterXFeet':RECEIVER_X,'receiverFrontBeyondGlassFeet':.00328084,'worktopOpeningFeet':[2*OPEN_HALF,BENCH_D],'hasSlopingRamp':True,'rampOutletHeightFeet':2.20,'rearBlueRim':False,'whiteWorktopMeetsGlass':True,'whiteBacksplashHeightFeet':BH,'receiverHeightAboveWorktopFeet':H_BACK-Y}
 (ROOT/'tools/models/exit-return-counter-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/exit-return-counter.blend'),compress=True)
 bpy.ops.object.join();bpy.context.object.name='ExitReturnCounter'

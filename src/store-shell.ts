@@ -1,3 +1,4 @@
+import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import { installTrofferModels, trofferCeilingGeometry } from './troffer-model.ts';
 import { reelSetting } from './reel-profile';
 import { mobileStoreActive } from './mobile-store';
@@ -40,7 +41,6 @@ import { liveMirrorsAllowed, reflectorTargetSize } from './store-mirrors';
 import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
-import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import { installHalloween } from './entrance/halloween';
 import { HALLOWEEN_PUMPKIN_COUNTER_U, HALLOWEEN_PUMPKIN_DESK_U, halloweenPumpkinCounterPosition } from './entrance/halloween-layout';
 import { buildWindowBays } from './entrance/windows';
@@ -1587,7 +1587,6 @@ export function buildStore(scene: StoreScene) {
   const { group: frontWindow, panes: frontPanes, width: frontGlazedWidth } = buildWindowBays(
     scene.storefrontSpec, WINDOW_HEAD_Y, { center: 0, halfWidth: frontVestibuleHalfWidth },
     scene.wallSurface ?? undefined,
-    returnWindowCounter ? {x:STORE_CENTER_X-returnWindowX,width:quickDrop.slotWidth*returnWindowCounter.w/15.5,bottom:quickDrop.slotBottom,top:quickDrop.slotTop} : undefined,
   );
   frontWindow.position.set(STORE_CENTER_X, floorY, FRONT_GLASS_Z);
   frontWindow.rotation.y = Math.PI; // Facing inwards

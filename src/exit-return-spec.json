@@ -8,9 +8,7 @@
   "hoodFront": -1.2,
   "hoodBackHeight": 3.55,
   "hoodFrontHeight": 3.4,
-  "slotBottom": 4.28,
-  "slotTop": 4.72,
-  "slotCenter": 4.5,
-  "slotWidth": 2.05,
-  "labelHeight": 3.95
+  "labelHeight": 3.95,
+  "backsplashHeight": 0.25,
+  "backsplashDepth": 0.08
 }

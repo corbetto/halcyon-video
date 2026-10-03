@@ -35,6 +35,11 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     }
     fallback.add(piece);
   }
+  // Loading fallback uses the same low white window upstand as the millwork.
+  const backsplash=new THREE.Mesh(new THREE.BoxGeometry(length,quickDrop.backsplashHeight,quickDrop.backsplashDepth),worktop);
+  backsplash.name='White window backsplash';
+  backsplash.position.set(0,quickDrop.worktopHeight+quickDrop.backsplashHeight/2,quickDrop.glassOffset-quickDrop.backsplashDepth/2);
+  backsplash.castShadow=backsplash.receiveShadow=true;fallback.add(backsplash);
   const unsubscribe=onBrandChange(()=>{const t=getActiveTheme();body.color.set(t.palette.counterBody);
     worktop.color.set(0xf4f4f0);top.color.set(t.palette.counterTop);stripe.color.set(t.palette.secondary);});
   ctx.addCollider(fallback);
