@@ -18,6 +18,7 @@ export function candyStockMatrix(matrix: THREE.Matrix4, x: number, y: number, z:
 export function installCandyRackModel(
   ctx: FixtureContext, parent: THREE.Group, fallback: THREE.Group,
   width: number, depth: number, rows: number, steel: THREE.MeshStandardMaterial,
+  onInstalled?: (privateHardware: boolean) => void,
 ): () => void {
   let disposed = false;
   let hardware: THREE.Group | undefined;
@@ -106,6 +107,7 @@ export function installCandyRackModel(
     }
     parent.add(hardware);
     fallback.visible = false;
+    onInstalled?.(privateHardware);
     ctx.requestShadowRefresh(); ctx.requestRender();
   });
   return () => { disposed = true; release(); };

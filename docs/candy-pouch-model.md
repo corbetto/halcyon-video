@@ -165,3 +165,43 @@ Evidence is retained in `scratch/publicity-kits/pouches-277/`. These are asset
 and temporary-placement results; default/gondola runtime integration and the
 later slatwall-wing consumer slice remain outstanding. No issue-closing claim
 is made by this asset-only commit.
+
+## Bounded runtime integration and remaining scope
+
+The shared kit now renders on the original public queue rack's known flexible
+rows and on the existing gondola's two upper tiers. The default queue keeps
+CHOCO BARS and MOVIE MINTS as 35 carton instances each, and uses six small bags
+on each of GUMMY BEARS, POPCORN and SOUR RIBBONS. Product row IDs, catalog names,
+sizes, generated print maps and delivery behavior remain unchanged. Known
+custom palettes keep their existing canvas cards with explicit UV compensation;
+unknown labels or unproved dimensions retain their prior compatible stock.
+
+The rack's new pouch/support subset measures 19,332 triangles in seven draws;
+its two retained carton rows add 12,600 triangles and two draws, for 31,932
+stock/support triangles in nine draws. Original hardware is additional. The
+upper gondola replacement is 14,896 triangles in four draws, with fourteen full
+bags, fourteen long pegs and two crossbars. Lower cartons and host hardware are
+unchanged. Pending/failed stock keeps the original two batched upper print
+materials, avoiding a temporary unbatched fixture. No new texture downloads are
+introduced; fixture-owned maps and steel are reused, with owned print clones
+retired independently.
+
+Runtime checks verified loaded geometry, exact instancing costs, original row
+identity and footprints, support-rest coincidence within 1.55e-7 feet, custom
+printing, failed asset fallback, cancellation during pending loading and hidden
+GPU preparation, and resource disposal. Front/side/rear/support views and actual
+mobile-sized in-store eye-level photographs were inspected after numerical
+comparison. These are renderer/browser checks, not physical-phone performance
+measurements. The public store's normal warmup/detail-release lifecycle was
+preserved; an omitted release in an excluded private screenshot harness was
+identified and documented separately, without changing the product scheduler.
+
+This is **partial issue #277 progress**, not delivery of the photographed
+slatwall-wing hanging bags. The separate 1993 folded bulk-tray wing retains its
+own stock and geometry. The optional private rack counterpart retains its
+compatible centred-carton side facings; a test using public substitute hardware
+proved the legacy branch, but the real private wing's geometry and supports
+were not inspected here. Its actual source, backing/hooks, hanger fit and
+private/public-safe integration still require a distinct bounded assignment.
+Neither compatibility path should be described as a newly modeled hanging wing.
+Count-only checkout-bag assortment and physics also remain unchanged.

@@ -1,3 +1,4 @@
+import { candyPouchRows, installCandyRackPouches } from './candy-pouch';
 import { CANDY_CARTON_RACK, candyCartonFinishes, upgradeCandyCartonGeometry } from './candy-carton';
 import { CLEANER_CARTON, installCleanerCartons } from './cleaner-carton';
 export { buildPreviouslyViewedTub } from './previously-viewed-tub';
@@ -93,6 +94,7 @@ export class CandyDisplay implements StoreFixture {
   private disposables: Disposable[] = [];
   private disposeHardware: (() => void) | null = null;
   private disposeDispenserPacks: (() => void) | null = null;
+  private disposePouches: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -208,7 +210,13 @@ export class CandyDisplay implements StoreFixture {
     }
     this.disposeHardware = powerWing
       ? installCandyPowerWing(this.ctx, group, fallback)
-      : installCandyRackModel(this.ctx, group, fallback, width, depth, rows, frameMat);
+      : installCandyRackModel(this.ctx, group, fallback, width, depth, rows, frameMat, privateHardware => {
+        // The private counterpart's side facings use centred carton transforms.
+        // Only the numerically proved public hardware gets hanging supports.
+        if (privateHardware || this.group !== group) return;
+        const flexible = candyPouchRows(labels, width, depth, rows);
+        if (flexible.length) this.disposePouches = installCandyRackPouches(this.ctx, group, flexible, frameMat);
+      });
     this.ctx.requestShadowRefresh();
   }
 
@@ -234,6 +242,8 @@ export class CandyDisplay implements StoreFixture {
   }
 
   dispose(): void {
+    this.disposePouches?.();
+    this.disposePouches = null;
     this.disposeDispenserPacks?.();
     this.disposeDispenserPacks = null;
     this.disposeHardware?.();

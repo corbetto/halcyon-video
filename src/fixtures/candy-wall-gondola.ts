@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { installCandyGondolaPouches } from './candy-pouch';
 import { retailPackaging } from './retail-packaging';
 import type { FixtureContext, StoreFixture } from '../fixtures';
 import type { FixturePlacement } from '../store-layout';
@@ -15,6 +16,7 @@ export class CandyWallGondola implements StoreFixture {
   private group: THREE.Group | null = null;
   private owned: Array<{ dispose(): void }> = [];
   private removeModel: (() => void) | null = null;
+  private removePouches: (() => void) | null = null;
   private collider: THREE.Mesh | null = null;
 
   constructor(public placement: FixturePlacement, private ctx: FixtureContext) {}
@@ -67,7 +69,52 @@ export class CandyWallGondola implements StoreFixture {
 
     this.ctx.scene.add(group);
     this.ctx.addCollider(proxy);
-    this.removeModel = installDisplayModel(this.ctx, group, fallback, 'models/candy-wall-gondola.glb', retailPackaging(own, () => { if(this.group) this.ctx.requestRender(); }), new THREE.Vector3(1, 1, 1), prepareRetailModel);
+    const finishes = retailPackaging(own, () => { if (this.group === group) this.ctx.requestRender(); });
+    let prepared: THREE.Group | null = null;
+    let pouchFallback: THREE.Group | null = null;
+    let pouchSteel: THREE.Material = uprightMat;
+    const startPouches = () => {
+      if (!prepared || !pouchFallback || !pouchFallback.children.length || this.group !== group) return;
+      const host = prepared;
+      this.removePouches = installCandyGondolaPouches(this.ctx, group, pouchFallback,
+        finishes, pouchSteel, () => host.parent === group && host.visible && this.group === group);
+    };
+    const prepare = (model: THREE.Group) => {
+      prepared = model;
+      // Keep the old named stock separate before opaque material batching.
+      // It remains visible and loader-owned until the replacement is ready.
+      model.updateMatrixWorld(true);
+      const inverse = model.matrixWorld.clone().invert();
+      const stock: THREE.Mesh[] = [];
+      model.traverse(o => {
+        if (!(o instanceof THREE.Mesh)) return;
+        const roles = Array.isArray(o.material) ? o.material : [o.material];
+        const steel = roles.find(m => m.name === 'GondolaSteelStandard');
+        if (steel) pouchSteel = steel;
+        if (/^(SnackPouch_|PouchCrimp_)/.test(o.name)) stock.push(o);
+      });
+      pouchFallback = new THREE.Group(); pouchFallback.name = 'gondola-pouch-fallback';
+      for (const mesh of stock) {
+        const local = new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
+        mesh.removeFromParent(); mesh.matrix.copy(local);
+        local.decompose(mesh.position, mesh.quaternion, mesh.scale);
+        mesh.matrixAutoUpdate = false; pouchFallback.add(mesh);
+      }
+      prepareRetailModel(model);
+      pouchFallback.userData.sourcePartCount = stock.length;
+      prepareRetailModel(pouchFallback); // Keep failed/pending stock at its original two print draws.
+      model.add(pouchFallback);
+      if (!this.ctx.prepareDetailModel) startPouches();
+    };
+    const modelContext = this.ctx.prepareDetailModel ? {
+      ...this.ctx,
+      prepareDetailModel: async (model: THREE.Group, signal: AbortSignal) => {
+        await this.ctx.prepareDetailModel!(model, signal);
+        if (!signal.aborted) startPouches();
+      },
+    } : this.ctx;
+    this.removeModel = installDisplayModel(modelContext, group, fallback,
+      'models/candy-wall-gondola.glb', finishes, new THREE.Vector3(1, 1, 1), prepare);
     this.ctx.requestShadowRefresh();
     this.ctx.requestRender();
   }
@@ -80,6 +127,8 @@ export class CandyWallGondola implements StoreFixture {
   update(): void {}
 
   dispose(): void {
+    this.removePouches?.();
+    this.removePouches = null;
     this.removeModel?.();
     this.removeModel = null;
     if (this.collider) this.collider.raycast = () => {};
