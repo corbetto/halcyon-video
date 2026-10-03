@@ -481,10 +481,12 @@ export class EntranceCheckout implements StoreFixture {
         const first = group.children.length;
         buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {singlePanels:true,doorWidth:wall.doorWidth});
         for (const child of group.children.slice(first)) assembly.add(child);
-        // From inside the vestibule, the entrance hinges right and opens
-        // into the sales floor. The leaf fills the whole diagonal panel.
+        // Both diagonal side leaves hinge at the outer frame (where the angled
+        // panel meets the straight side glass) with hingeOnLeftOrInner=false.
+        // The exit door (side=-1) swings outward from the right into the vestibule.
+        // The entrance door (side=1) swings inward into the sales floor.
         const door = buildVestibuleDoor(this.ctx, assembly, doorMats, {...spec,doorWidth:wall.doorWidth}, 0, wall.doorAlong,
-          doorH, false, side === -1, -1.4, noFrame);
+          doorH, false, false, -1.4, noFrame);
         assembly.position.set(wall.x, 0, wall.z); assembly.rotation.y = wall.yaw;
         group.add(assembly);
         door.center.set(wall.doorX, door.center.y, wall.doorZ);

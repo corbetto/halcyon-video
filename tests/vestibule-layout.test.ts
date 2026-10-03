@@ -88,3 +88,32 @@ test('floor-plan rotations stay wall-aligned or at 45 degrees at every supported
     assert.ok(Math.abs(f.w/15.5-f.d/11.5)<1e-8,'no nonuniform model scaling');
   }
 });
+
+test('vestibule exit door hinges at the outer jamb and swings outward into the vestibule chamber', () => {
+  for (const doorWidth of [3, 3.2, 4]) {
+    const spec = { doorWidth, entryStyle: 'vestibule' as const };
+    const wall = vestibuleSide(spec, -1);
+    // Hinge is at the outer corner (wall.length) where diagonal meets the straight side glazing.
+    const hingeAlong = wall.doorAlong + wall.doorWidth / 2;
+    assert.ok(Math.abs(hingeAlong - wall.length) < 1e-8, 'exit door hinges at the outer frame');
+
+    // Moving latch leaf edge extends toward the counter (along = wall.doorAlong - wall.doorWidth / 2).
+    const closedAlong = wall.doorAlong - wall.doorWidth / 2;
+    assert.ok(Math.abs(closedAlong - 1) < 1e-8, 'closed latch sits 1ft from the checkout corner');
+
+    // Swing angle of -1.4 rad swings the leaf into the vestibule (positive normal, positive world Z).
+    const openAngle = -1.4;
+    const openNormal = -wall.doorWidth * Math.sin(openAngle);
+    assert.ok(openNormal > 0, 'exit leaf swings inward to the vestibule chamber, not into the sales floor');
+
+    const closedZ = wall.z + closedAlong * wall.cos;
+    const localAlong = -wall.doorWidth * Math.cos(openAngle);
+    const openAlong = hingeAlong + localAlong;
+    const openX = wall.x + openAlong * wall.sin + openNormal * wall.cos;
+    const openZ = wall.z + openAlong * wall.cos - openNormal * wall.sin;
+
+    assert.ok(openZ > closedZ + 1, 'exit door swings forward toward vestibule front');
+    const normal = (openX - wall.x) * wall.cos - (openZ - wall.z) * wall.sin;
+    assert.ok(normal > 1, 'open latch rests inside vestibule envelope');
+  }
+});
