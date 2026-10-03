@@ -948,6 +948,7 @@ export interface FixturePlacement {
 }
 
 export interface MovieSlot {
+  displayCopy?: boolean;
   movie: Movie;
   libraryIdx: number;
   unitIdx: number;

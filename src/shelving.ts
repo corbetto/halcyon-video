@@ -89,7 +89,7 @@ function getThickWireGridTexture(): THREE.Texture {
 // lip under it — plus a faint vertical grain so the big flat panel doesn't
 // read as one untextured card. Painted once, cached; cheap albedo only.
 let cachedSpineSlatwallMat: THREE.MeshStandardMaterial | null = null;
-function getSpineSlatwallMaterial(panelHeightFt: number): THREE.MeshStandardMaterial {
+export function getSpineSlatwallMaterial(panelHeightFt: number): THREE.MeshStandardMaterial {
   if (!cachedSpineSlatwallMat) {
     const canvas = document.createElement('canvas');
     canvas.width = 64;

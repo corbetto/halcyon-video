@@ -914,6 +914,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const backJitter = retailBackstock ? 0 : (seededRandom01(movie.id) - 0.5) * COPY_X_JITTER_RANGE;
       const slot: MovieSlot = {
         movie,
+        displayCopy: fixtureSlot.displayCopy,
         libraryIdx: 0,
         unitIdx: -1,
         source: 'fixture',

@@ -4,15 +4,18 @@ import * as THREE from 'three';
 import { shelfLeanAngle } from '../shelf-profile';
 import { lowerBackrestGeometry } from '../shelf-profile-geometry';
 import { ShelfModelBatch } from '../shelf-model';
+import { getSpineSlatwallMaterial } from '../shelving';
+import { gameShelfBays, fillGameShelfBays, type GameShelfEntry } from './game-section-stock';
+import { activeStoreFormat } from '../store-format';
 import { Movie } from '../jellyfin';
-import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH } from '../store-layout';
+import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, AISLE_SHELF_HEIGHTS, UNIT_FRAME_HEIGHT, unitDepthAtHeight } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint, localZOffset } from '../layout-validator';
 import { createCategorySignTexture, createFlushTopperLabelTexture } from '../canvas-textures';
 import { gameCaseDims } from '../video-case';
-import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, getSlatwallPanelMaterial, markSignMesh } from '../sign-builders';
+import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from '../sign-builders';
 
-const SHELF_HEIGHTS = [1.0, 2.1, 3.2, 4.3]; // standard aisle heights
+const SHELF_HEIGHTS = AISLE_SHELF_HEIGHTS; // same decks as the standard aisle
 
 // The game department's section grid: 6 columns between dividers (matching the
 // movie aisles' 6) — two platform bays and ONE internal divider per
@@ -172,8 +175,8 @@ export class GameSection implements SlottedFixture {
 
   public frontPlatforms: string[] = [];
   public backPlatforms: string[] = [];
-  private frontMovies: Movie[][] = [];
-  private backMovies: Movie[][] = [];
+  private frontMovies: GameShelfEntry[][] = [];
+  private backMovies: GameShelfEntry[][] = [];
 
   private hasFrontCap = true;
   private hasBackCap = true;
@@ -208,7 +211,8 @@ export class GameSection implements SlottedFixture {
     const cols = this.cols;
     const shelfLength = (cols - 1) * BOX_SPACING + 1.0;
     const unitDepth = UNIT_DEPTH;
-    const unitTopDepth = UNIT_TOP_DEPTH;
+    const frameTopDepth = unitDepthAtHeight(UNIT_FRAME_HEIGHT);
+    const frameCenterY = UNIT_FRAME_HEIGHT / 2;
 
     this.group = new THREE.Group();
     this.group.position.set(this.placement.position.x, 0.0, this.placement.position.z);
@@ -219,62 +223,72 @@ export class GameSection implements SlottedFixture {
 
     // Gondola Materials
     const baseShelfMat = this.ctx.gondolaMaterials.shelf;
+    const spineMat = isWireFrame ? getSpineSlatwallMaterial(UNIT_FRAME_HEIGHT) : baseShelfMat;
+    const modeledSpineMat = isWireFrame ? shelfModels.own(spineMat.clone()) : baseShelfMat;
     const stripMat = this.ctx.gondolaMaterials.strip;
 
     // 1. End Caps — Skeuomorphic End Caps: a run is a chain of units joined short-end
     // to short-end (like movie aisles), so caps only belong at the two true outer ends.
     // Interior joints get nothing so the run reads as one continuous shelf.
-    const capTopDepth = isWireFrame ? unitDepth : unitTopDepth;
-    const trapezoidGeo = createTrapezoidGeometry(5.1, unitDepth, capTopDepth, 0.1);
+    const capTopDepth = isWireFrame ? unitDepth : frameTopDepth;
+    const trapezoidGeo = createTrapezoidGeometry(UNIT_FRAME_HEIGHT, unitDepth, capTopDepth, 0.1);
     if (this.faces === 'front') this.trimRearHalf(trapezoidGeo);
     splitTrapezoidGroups(trapezoidGeo);
-    const capMats = createLibraryEndCapMaterial(false);
+    const capMats = createLibraryEndCapMaterial(isWireFrame);
 
     if (this.hasFrontCap) {
       // Front End Cap (+Z end, facing +Z)
       const frontCap = new THREE.Mesh(trapezoidGeo, capMats);
-      frontCap.position.set(0, 2.55, shelfLength / 2 + 0.05);
+      frontCap.position.set(0, frameCenterY, shelfLength / 2 + 0.05);
       frontCap.rotation.y = 0;
       frontCap.castShadow = true;
       frontCap.receiveShadow = true;
       this.group.add(frontCap);
       this.ctx.addCollider(frontCap);
+      if (this.faces === 'both') shelfModels.add(frontCap, [{ kind: 'cap', depth: unitDepth,
+        topDepth: capTopDepth, height: UNIT_FRAME_HEIGHT, length: .1,
+        y: -frameCenterY, physicalUV: isWireFrame }], capMats, true);
     }
 
     if (this.hasBackCap) {
       // Back End Cap (-Z end, facing -Z)
       const backCap = new THREE.Mesh(trapezoidGeo, capMats);
-      backCap.position.set(0, 2.55, -shelfLength / 2 - 0.05);
+      backCap.position.set(0, frameCenterY, -shelfLength / 2 - 0.05);
       backCap.rotation.y = this.faces === 'front' ? 0 : Math.PI;
       backCap.castShadow = true;
       backCap.receiveShadow = true;
       this.group.add(backCap);
       this.ctx.addCollider(backCap);
+      if (this.faces === 'both') shelfModels.add(backCap, [{ kind: 'cap', depth: unitDepth,
+        topDepth: capTopDepth, height: UNIT_FRAME_HEIGHT, length: .1,
+        y: -frameCenterY, physicalUV: isWireFrame }], capMats, true);
     }
 
     // 2. Central Backing Wall — solid in every theme, matching the movie aisles.
     // Extends to shelf edge on ends without end caps so multi-unit runs join seamlessly.
     {
-      const zMin = this.hasBackCap ? -shelfLength / 2 + 0.05 : -shelfLength / 2;
-      const zMax = this.hasFrontCap ? shelfLength / 2 - 0.05 : shelfLength / 2;
+      const zMin = -shelfLength / 2 + .02;
+      const zMax = shelfLength / 2 - .02;
       const wallLen = zMax - zMin;
       const wallZ = (zMin + zMax) / 2;
-      const backingWallGeo = new THREE.BoxGeometry(0.5, 5.1, wallLen);
+      const backingWallGeo = new THREE.BoxGeometry(0.5, UNIT_FRAME_HEIGHT, wallLen);
       const backingWall = new THREE.Mesh(
         backingWallGeo,
-        isWireFrame ? getSlatwallPanelMaterial(5.1) : baseShelfMat
+        spineMat
       );
-      backingWall.position.set(0, 2.55, wallZ);
+      backingWall.position.set(0, frameCenterY, wallZ);
       backingWall.receiveShadow = true;
       backingWall.castShadow = true;
       this.group.add(backingWall);
       this.ctx.addCollider(backingWall);
+      shelfModels.add(backingWall, [{ kind: isWireFrame ? 'slat' : 'spine',
+        depth: .5, length: wallLen, height: UNIT_FRAME_HEIGHT, y: isWireFrame ? 0 : -frameCenterY }], modeledSpineMat);
     }
 
     // 3. Horizontal Shelves
     SHELF_HEIGHTS.forEach((yPos, row) => {
-      if (row < 2) for (const side of this.faces === 'front' ? [1] : [-1, 1]) {
-        const backing = new THREE.Mesh(lowerBackrestGeometry(row, shelfLength - .04), baseShelfMat);
+      if (activeStoreFormat().unitTaper && row < 2) for (const side of this.faces === 'front' ? [1] : [-1, 1]) {
+        const backing = new THREE.Mesh(lowerBackrestGeometry(row, shelfLength - .04), modeledSpineMat);
         backing.position.set(side * .25, yPos + .02, 0);
         backing.rotation.y = side < 0 ? Math.PI : 0;
         backing.castShadow = backing.receiveShadow = true;
@@ -282,7 +296,7 @@ export class GameSection implements SlottedFixture {
         this.group!.add(backing); this.ctx.addCollider(backing);
         shelfModels.add(backing, [{kind:'backrest',row,depth:0,length:shelfLength-.04}]);
       }
-      const shelfDepth = unitDepth - (unitDepth - unitTopDepth) * (yPos / 5.1);
+      const shelfDepth = unitDepthAtHeight(yPos);
       const deckDepth = this.faces === 'front' ? shelfDepth / 2 + .25 : shelfDepth;
       const deckCenter = this.faces === 'front' ? shelfDepth / 4 - .125 : 0;
       const shelfGeo = new THREE.BoxGeometry(deckDepth, 0.04, shelfLength);
@@ -313,21 +327,24 @@ export class GameSection implements SlottedFixture {
       // end faces off the board's own planes — stamped flush they z-fight along
       // the whole lip (same fix as shelving.ts).
       const STRIP_EPS = 0.003;
-      const stripGeo = new THREE.BoxGeometry(0.02, 0.03, shelfLength - 2 * STRIP_EPS);
-      const stripX = shelfDepth / 2 - 0.01 + STRIP_EPS;
+      const stripW = isWireFrame ? .035 : .02;
+      const stripH = isWireFrame ? .06 : .03;
+      const stripY = isWireFrame ? yPos + .03 : yPos + .02;
+      const stripGeo = new THREE.BoxGeometry(stripW, stripH, shelfLength - 2 * STRIP_EPS);
+      const stripX = shelfDepth / 2 - stripW / 2 + STRIP_EPS;
 
       // Front lip pricing strip. receiveShadow so the lip shades with the
       // boards instead of reading as a self-lit white line (same fix as the
       // gondola/wall strips — see sharedStripMat in store-shell.ts).
       const stripFront = new THREE.Mesh(stripGeo, stripMat);
-      stripFront.position.set(stripX, yPos + 0.02, 0);
+      stripFront.position.set(stripX, stripY, 0);
       stripFront.receiveShadow = true;
       this.group!.add(stripFront);
       this.ctx.addCollider(stripFront);
 
       // Back lip pricing strip
       const stripBack = new THREE.Mesh(stripGeo, stripMat);
-      stripBack.position.set(-stripX, yPos + 0.02, 0);
+      stripBack.position.set(-stripX, stripY, 0);
       stripBack.receiveShadow = true;
       if (this.faces === 'both') {
         this.group!.add(stripBack);
@@ -337,13 +354,8 @@ export class GameSection implements SlottedFixture {
         if (side === -1 && this.faces === 'front') continue;
         shelfModels.add(strip, [{ kind: 'rail', depth: 0, length: shelfLength - .012,
           x: side * (shelfDepth / 2 - .018) - strip.position.x,
-          y: -.032, yaw: side < 0 ? Math.PI : 0 }]);
+          y: yPos - .012 - strip.position.y, yaw: side < 0 ? Math.PI : 0 }]);
       }
-    });
-
-    shelfModels.finish(() => {
-      this.ctx.requestShadowRefresh();
-      this.ctx.requestRender();
     });
 
     // 4. Section Dividers — present in every theme, matching the movie
@@ -356,23 +368,29 @@ export class GameSection implements SlottedFixture {
       if (isWireFrame && this.ctx.gondolaMaterials.wireShelf) {
         const wireMat = this.ctx.gondolaMaterials.wireShelf.clone() as THREE.MeshStandardMaterial;
         const wireTex = getThickWireGridTexture().clone();
-        wireTex.repeat.set(unitDepth * 6, 5.1 * 6);
+        wireTex.repeat.set(.8 * 6, UNIT_FRAME_HEIGHT * 6);
         wireTex.needsUpdate = true;
         wireMat.map = wireTex;
         wireMat.needsUpdate = true;
         dividerMat = wireMat;
         this.textures.push(wireTex);
       }
-      const dividerGeo = createTrapezoidGeometry(5.1, unitDepth - 0.05, unitTopDepth - 0.05, 0.04);
+      const dividerGeo = isWireFrame ? new THREE.BoxGeometry(.8, UNIT_FRAME_HEIGHT, .04)
+        : createTrapezoidGeometry(UNIT_FRAME_HEIGHT, unitDepth, frameTopDepth, .04);
 
       if (this.faces === 'front') this.trimRearHalf(dividerGeo);
       const addDivider = (zDiv: number) => {
         const div = new THREE.Mesh(dividerGeo, dividerMat);
-        div.position.set(0, 2.55, zDiv);
+        div.position.set(0, frameCenterY, zDiv);
         div.receiveShadow = true;
         div.castShadow = true;
         this.group!.add(div);
         this.ctx.addCollider(div);
+        if (this.faces === 'both') shelfModels.add(div, isWireFrame ? [
+          { kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY },
+          { kind: 'foot', depth: unitDepth - .12, length: .14, y: -frameCenterY },
+        ] : [{ kind: 'upright', depth: unitDepth, topDepth: frameTopDepth,
+          height: UNIT_FRAME_HEIGHT, length: .04, y: -frameCenterY }], isWireFrame ? stripMat : baseShelfMat);
       };
 
       for (let s = 0; s < numSections - 1; s++) {
@@ -439,7 +457,7 @@ export class GameSection implements SlottedFixture {
 
         const mesh = new THREE.Mesh(geo, [labelMat, flushSideMat]);
         mesh.rotation.y = dir * Math.PI / 2;
-        mesh.position.set(0, 5.1, 0);
+        mesh.position.set(0, UNIT_FRAME_HEIGHT, 0);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.layers.set(1);
@@ -486,7 +504,7 @@ export class GameSection implements SlottedFixture {
           signSideMat    // -Z
         ]);
         // Gondola frame tops out at 5.1; the card's BOTTOM edge lands there.
-        signMesh.position.set(0, 5.1 + signHeight / 2, zSecCenter);
+        signMesh.position.set(0, UNIT_FRAME_HEIGHT + signHeight / 2, zSecCenter);
         markSignMesh(signMesh, { casts: true }); // free-hanging board: it does cast
         signMesh.layers.set(1);
         this.group.add(signMesh);
@@ -511,8 +529,8 @@ export class GameSection implements SlottedFixture {
       // This gives the marker a continuous mounting edge without burying any
       // part of its face through the shelf decks below.
       const cardBottom = TOP_SHELF_TIP - CARD_H;
-      const edgeHalfTop = (unitDepth - (unitDepth - unitTopDepth) * (TOP_SHELF_TIP / 5.1)) / 2;
-      const edgeHalfBottom = (unitDepth - (unitDepth - unitTopDepth) * (cardBottom / 5.1)) / 2;
+      const edgeHalfTop = unitDepthAtHeight(TOP_SHELF_TIP) / 2;
+      const edgeHalfBottom = unitDepthAtHeight(cardBottom) / 2;
       const edgeHalfMid = (edgeHalfTop + edgeHalfBottom) / 2;
       const edgeAngle = Math.atan((edgeHalfBottom - edgeHalfTop) / CARD_H);
       const cardSides: ('front' | 'back')[] = this.faces === 'front' ? ['front'] : ['front', 'back'];
@@ -575,6 +593,34 @@ export class GameSection implements SlottedFixture {
       }
     }
 
+    if (isWireFrame && this.faces === 'both') {
+      for (const z of [-shelfLength / 2 + .04, shelfLength / 2 - .04]) {
+        const support = new THREE.Mesh(new THREE.BoxGeometry(.14, UNIT_FRAME_HEIGHT, .09), stripMat);
+        support.position.set(0, frameCenterY, z);
+        support.castShadow = support.receiveShadow = true;
+        this.group.add(support);
+        shelfModels.add(support, [
+          { kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY },
+          { kind: 'foot', depth: unitDepth - .12, length: .14, y: -frameCenterY },
+        ], stripMat);
+      }
+    }
+    if (!isWireFrame) {
+      const baseH = SHELF_HEIGHTS[0] - .0425;
+      for (const side of this.faces === 'front' ? [1] : [-1, 1]) {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(.0625, baseH, shelfLength - .04), baseShelfMat);
+        base.position.set(side * (unitDepth / 2 - .03125), baseH / 2, 0);
+        base.castShadow = base.receiveShadow = true;
+        this.group.add(base); this.ctx.addCollider(base);
+        shelfModels.add(base, [{ kind: 'spine', depth: .0625, height: baseH,
+          length: shelfLength - .04, y: -baseH / 2 }]);
+      }
+    }
+    // All carcass parts, including caps/dividers, join the same standard batch.
+    shelfModels.finish(() => {
+      this.ctx.requestShadowRefresh();
+      this.ctx.requestRender();
+    });
     this.ctx.scene.add(this.group);
     this.ctx.addCollider(this.group);
     this.ctx.requestShadowRefresh();
@@ -660,7 +706,7 @@ export class GameSection implements SlottedFixture {
         for (let localCol = 0; localCol < GAME_SECTION_COLS; localCol++) {
           const idx = shelfIdx * GAME_SECTION_COLS + localCol;
           if (idx >= platformGames.length) continue;
-          const movie = platformGames[idx];
+          const { movie, displayCopy } = platformGames[idx];
 
           const col = s * GAME_SECTION_COLS + localCol;
           // front side columns read screen-left to screen-right, which is -Z to +Z direction.
@@ -689,7 +735,7 @@ export class GameSection implements SlottedFixture {
           const zPos = position.z - rx * sin + rz * c;
 
           slots.push({
-            movie,
+            movie, displayCopy,
             side: 'front',
             shelfIdx,
             col,
@@ -714,7 +760,7 @@ export class GameSection implements SlottedFixture {
         for (let localCol = 0; localCol < GAME_SECTION_COLS; localCol++) {
           const idx = shelfIdx * GAME_SECTION_COLS + localCol;
           if (idx >= platformGames.length) continue;
-          const movie = platformGames[idx];
+          const { movie, displayCopy } = platformGames[idx];
 
           const col = s * GAME_SECTION_COLS + localCol;
           // back side columns read screen-left to screen-right, which is +Z to -Z direction.
@@ -743,7 +789,7 @@ export class GameSection implements SlottedFixture {
           const zPos = position.z - rx * sin + rz * c;
 
           slots.push({
-            movie,
+            movie, displayCopy,
             side: 'back',
             shelfIdx,
             col,
@@ -770,34 +816,10 @@ export class GameSection implements SlottedFixture {
       byPlatform.get(key)!.push(g);
     }
 
-    const sortedPlatforms = Array.from(byPlatform.keys()).sort();
-    // Per-section capacity: every shelf column of every shelf level holds one case.
     const sectionCapacity = GAME_SECTION_COLS * this.shelfHeights.length;
-    // Each platform's full best-first catalog, chunked into section-sized
-    // groups (24 cases) — so a big platform fills as many signboard sections
-    // as it has stock for, instead of one 20-of-top-20 section and acres of
-    // empty shelf.
-    const platformChunks: [string, Movie[]][] = [];
-    let maxRounds = 0;
-    const chunksByPlatform = sortedPlatforms.map(platform => {
-      const games = sortGamesBest(byPlatform.get(platform)!);
-      const chunks: Movie[][] = [];
-      for (let i = 0; i < games.length; i += sectionCapacity) {
-        // Partial sections stay partial — no duplicate copies are cycled in
-        // to fill shelf columns (the user wants each game to appear once).
-        chunks.push(games.slice(i, i + sectionCapacity));
-      }
-      maxRounds = Math.max(maxRounds, chunks.length);
-      return { platform, chunks };
-    });
-    // Interleave by round so every platform gets shelf presence before any
-    // platform gets a second section.
-    for (let round = 0; round < maxRounds; round++) {
-      for (const { platform, chunks } of chunksByPlatform) {
-        if (round < chunks.length) platformChunks.push([platform, chunks[round]]);
-      }
-    }
-
+    const platformChunks = gameShelfBays(Array.from(byPlatform.keys()).sort().map(platform => ({
+      platform, games: sortGamesBest(byPlatform.get(platform)!),
+    })), sectionCapacity);
     const N = platformChunks.length;
 
     // (#59) Sliced mode: this gondola is unit `unit` of a `units`-unit game
@@ -829,13 +851,11 @@ export class GameSection implements SlottedFixture {
           for (let u = 0; u < unitCount; u++) slotOrder.push({ u, side, s });
         }
       });
-      // Fewer distinct platform chunks than department sections: leave the
-      // remaining sections empty rather than dealing duplicate copies of the
-      // same stock (no duplicates on the game shelves).
-      for (let i = 0; i < Math.min(platformChunks.length, slotOrder.length); i++) {
+      const filled = fillGameShelfBays(platformChunks, slotOrder.length);
+      for (let i = 0; i < filled.length; i++) {
         const slot = slotOrder[i];
         if (slot.u !== unitIndex) continue;
-        const [platform, games] = platformChunks[i];
+        const { platform, entries: games } = filled[i];
         if (slot.side === 'front') {
           this.frontPlatforms[slot.s] = platform;
           this.frontMovies[slot.s] = games;
@@ -846,17 +866,18 @@ export class GameSection implements SlottedFixture {
       }
       return;
     }
-    const numSectionsPerSide = Math.max(1, Math.ceil(N / 2));
+    const numSectionsPerSide = Math.max(1, Math.ceil(N / (this.faces === 'front' ? 1 : 2)));
     this.cols = numSectionsPerSide * GAME_SECTION_COLS;
-    this.capacity = 2 * this.shelfHeights.length * this.cols;
+    this.capacity = (this.faces === 'front' ? 1 : 2) * this.shelfHeights.length * this.cols;
 
     this.frontPlatforms = [];
     this.backPlatforms = [];
     this.frontMovies = Array.from({ length: numSectionsPerSide }, () => []);
     this.backMovies = Array.from({ length: numSectionsPerSide }, () => []);
 
-    for (let i = 0; i < N; i++) {
-      const [platform, games] = platformChunks[i];
+    const filled = fillGameShelfBays(platformChunks, numSectionsPerSide * (this.faces === 'front' ? 1 : 2));
+    for (let i = 0; i < filled.length; i++) {
+      const { platform, entries: games } = filled[i];
       if (i < numSectionsPerSide) {
         this.frontPlatforms[i] = platform;
         this.frontMovies[i] = games;

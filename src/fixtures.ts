@@ -70,6 +70,8 @@ import { Movie } from './jellyfin';
 
 export interface FixtureSlot {
   movie: Movie;
+  // Physical copy of an existing title; never a new catalog identity.
+  displayCopy?: boolean;
   side: 'front' | 'back' | 'left' | 'right';
   shelfIdx: number;
   col: number;
