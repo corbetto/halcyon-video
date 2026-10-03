@@ -1,3 +1,4 @@
+import { CANDY_CARTON_BAG, candyCartonFinishes, upgradeCandyCartonGeometry } from './fixtures/candy-carton';
 import { vestibuleLayout, vestibuleSide } from './vestibule-layout.ts';
 // Checkout & carry flow — extracted from StoreScene (three-scene.ts keeps
 // one-line delegating stubs): picking tapes up into the carried stack,
@@ -913,12 +914,16 @@ export function getCandyRows(scene: StoreScene): CandyRow[] {
 
 export function dropCandyIntoBag(scene: StoreScene, count: number): void {
   if (!scene.entrance) return;
-  if (!scene.candyBoxGeo) scene.candyBoxGeo = new THREE.BoxGeometry(0.24, 0.32, 0.12);
+  if (!scene.candyBoxGeo) {
+    scene.candyBoxGeo = new THREE.BoxGeometry(...CANDY_CARTON_BAG);
+    const uv = scene.candyBoxGeo.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
+    void upgradeCandyCartonGeometry(scene.candyBoxGeo, CANDY_CARTON_BAG, () => {
+      scene.renderer.shadowMap.needsUpdate = true; scene.requestRender();
+    });
+  }
   if (!scene.candyBoxMats) {
-    const colors = [0xc81e2c, 0x1a3fae, 0xe08a00, 0x1c8a4a, 0x7a1cae];
-    scene.candyBoxMats = colors.map(
-      (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0.05 })
-    );
+    scene.candyBoxMats = Object.values(candyCartonFinishes(() => scene.requestRender()));
   }
   const n = Math.max(0, Math.min(count, 5));
   for (let i = 0; i < n; i++) {

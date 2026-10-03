@@ -3,7 +3,7 @@ import { BB_ARCHIVO_BLACK, ensureBundledFont } from '../bundled-fonts';
 
 /** Original, brand-free printed packaging. Shared by all facings of a product;
  * fixture ownership keeps generated maps alive through the model load only. */
-export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, render:()=>void) {
+export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, render:()=>void, only?: readonly string[]) {
   const roles: Record<string,THREE.Material> = {};
   const products: [string,string,string][] = [
     ['DrinkCanRed','COLA','#9b2530'],['DrinkCanBlue','SODA','#205880'],
@@ -13,11 +13,16 @@ export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, r
     ['PopcornCartonYellow','POPCORN','#a57419'],['PopcornTubWhite','POPCORN','#9b2530'],
   ];
   const painters: (()=>void)[]=[];
+  const live: (()=>boolean)[]=[];
   for (const [role,label,color] of products) {
+    if (only && !only.includes(role)) continue;
     const canvas=document.createElement('canvas');canvas.width=256;canvas.height=256;
     const tex=own(new THREE.CanvasTexture(canvas));tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;
     tex.anisotropy=4;tex.name=`${label} printed wrap`;
+    let disposed=false;tex.addEventListener('dispose',()=>{disposed=true;});
+    live.push(()=>!disposed);
     const paint=()=>{
+      if(disposed) return;
       const c=canvas.getContext('2d')!;
       c.fillStyle=color;c.fillRect(0,0,256,256);
       c.fillStyle='#eee9da';c.fillRect(0,24,256,5);c.fillRect(0,210,256,5);
@@ -36,9 +41,10 @@ export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, r
     const mat=own(new THREE.MeshStandardMaterial({map:tex,roughness:role.startsWith('Drink')?.38:.58,
       metalness:role.startsWith('Drink')?.22:0}));mat.name=role;roles[role]=mat;
   }
-  ensureBundledFont(BB_ARCHIVO_BLACK,()=>{painters.forEach(p=>p());render();});
+  ensureBundledFont(BB_ARCHIVO_BLACK,()=>{painters.forEach(p=>p());if(live.some(active=>active())) render();});
   // Clear sheet goods transmit the shelf stock without the opaque warm veil.
   for(const role of ['CoolerGlass','PopcornClearAcrylic','GondolaRetainingLip']) {
+    if (only && !only.includes(role)) continue;
     const mat=own(new THREE.MeshPhysicalMaterial({color:0xf5f9fa,transparent:true,opacity:.075,
       roughness:.13,metalness:0,clearcoat:.45,depthWrite:false}));mat.name=role;roles[role]=mat;
   }

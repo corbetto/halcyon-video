@@ -1,3 +1,4 @@
+import { CANDY_CARTON_RACK, candyCartonFinishes, upgradeCandyCartonGeometry } from './candy-carton';
 import { CLEANER_CARTON, installCleanerCartons } from './cleaner-carton';
 export { buildPreviouslyViewedTub } from './previously-viewed-tub';
 import { createCandyRackFinish } from './candy-rack-finish';
@@ -145,7 +146,16 @@ export class CandyDisplay implements StoreFixture {
     fallback.add(foot);
 
     const shelfGeo = new THREE.BoxGeometry(width - (dispenserPacks ? .17 : .1), 0.03, depth - 0.1);
-    const boxGeo = new THREE.BoxGeometry(0.32, 0.42, 0.18);
+    const boxGeo = new THREE.BoxGeometry(...CANDY_CARTON_RACK);
+    const printed = options.palette ? null : candyCartonFinishes(() => this.ctx.requestRender());
+    if (printed) Object.values(printed).forEach(mat => this.disposables.push({ mat }));
+    // Existing custom labels/palettes keep their canvas cards and flipY convention.
+    const customPrint = !!options.palette || labels.some(label => !printed?.[label]);
+    const uv = boxGeo.getAttribute('uv');
+    if (!customPrint) for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
+    void upgradeCandyCartonGeometry(boxGeo, CANDY_CARTON_RACK, () => {
+      this.ctx.requestShadowRefresh(); this.ctx.requestRender();
+    }, customPrint);
     this.disposables.push({ geo: shelfGeo }, { geo: boxGeo });
 
     for (let r = 0; r < rows; r++) {
@@ -159,13 +169,13 @@ export class CandyDisplay implements StoreFixture {
 
       const label = labels[r % labels.length];
       const bg = palette[r % palette.length];
-      const tex = createLabelTexture(label, bg, '#ffffff');
-      const boxMat = new THREE.MeshStandardMaterial({
-        map: tex,
-        roughness: 0.65,
-        metalness: 0.05,
-      });
-      this.disposables.push({ mat: boxMat, tex });
+      let boxMat: THREE.MeshStandardMaterial;
+      if (!customPrint && printed?.[label]) boxMat = printed[label];
+      else {
+        const tex = createLabelTexture(label, bg, '#ffffff');
+        boxMat = new THREE.MeshStandardMaterial({ map: tex, roughness: .65, metalness: .05 });
+        this.disposables.push({ mat: boxMat, tex });
+      }
 
       const perRow = Math.max(3, Math.floor((width - 0.3) / 0.36));
       const stockDepth = Math.max(1, Math.floor((depth - .22) / .24));

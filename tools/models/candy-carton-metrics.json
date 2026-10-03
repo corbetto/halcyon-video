@@ -1,0 +1,72 @@
+{
+  "nominalRackFeet": [
+    0.32,
+    0.42,
+    0.18
+  ],
+  "nominalBagFeet": [
+    0.24,
+    0.32,
+    0.12
+  ],
+  "constructionEstimatesFeet": {
+    "board": 0.0012,
+    "cornerFold": 0.002,
+    "tuck": 0.035,
+    "glueLap": 0.018
+  },
+  "parts": [
+    {
+      "name": "Scored_continuous_paperboard_sleeve",
+      "vertices": 32,
+      "triangles": 64,
+      "manifold": true
+    },
+    {
+      "name": "Top_folded_tuck_closure",
+      "vertices": 16,
+      "triangles": 28,
+      "manifold": true
+    },
+    {
+      "name": "Top_left_dust_flap",
+      "vertices": 8,
+      "triangles": 12,
+      "manifold": true
+    },
+    {
+      "name": "Top_right_dust_flap",
+      "vertices": 8,
+      "triangles": 12,
+      "manifold": true
+    },
+    {
+      "name": "Bottom_folded_tuck_closure",
+      "vertices": 16,
+      "triangles": 28,
+      "manifold": true
+    },
+    {
+      "name": "Bottom_left_dust_flap",
+      "vertices": 8,
+      "triangles": 12,
+      "manifold": true
+    },
+    {
+      "name": "Bottom_right_dust_flap",
+      "vertices": 8,
+      "triangles": 12,
+      "manifold": true
+    },
+    {
+      "name": "Rear_internal_glue_lap",
+      "vertices": 8,
+      "triangles": 12,
+      "manifold": true
+    }
+  ],
+  "triangles": 180,
+  "materials": 1,
+  "embeddedTextures": 0,
+  "glbBytes": 19128
+}
