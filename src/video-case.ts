@@ -1,3 +1,4 @@
+import { setMaterialEnvironment } from './material-environment';
 import { waitForExternalGame } from './external-game-state.ts';
 import * as THREE from 'three';
 import { isPublicDemo } from './demo-mode';
@@ -5974,24 +5975,9 @@ export function refreshPosterCrop() {
 
 export function updateGlobalMaterialsEnvMap(envMap: THREE.Texture | null) {
   initGlobalMaterials();
-  if (globalFrontMaterialRegular) {
-    globalFrontMaterialRegular.envMap = envMap;
-    globalFrontMaterialRegular.needsUpdate = true;
-  }
-  if (globalFrontMaterialAnimated) {
-    globalFrontMaterialAnimated.envMap = envMap;
-    globalFrontMaterialAnimated.needsUpdate = true;
-  }
-  if (globalSpineMaterialRegular) {
-    globalSpineMaterialRegular.envMap = envMap;
-    globalSpineMaterialRegular.needsUpdate = true;
-  }
-  if (globalSpineMaterialAnimated) {
-    globalSpineMaterialAnimated.envMap = envMap;
-    globalSpineMaterialAnimated.needsUpdate = true;
-  }
-  if (globalBackMaterialAnimated) {
-    globalBackMaterialAnimated.envMap = envMap;
-    globalBackMaterialAnimated.needsUpdate = true;
-  }
+  setMaterialEnvironment(globalFrontMaterialRegular, envMap);
+  setMaterialEnvironment(globalFrontMaterialAnimated, envMap);
+  setMaterialEnvironment(globalSpineMaterialRegular, envMap);
+  setMaterialEnvironment(globalSpineMaterialAnimated, envMap);
+  setMaterialEnvironment(globalBackMaterialAnimated, envMap);
 }

@@ -1,3 +1,4 @@
+import { setMaterialEnvironment } from './material-environment';
 // CheckoutBag — the glossy white plastic rental bag on the inner counter, as a
 // real (tiny) soft body. The bag is a "pillow bag" exactly like the physical
 // die-cut-handle merch bags video stores used: two thin sheets welded together
@@ -730,8 +731,7 @@ export class CheckoutBag {
   }
 
   setEnvMap(envMap: THREE.Texture | null): void {
-    this.material.envMap = envMap;
-    this.material.needsUpdate = true;
+    setMaterialEnvironment(this.material, envMap);
   }
 
   /** Per-frame driver. No-ops entirely (zero writes) when hidden or asleep. */
