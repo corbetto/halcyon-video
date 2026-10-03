@@ -53,6 +53,11 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
   const roof = new THREE.Raycaster(new THREE.Vector3(0, 4.3, -.8), new THREE.Vector3(0, -1, 0), 0, 1).intersectObject(scene, true);
   assert.ok(roof.length > 0, 'continuous top covers the collection cavity');
   assert.ok(Math.abs(roof[0].point.y - 3.85) < .01);
+  // The crown must keep its full roll, not regress to a small edge fillet.
+  const roll = .38, diagonal = roll / Math.sqrt(2);
+  const crown = new THREE.Raycaster(new THREE.Vector3(0, 4.3, 1/3 - roll + diagonal), new THREE.Vector3(0, -1, 0))
+    .intersectObject(scene.getObjectByName('ChuteLaminate')!, true);
+  assert.ok(crown.length && Math.abs(crown[0].point.y - (3.85 - roll + diagonal)) < .002, 'pronounced quarter-round crown reaches the established profile');
   const rear = new THREE.Raycaster(new THREE.Vector3(.6, 2, -.8), new THREE.Vector3(0, 0, -1), 0, .8);
   assert.equal(rear.intersectObject(scene, true).length, 0, 'hollow receiver remains accessible from the rear');
   const flap = scene.getObjectByName('ChuteFlap')!;

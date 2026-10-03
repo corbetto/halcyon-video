@@ -56,7 +56,7 @@ const SLOT_W = 1.0;     // "a little bigger than a VHS length" (case is ~0.73 ft
 const SLOT_H = 0.3;
 const SLOT_Y = 2.55;    // slot centre height — a natural drop-in height
 const SLOT_X = -0.9;    // flap sits lower-LEFT on the shell (frames2/scene_011)
-const TOP_R = 0.38;     // ~4.6in bullnose per the footage's fat top roll
+const TOP_R = 0.38;     // 4.56in crown; mirrored by interior-return-chute.py ROLL
 
 // ── Sign plate, MEASURED off the 1993 return-station macro ──────────────────
 // reference/video-store-stills-2026-07-30/rUhRHo44CIA/f0068.jpg (the

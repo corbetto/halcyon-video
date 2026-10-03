@@ -6,18 +6,19 @@ a boolean through-aperture, and eased cut edges. The counter provides the
 rear closure: the open-backed socket fits around its existing panels. Separate folded steel throat
 panels, a sloping receiver, rear light baffle, top-pivot flap and four acrylic-label
 stand-offs provide physical depth. Closed solids are checked for manifold edges.
-The editable source retains twelve named parts; the runtime batches static parts
-by finish and retains the flap separately.
+The editable source retains 24 named parts; the runtime batches static parts
+by finish and retains the two flaps separately.
 
 ## Contract and provenance
 
 Feet, ground origin, width along X, front toward local +Z. Blender coordinates
 are `(x, -store_z, height)` and export directly to Three.js Y-up coordinates.
-Bounds: X ±1.20, Y 0–3.85, Z −1.49–0.907 ft. The shell face remains Z 0.90;
-the 1.00 × 0.30 ft aperture remains centered at (−0.50, 2.55, 0.90).
-Crown radius is 0.38 ft; nominal shell thickness is 0.14 ft. The flap pivot is
-(−0.50, 2.665, 0.743), opening inward about X during the existing return ritual.
-Stand-offs end at Z 0.907 behind the existing clear label and screw heads.
+Bounds: X ±1.60, Y 0–3.85, Z −1.49–0.340333 ft. The shell face remains Z 1/3;
+the two 1.00 × 0.30 ft apertures remain centered at (±0.90, 2.55, 1/3).
+Crown radius is 0.38 ft, matching `return-slot.ts`'s loading fallback; nominal
+shell thickness is 0.14 ft. The flap pivots are (±0.90, 2.665, 0.309333),
+opening inward about X during the existing return ritual.
+Stand-offs end at Z 0.340333 behind the existing clear label and screw heads.
 
 The dimensions and silhouette come from the existing application geometry.
 Internal folds, bevels, baffle and hardware depths are construction estimates.
@@ -41,9 +42,10 @@ active counter-top color at runtime. All three retain embedded tangent-space fin
 grain and roughness textures (two shared 256² images). The shell is blue laminate and the slot is white, nonmetallic painted metal.
 Laminate metalness is 0.03 and reveal metalness 0.10; roughness
 varies approximately 0.44–0.56. UV islands are packed per physical part and tiled 8× for fine physical grain.
-The light baffle sits at Z 0.05, giving 0.85 ft of visible depth ahead of the
+The light baffle sits at Z 0.05, giving approximately 0.28 ft of visible depth ahead of the
 existing counter band; it masks the blue counter behind the receiving throat.
-Cost: 2,240 triangles, four mesh draws, three materials, 342,748 GLB bytes.
+Resource cost is recorded in `tools/models/interior-return-chute-metrics.json`;
+the runtime uses five mesh draws, three materials and two packed images.
 Decoded image pixels total 512 KiB before mipmaps; loader texture objects can
 share image data. The existing runtime label adds its original draws/textures.
 
@@ -84,4 +86,19 @@ The mouth anchor, hinge, overall dimensions, collision and drop timing stay
 unchanged. The opening is checked in the installed counter as well as the
 public fallback model.
 
-The housing retains a continuous blue crown above the hollow receiver. Staff access remains through the rear counter socket; the collection cavity no longer cuts through the top. The slot, flap pivot, outer bounds and four render batches are unchanged.
+The housing retains a continuous blue crown above the hollow receiver. Staff access remains through the rear counter socket; the collection cavity no longer cuts through the top. The slot, flap pivot, outer bounds and five render batches are unchanged.
+
+## Pronounced crown profile (#372)
+
+The Blender source had reduced the crown to a 0.14 ft edge fillet while the
+procedural fallback retained the established 0.38 ft quarter-round. Restoring
+the full radius makes the upper front roll descend 4.56 inches instead of
+1.68 inches, with the same increase in its top setback. It does not change
+the housing envelope, slot openings, label position or counter anchors. The
+GLB geometry test ray-checks the diagonal of the crown to prevent a subtle
+edge fillet from replacing the intended broad roll again.
+
+The archival f0068 frame was located and inspected for this correction. Its
+broad upper roll supports the established application profile; perspective
+and the cropped housing do not establish a new exact radius measurement.
+No reference pixels or artwork are included in the model.

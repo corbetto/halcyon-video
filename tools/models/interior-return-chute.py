@@ -45,7 +45,9 @@ def box(name,x0,x1,y0,y1,z0,z1,mat,bevel=.006):
  return profile(name,x0,x1,[(y0,z0),(y1,z0),(y1,z1),(y0,z1)],mat,bevel)
 # Continuous rounded millwork envelope, with a machined aperture and hollow rear.
 FACE=.333333
-ROLL=.14
+# Match return-slot.ts TOP_R: the broad crown rolls down 4.56 inches.
+# A .14-foot edge fillet flattened this into a barely visible lip.
+ROLL=.38
 yz=[(0,-1.49),(3.85,-1.49),(3.85,FACE-ROLL)]
 for i in range(1,17):
  a=math.pi/2*(1-i/16); yz.append((3.85-ROLL+ROLL*math.sin(a),FACE-ROLL+ROLL*math.cos(a)))
