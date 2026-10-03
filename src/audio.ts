@@ -1,4 +1,8 @@
 import { isExternalGameActive } from './external-game-state.ts';
+import { assetUrl } from './asset-url.ts';
+
+export type CaseMedium = 'vhs' | 'dvd';
+
 // Small procedural sound engine for the store's immersion audio pass.
 //
 // Original material contacts and register tones, synthesized with WebAudio (oscillators +
@@ -32,6 +36,7 @@ class RetailAudio {
     try {
       if (!this.ctx) this.ctx = new AudioContext();
       if (this.ctx.state === 'suspended' && !this.idleSuspended) this.ctx.resume().catch(() => {});
+      if (!this.foleyLoaded && !this.foleyLoading) this.preloadFoley(this.ctx);
       return this.ctx;
     } catch {
       return null; // WebAudio unavailable — fail silent, never throw
@@ -93,8 +98,86 @@ class RetailAudio {
     try {
       if (!this.ctx) this.ctx = new AudioContext();
       this.noiseBuffer(this.ctx);
+      this.preloadFoley(this.ctx);
     } catch { /* no audio device — ensureCtx keeps handling that case */ }
   }
+
+  private vhsFlipBuffers: AudioBuffer[] = [];
+  private dvdFlipBuffers: AudioBuffer[] = [];
+  private foleyLoading = false;
+  private foleyLoaded = false;
+  private lastVhsIdx = -1;
+  private lastDvdIdx = -1;
+
+  public preloadFoley(ctx: AudioContext) {
+    if (this.foleyLoading || this.foleyLoaded) return;
+    this.foleyLoading = true;
+    const loadList = (prefix: string, count: number): Promise<AudioBuffer[]> => {
+      const promises: Promise<AudioBuffer | null>[] = [];
+      for (let i = 1; i <= count; i++) {
+        const name = `${prefix}_${i < 10 ? '0' : ''}${i}.mp3`;
+        promises.push(
+          fetch(assetUrl(`sounds/foley/${name}`))
+            .then((r) => { if (!r.ok) throw new Error(`${name} ${r.status}`); return r.arrayBuffer(); })
+            .then((ab) => ctx.decodeAudioData(ab))
+            .catch(() => null)
+        );
+      }
+      return Promise.all(promises).then((res) => res.filter((b): b is AudioBuffer => b !== null));
+    };
+
+    Promise.all([
+      loadList('vhs_flip', 8),
+      loadList('dvd_flip', 8),
+    ]).then(([vhs, dvd]) => {
+      this.vhsFlipBuffers = vhs;
+      this.dvdFlipBuffers = dvd;
+      this.foleyLoaded = true;
+    }).catch(() => {});
+  }
+
+  private playFoleyHit(ctx: AudioContext, medium: CaseMedium, gainLevel = 1.0): boolean {
+    const list = medium === 'vhs' ? this.vhsFlipBuffers : this.dvdFlipBuffers;
+    if (!list || list.length === 0) return false;
+    let idx = Math.floor(Math.random() * list.length);
+    const last = medium === 'vhs' ? this.lastVhsIdx : this.lastDvdIdx;
+    if (list.length > 1 && idx === last) {
+      idx = (idx + 1) % list.length;
+    }
+    if (medium === 'vhs') this.lastVhsIdx = idx;
+    else this.lastDvdIdx = idx;
+
+    const source = ctx.createBufferSource();
+    source.buffer = list[idx];
+    source.playbackRate.value = 0.97 + Math.random() * 0.06;
+    const gain = ctx.createGain();
+    gain.gain.value = MASTER_VOLUME * gainLevel;
+    source.connect(gain);
+    gain.connect(this.bus(ctx));
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+    };
+    source.start(ctx.currentTime + 0.002);
+    return true;
+  }
+
+  private currentMedium: CaseMedium | null = null;
+  public setMedium(medium: CaseMedium) {
+    this.currentMedium = medium;
+  }
+  public getMedium(medium?: CaseMedium): CaseMedium {
+    if (medium) return medium;
+    if (this.currentMedium) return this.currentMedium;
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('bb_medium');
+      if (saved === 'vhs' || saved === 'dvd') return saved;
+      const theme = localStorage.getItem('bb_theme');
+      if (theme && (theme.startsWith('bb-199') || theme.startsWith('bb-2000'))) return 'vhs';
+    }
+    return 'dvd';
+  }
+
 
   // One reusable noise bed; each contact starts at a different point so rapid
   // browsing does not allocate/fill another audio buffer on the input thread.
@@ -187,26 +270,37 @@ class RetailAudio {
   }
 
   // Case edge against its shelf, then a light plastic contact in the hand.
-  // The former falling sine thump implied a drum hit after every selection.
-  public playBoxPickup() {
+  // Combines recorded tactile foley contact with the shelf edge contact.
+  public playBoxPickup(medium?: CaseMedium) {
     const ctx = this.start('pickup', 0.075);
     if (!ctx) return;
+    const m = this.getMedium(medium);
+    if (!this.playFoleyHit(ctx, m, 0.45)) {
+      const t = ctx.currentTime + 0.005;
+      this.contact(ctx, t + 0.055, 0.035, 520, 0.16, 1.1);
+      this.contact(ctx, t + 0.067, 0.025, 2100, 0.045, 0.8);
+    }
     const t = ctx.currentTime + 0.005;
-    this.contact(ctx, t, 0.095, 1000, 0.12, 0.65);
-    this.contact(ctx, t + 0.055, 0.035, 520, 0.16, 1.1);
-    this.contact(ctx, t + 0.067, 0.025, 2100, 0.045, 0.8);
+    this.contact(ctx, t, 0.095, 1000, 0.08, 0.65);
   }
 
-  // A closed case turning in the fingers: sleeve rub and two small shell
-  // contacts. A hand turn does not need an air whoosh or a latch snapping shut.
-  public playBoxFlip() {
-    const ctx = this.start('flip', 0.1);
+  // A closed case turning in the fingers. Uses recorded foley hits for VHS
+  // clamshells and DVD keepcases, falling back to procedural synthesis if
+  // audio samples are still loading.
+  public playBoxFlip(medium?: CaseMedium) {
+    const ctx = this.start('flip', 0.08);
     if (!ctx) return;
+    const m = this.getMedium(medium);
+    if (this.playFoleyHit(ctx, m, 0.85)) {
+      return;
+    }
     const t = ctx.currentTime + 0.005;
     this.contact(ctx, t, 0.075, 1250, 0.065, 0.6);
     this.contact(ctx, t + 0.025, 0.022, 750, 0.1, 1);
     this.contact(ctx, t + 0.105, 0.03, 1650, 0.075, 0.8);
   }
+
+
 
   // One short register confirmation; also used by terminal confirmations.
   public playCheckoutChime() {
