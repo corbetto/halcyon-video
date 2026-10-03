@@ -1,0 +1,262 @@
+{
+  "units": "feet",
+  "axes": "glTF X across, Y up, +Z front; Blender (x,-z,y)",
+  "neckDropFeet": 0.013852935769827046,
+  "rackCrossbarOffsetFeet": 0.5636862691031603,
+  "groups": [
+    {
+      "name": "PouchSmall",
+      "triangles": 888,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.20999999344348907,
+          0.0,
+          -0.07500000298023224
+        ],
+        "max": [
+          0.20999999344348907,
+          0.5833333134651184,
+          0.07500000298023224
+        ]
+      },
+      "anchors": {
+        "Anchor_Small_Bottom": [
+          0.0,
+          0.0,
+          -0.0
+        ],
+        "Anchor_Small_PegHole": [
+          0.0,
+          0.5483333468437195,
+          -0.0
+        ],
+        "Anchor_Small_WireRest": [
+          0.0,
+          0.5548333525657654,
+          -0.0
+        ]
+      }
+    },
+    {
+      "name": "PouchFull",
+      "triangles": 888,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.25,
+          0.0,
+          -0.10000000149011612
+        ],
+        "max": [
+          0.25,
+          0.7200000286102295,
+          0.10000000149011612
+        ]
+      },
+      "anchors": {
+        "Anchor_Full_Bottom": [
+          0.0,
+          0.0,
+          -0.0
+        ],
+        "Anchor_Full_PegHole": [
+          0.0,
+          0.6850000023841858,
+          -0.0
+        ],
+        "Anchor_Full_WireRest": [
+          0.0,
+          0.6915000081062317,
+          -0.0
+        ]
+      }
+    },
+    {
+      "name": "PegShort",
+      "triangles": 172,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.006000000052154064,
+          -0.01985287480056286,
+          -0.0011929282918572426
+        ],
+        "max": [
+          0.006000000052154064,
+          0.005880214739590883,
+          0.25600001215934753
+        ]
+      },
+      "anchors": {
+        "Anchor_PegShort_Load": [
+          0.0,
+          -0.013852936215698719,
+          0.18000000715255737
+        ],
+        "Anchor_PegShort_Mount": [
+          0.0,
+          0.0,
+          -0.0
+        ]
+      }
+    },
+    {
+      "name": "PegLong",
+      "triangles": 172,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.006000000052154064,
+          -0.019852932542562485,
+          -0.0011929282918572426
+        ],
+        "max": [
+          0.006000000052154064,
+          0.005880214739590883,
+          0.8259999752044678
+        ]
+      },
+      "anchors": {
+        "Anchor_PegLong_Load": [
+          0.0,
+          -0.013852936215698719,
+          0.75
+        ],
+        "Anchor_PegLong_Mount": [
+          0.0,
+          0.0,
+          -0.0
+        ]
+      }
+    },
+    {
+      "name": "RackCrossbar",
+      "triangles": 28,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -1.4299999475479126,
+          -0.012500000186264515,
+          -0.012500000186264515
+        ],
+        "max": [
+          1.4299999475479126,
+          0.012500000186264515,
+          0.012500000186264515
+        ]
+      },
+      "anchors": {
+        "Anchor_RackCrossbar_Left": [
+          -1.4299999475479126,
+          0.0,
+          -0.0
+        ],
+        "Anchor_RackCrossbar_Right": [
+          1.4299999475479126,
+          0.0,
+          -0.0
+        ]
+      }
+    },
+    {
+      "name": "GondolaCrossbar",
+      "triangles": 28,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -1.850000023841858,
+          -0.012500000186264515,
+          -0.012500000186264515
+        ],
+        "max": [
+          1.850000023841858,
+          0.012500000186264515,
+          0.012500000186264515
+        ]
+      },
+      "anchors": {
+        "Anchor_GondolaCrossbar_Left": [
+          -1.850000023841858,
+          0.0,
+          -0.0
+        ],
+        "Anchor_GondolaCrossbar_Right": [
+          1.850000023841858,
+          0.0,
+          -0.0
+        ]
+      }
+    },
+    {
+      "name": "RackSideRail",
+      "triangles": 28,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.012500000186264515,
+          -0.012500000186264515,
+          -0.6399999856948853
+        ],
+        "max": [
+          0.012500000186264515,
+          0.012500000186264515,
+          0.6399999856948853
+        ]
+      },
+      "anchors": {
+        "Anchor_RackSideRail_Front": [
+          0.0,
+          0.0,
+          -0.6399999856948853
+        ],
+        "Anchor_RackSideRail_Rear": [
+          0.0,
+          0.0,
+          0.6399999856948853
+        ]
+      }
+    },
+    {
+      "name": "RackCrownRail",
+      "triangles": 28,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.012500000186264515,
+          -0.012500000186264515,
+          -0.2449173927307129
+        ],
+        "max": [
+          0.012500000186264515,
+          0.012500000186264515,
+          0.2449173927307129
+        ]
+      },
+      "anchors": {
+        "Anchor_RackCrownRail_Front": [
+          0.0,
+          0.0,
+          -0.2449173927307129
+        ],
+        "Anchor_RackCrownRail_Rear": [
+          0.0,
+          0.0,
+          0.2449173927307129
+        ]
+      }
+    }
+  ],
+  "embeddedTextures": 0,
+  "construction": "Original generic sealed pouch and welded/bent-wire support kit. Visible pillow silhouette informed by reference; holes, sealed thickness, rear fin and support joints are estimates.",
+  "triangles": 2232,
+  "glbBytes": 96580
+}
