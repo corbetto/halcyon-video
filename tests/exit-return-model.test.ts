@@ -9,10 +9,20 @@ test('angled returns export preserves its floor origin, worktop height and bound
   const metrics=JSON.parse(readFileSync(new URL('../tools/models/exit-return-counter-metrics.json',import.meta.url),'utf8'));
   const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   const box=new THREE.Box3().setFromObject(scene);
-  assert.ok(Math.abs(box.min.y)<1e-5 && Math.abs(box.max.y-4.2)<1e-5);
+  assert.ok(Math.abs(box.min.y)<1e-5 && Math.abs(box.max.y-3.55)<1e-5);
   assert.ok(box.min.x>=-7.75-1e-5 && box.max.x<=7.75+1e-5);
   assert.ok(box.min.z>=-11.5-1e-5 && box.max.z<=.23+1e-5);
   assert.ok(box.min.z<-11.3,'projecting point is present');
+  // The worktop, not a tall repainted rim, meets the glazing.
+  for(const x of [-5.5,0]) {
+    const top=new THREE.Raycaster(new THREE.Vector3(x,4,.15),new THREE.Vector3(0,-1,0)).intersectObject(scene,true);
+    assert.ok(top.length && Math.abs(top[0].point.y-2.82)<.001,'white rear worktop reaches the window datum');
+    assert.equal((top[0].object as THREE.Mesh).material.name,'CounterWorktop');
+    const rear=new THREE.Raycaster(new THREE.Vector3(x,3.25,1),new THREE.Vector3(0,0,-1),0,2);
+    assert.equal(rear.intersectObject(scene,true).length,0,'no raised shelf remains at the back');
+  }
+  const bridge=new THREE.Raycaster(new THREE.Vector3(5.6,4,-1.65),new THREE.Vector3(0,-1,0)).intersectObject(scene,true);
+  assert.ok(bridge.length && Math.abs(bridge[0].point.y-2.82)<.001,'white worktop continues ahead of the low receiver');
   let triangles=0,meshes=0;
   const materials=new Set<THREE.Material>();
   scene.traverse(o=>{

@@ -10,14 +10,16 @@ ROOT=Path(__file__).resolve().parents[2]
 source=(ROOT/'tools/models/checkout-counter.py').read_text()
 exec(compile(source.split('\ndef shield(')[0],str(ROOT/'tools/models/checkout-counter.py'),'exec'))
 parts=[]
-RECEIVER_X=5.6
-OPEN_HALF=1.18
-# Pin 213: both the upper customer rim and the lower work shelf stop at the
-# rectangular return opening. The old continuous blue rim crossed the ramp.
-parts.append(sweep('Continuous blue customer rim right',[(7.75,-2.4),(7.75,0),(RECEIVER_X+OPEN_HALF,0)],.8))
-parts.append(sweep('Continuous blue customer rim left',[(RECEIVER_X-OPEN_HALF,0),(-7.75,0),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8))
-parts.append(sweep('Lower white window-side work shelf right',[(6.95,-.8),(RECEIVER_X+OPEN_HALF,-.8)],1.4,island=True))
-parts.append(sweep('Lower white window-side work shelf left',[(RECEIVER_X-OPEN_HALF,-.8),(-6.95,-.8)],1.4,island=True))
+SPEC=json.loads((ROOT/'src/exit-return-spec.json').read_text())
+RECEIVER_X=SPEC['receiverX']
+HALF=SPEC['receiverWidth']/2
+OPEN_HALF=HALF-.09
+# The rear is a single white worktop against the glazing, not a raised blue rim.
+# Retain the customer-side enclosure; its finished end meets the white bench.
+parts.append(sweep('Blue customer-side enclosure',[(-7.75,-2.2),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8))
+BACK=SPEC['glassOffset'];BENCH_D=BACK-SPEC['worktopFront']
+parts.append(sweep('White window worktop right',[(7.75,BACK),(RECEIVER_X+OPEN_HALF,BACK)],BENCH_D,island=True))
+parts.append(sweep('White window worktop left',[(RECEIVER_X-OPEN_HALF,BACK),(-7.75,BACK)],BENCH_D,island=True))
 parts.append(sweep('Lower white inner sorting shelf',[(-6.95,-5.35),(-2,-10.3),(2.4,-5.9)],1.3,island=True))
 # Through-window receiver at the left end when viewed from the staff side.
 # The runtime fits its front endpoint to the glazing and adds outward window vinyl.
@@ -30,9 +32,9 @@ def solid(name,outline,z0,z1,mat):
  bpy.context.view_layer.objects.active=ob;ob.select_set(True)
  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT');ob.select_set(False)
  parts.append(ob);return ob
-FRONT=.18328084
-# The shortened hood projects about ten inches into the shop, then feeds the existing
-# ramp into the counter. Side cheeks follow its slope rather than a tall box.
+FRONT=SPEC['glassOffset']+SPEC['faceClearance']
+# The reference shows a compact low receiver on the white rear worktop.
+# Its narrow rear throat accepts tapes from the window; the ramp feeds the cabinet.
 def channel(name,x0,x1,yz):
  verts=[(x,-z,y) for x in (x0,x1) for y,z in yz];n=len(yz)
  faces=[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
@@ -42,19 +44,27 @@ def channel(name,x0,x1,yz):
  bpy.context.view_layer.objects.active=ob;ob.select_set(True)
  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT');ob.select_set(False)
  parts.append(ob)
-cheek=[(2.82,FRONT),(4.2,FRONT),(3.12,-.65),(2.82,-.65)]
-channel('Quick return receiver left cheek',RECEIVER_X-1.15,RECEIVER_X-1.06,cheek)
-channel('Quick return receiver right cheek',RECEIVER_X+1.06,RECEIVER_X+1.15,cheek)
-channel('Quick return receiver hood',RECEIVER_X-1.15,RECEIVER_X+1.15,
- [(4.11,FRONT),(4.2,FRONT),(3.12,-.65),(3.03,-.65)])
+Y=SPEC['worktopHeight'];H_BACK=SPEC['hoodBackHeight'];H_FRONT=SPEC['hoodFrontHeight'];Z_FRONT=SPEC['hoodFront']
+# A squat, enclosed white receiver with a gently raked removable lid. The
+# narrow rear throat remains open beneath the window flap and feeds the ramp.
+cheek=[(Y,FRONT),(H_BACK,FRONT),(H_FRONT,Z_FRONT),(Y,Z_FRONT)]
+channel('Quick return receiver left cheek',RECEIVER_X-HALF,RECEIVER_X-OPEN_HALF,cheek)
+channel('Quick return receiver right cheek',RECEIVER_X+OPEN_HALF,RECEIVER_X+HALF,cheek)
+channel('Quick return receiver hood',RECEIVER_X-HALF,RECEIVER_X+HALF,
+ [(H_BACK-.08,-.10),(H_BACK,-.10),(H_FRONT,Z_FRONT),(H_FRONT-.08,Z_FRONT)])
+# Finished front panel and white worktop bridge conceal the under-counter well.
+slope=(H_BACK-H_FRONT)/(-.10-Z_FRONT)
+channel('Quick return receiver front panel',RECEIVER_X-OPEN_HALF,RECEIVER_X+OPEN_HALF,
+ [(Y,Z_FRONT),(H_FRONT-.08,Z_FRONT),(H_FRONT-.08+slope*.08,Z_FRONT+.08),(Y,Z_FRONT+.08)])
+parts.append(sweep('White surface ahead of receiver',[(RECEIVER_X+OPEN_HALF,Z_FRONT),(RECEIVER_X-OPEN_HALF,Z_FRONT)],Z_FRONT-SPEC['worktopFront'],island=True))
 solid('Quick return receiver sill',[(-1.06,FRONT),(1.06,FRONT),(1.06,-1.95),(-1.06,-1.95)],1.35,1.43,3)
 channel('Sloping quick-return ramp',RECEIVER_X-1.06,RECEIVER_X+1.06,
- [(3.90,FRONT),(3.82,FRONT),(2.12,-1.88),(2.20,-1.88)])
+ [(3.30,FRONT),(3.22,FRONT),(2.12,-1.88),(2.20,-1.88)])
 # Keep the receiving cabinet beneath the opening. Only the worktop is open;
 # removing an entire sweep must not leave a floor-to-counter void in the run.
 solid('Receiver cabinet front',[(-1.18,-2.2),(1.18,-2.2),(1.18,-2.12),(-1.18,-2.12)],.32,2.70,0)
-solid('Receiver cabinet back',[(-1.18,-.08),(1.18,-.08),(1.18,0),(-1.18,0)],.32,2.70,0)
-solid('Receiver cabinet plinth',[(-1.12,-2.12),(1.12,-2.12),(1.12,-.08),(-1.12,-.08)],0,.32,4)
+solid('Receiver cabinet back',[(-1.18,BACK-.08),(1.18,BACK-.08),(1.18,BACK),(-1.18,BACK)],.32,2.70,0)
+solid('Receiver cabinet plinth',[(-1.12,-2.12),(1.12,-2.12),(1.12,BACK-.08),(-1.12,BACK-.08)],0,.32,4)
 
 scene=bpy.context.scene;scene.unit_settings.system='IMPERIAL';scene.unit_settings.scale_length=.3048
 scene['construction']='Enclosed returns millwork with an open vestibule-side staff aisle, lower inner worktops and generic return receiver. Angled plan follows the owner floor-plan sketch of 2026-09-20; dimensions are approximate.'
@@ -65,7 +75,7 @@ bpy.context.view_layer.objects.active=parts[0]
 for screen in bpy.data.screens:
  for area in screen.areas:
   if area.type=='VIEW_3D':area.spaces.active.region_3d.view_distance=22;area.spaces.active.region_3d.view_location=(0,3.5,1.6)
-metrics={'boundsFeet':[15.5,11.73,4.2],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':round(math.hypot(7.75-3.25,6.25-2.4),2),'staffOpeningSide':'vestibule (+X)','vestibuleStubDepthFeet':2.4,'receiverCenterXFeet':RECEIVER_X,'receiverFrontBeyondGlassFeet':.00328084,'worktopOpeningFeet':[2*OPEN_HALF,1.4],'hasSlopingRamp':True,'rampOutletHeightFeet':2.20,'upperRimOpeningFeet':2*OPEN_HALF}
+metrics={'boundsFeet':[15.5,11.5+FRONT,H_BACK],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':round(math.hypot(7.75-3.25,6.25-2.2),2),'staffOpeningSide':'vestibule (+X)','vestibuleStubDepthFeet':0,'receiverCenterXFeet':RECEIVER_X,'receiverFrontBeyondGlassFeet':.00328084,'worktopOpeningFeet':[2*OPEN_HALF,BENCH_D],'hasSlopingRamp':True,'rampOutletHeightFeet':2.20,'rearBlueRim':False,'whiteWorktopMeetsGlass':True,'receiverHeightAboveWorktopFeet':H_BACK-Y}
 (ROOT/'tools/models/exit-return-counter-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/exit-return-counter.blend'),compress=True)
 bpy.ops.object.join();bpy.context.object.name='ExitReturnCounter'

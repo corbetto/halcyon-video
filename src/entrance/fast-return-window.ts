@@ -1,3 +1,4 @@
+import quickDrop from '../exit-return-spec.json' with { type: 'json' };
 import { markSignMesh } from '../sign-builders';
 import * as THREE from 'three';
 import type { FixtureContext } from '../fixtures';
@@ -10,7 +11,7 @@ export function addFastReturnWindow(ctx: FixtureContext, root: THREE.Group, scal
   const group = new THREE.Group(); group.name = 'fast-return-window';
   // Counter-local glass plane is z=.18. The outer face of the .05-ft infill
   // finishes exactly 1 mm beyond it (pin 217).
-  group.position.set(5.6*scale,0,.18 + .00328084 - .025); root.add(group);
+  group.position.set(quickDrop.receiverX*scale,0,quickDrop.glassOffset + quickDrop.faceClearance - .025); root.add(group);
   const metal = new THREE.MeshStandardMaterial({color:0xd5d4ce,roughness:.58,metalness:.15});
   const flapMaterial = new THREE.MeshStandardMaterial({color:0x454749,roughness:.7});
   const geometries: THREE.BufferGeometry[]=[];
@@ -20,16 +21,18 @@ export function addFastReturnWindow(ctx: FixtureContext, root: THREE.Group, scal
     mesh.castShadow=mesh.receiveShadow=true;return mesh;
   };
   // Two-foot tape aperture is genuinely open between the infill rails.
-  // One continuous-looking folded-metal infill surrounds the aperture,
-  // extending below it and just above it while leaving the mouth genuinely open.
-  box(2.3,.16,0,4.23,metal);box(2.3,1.70,0,2.85,metal);
-  box(.16,.39,-1.07,3.91,metal);box(.16,.39,1.07,3.91,metal);
-  const flap=box(1.96,.32,0,3.90,flapMaterial);flap.position.z=-.07;flap.rotation.x=-.12;
+  // A shallow metal flap sits above the glass lettering. There is no tall
+  // infill plate hiding the clear window between it and the white receiver.
+  box(2.3,.08,0,quickDrop.slotTop+.04,metal);
+  box(2.3,.08,0,quickDrop.slotBottom-.04,metal);
+  box(.16,quickDrop.slotTop-quickDrop.slotBottom,-1.07,quickDrop.slotCenter,metal);
+  box(.16,quickDrop.slotTop-quickDrop.slotBottom,1.07,quickDrop.slotCenter,metal);
+  const flap=box(1.96,.32,0,quickDrop.slotCenter,flapMaterial);flap.position.z=-.07;flap.rotation.x=-.12;
   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=200;
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
   const labelMat=new THREE.MeshStandardMaterial({map:texture,transparent:true,depthWrite:true,alphaTest:.1,side:THREE.DoubleSide,roughness:.8,metalness:0});
   const geo=new THREE.PlaneGeometry(2.75*scale,.54);geometries.push(geo);
-  const label=markSignMesh(new THREE.Mesh(geo,labelMat));label.name='FAST RETURN outward window vinyl';label.position.set(0,4.8,.035);group.add(label);
+  const label=markSignMesh(new THREE.Mesh(geo,labelMat));label.name='FAST RETURN outward window vinyl';label.position.set(0,quickDrop.labelHeight,.035);group.add(label);
   let disposed=false;
   const paint=()=>{
     if(disposed)return;

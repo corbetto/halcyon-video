@@ -26,8 +26,8 @@ test('return station opens beside the vestibule and closes the opposite end',()=
       return Math.abs(dx*c-dz*s)<p.w/2 && Math.abs(dx*s+dz*c)<p.d/2;
     });
     // A three-foot-wide staff approach from the vestibule side into the sorting aisle.
-    const back=f.cz+f.d/2;
-    const sz=f.d/11.5;
+    const back=f.cz+f.d/2-.18;
+    const sz=f.w/15.5;
     for(let x=4.6;x<=8.5;x+=.1) for(let z=-5.4;z<=-3.5;z+=.1)
       assert.equal(occupied(f.cx+x*f.w/15.5,back+z),false,'vestibule-side opening stays clear');
     assert.equal(occupied(f.cx-7.75*f.w/15.5+.4,back-3.25*sz),true,'old far-end opening is closed');
@@ -69,7 +69,7 @@ test('returned tape stacks sit cleanly on worktops and clear counter walls', () 
         const [xRel, zRel] = positions[i];
         const rotY = rots[i];
         const x = f.cx + xRel * f.w / 15.5;
-        const z = f.cz + f.d / 2 + zRel * f.d / 11.5;
+        const z = f.cz + f.d / 2 - .18 + zRel * f.w / 15.5;
 
         const c = Math.cos(rotY), s = Math.sin(rotY);
         const halfW = CASE_W / 2, halfL = CASE_L / 2;
@@ -94,5 +94,16 @@ test('returned tape stacks sit cleanly on worktops and clear counter walls', () 
         }
       }
     }
+  }
+});
+
+test('white window worktop reaches the glass at every supported room width',()=>{
+  for(const width of [40,48,64,80]) {
+    const f=exitReturnLayout(width,{xL:3.3,frontZ:15,sideDoorZ:10,doorW:3.2,hasChamber:true})!;
+    const parts=exitReturnSegments(f);
+    assert.ok(!parts.some(p=>p.label.endsWith('back')||p.label.endsWith('vestibule-stub')));
+    const worktop=parts.find(p=>p.label.endsWith('window-worktop'))!;
+    const rear=worktop.cz+Math.abs(Math.cos(worktop.yaw))*worktop.d/2+Math.abs(Math.sin(worktop.yaw))*worktop.w/2;
+    assert.ok(Math.abs(rear-15)<1e-9,'scaled counter must butt against fixed glazing');
   }
 });

@@ -40,6 +40,7 @@ import { liveMirrorsAllowed, reflectorTargetSize } from './store-mirrors';
 import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
+import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import { installHalloween } from './entrance/halloween';
 import { HALLOWEEN_PUMPKIN_COUNTER_U, HALLOWEEN_PUMPKIN_DESK_U, halloweenPumpkinCounterPosition } from './entrance/halloween-layout';
 import { buildWindowBays } from './entrance/windows';
@@ -1582,11 +1583,11 @@ export function buildStore(scene: StoreScene) {
     sideDoorZ:vestibuleSide(scene.storefrontSpec,-1).doorZ,doorW:scene.storefrontSpec.doorWidth,
     hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
   });
-  const returnWindowX = returnWindowCounter ? returnWindowCounter.cx + 5.6*returnWindowCounter.w/15.5 : Infinity;
+  const returnWindowX = returnWindowCounter ? returnWindowCounter.cx + quickDrop.receiverX*returnWindowCounter.w/15.5 : Infinity;
   const { group: frontWindow, panes: frontPanes, width: frontGlazedWidth } = buildWindowBays(
     scene.storefrontSpec, WINDOW_HEAD_Y, { center: 0, halfWidth: frontVestibuleHalfWidth },
     scene.wallSurface ?? undefined,
-    returnWindowCounter ? {x:STORE_CENTER_X-returnWindowX,width:2.05*returnWindowCounter.w/15.5,bottom:3.7,top:4.12} : undefined,
+    returnWindowCounter ? {x:STORE_CENTER_X-returnWindowX,width:quickDrop.slotWidth*returnWindowCounter.w/15.5,bottom:quickDrop.slotBottom,top:quickDrop.slotTop} : undefined,
   );
   frontWindow.position.set(STORE_CENTER_X, floorY, FRONT_GLASS_Z);
   frontWindow.rotation.y = Math.PI; // Facing inwards

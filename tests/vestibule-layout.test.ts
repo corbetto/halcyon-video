@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import quickDrop from '../src/exit-return-spec.json' with { type: 'json' };
 import { vestibuleLayout, counterDatumShift, vestibuleSide, vestibuleStraightSide, vestibuleFrontHalf, clampVestibuleSide, vestibuleExitGates } from '../src/vestibule-layout.ts';
 import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
 
@@ -21,7 +22,9 @@ test('open return end retains the back wall and a body-width side-door approach'
     const f=exitReturnLayout(storeWidth,vest)!; assert.ok(f);
     assert.ok(Math.abs(f.cx+f.w/2-(vest.xL-.15))<1e-8);
     const segments=exitReturnSegments(f);
-    assert.ok(segments.some(p=>p.label==='structure:return-back'),'back wall remains');
+    const rear=segments.find(p=>p.label==='structure:return-window-worktop');
+    assert.ok(rear,'white window-side enclosure remains');
+    assert.ok(Math.abs(rear.cz+rear.d/2-vest.frontZ)<1e-8,'rear worktop is against the glazing');
     assert.ok(!segments.some(p=>p.label==='structure:return-right'),'vestibule side is open');
     // Follow the angled doorway normal, testing a body-width approach.
     for(let normal=-2;normal<=1.5;normal+=.1) for(const p of segments) {
@@ -85,7 +88,7 @@ test('floor-plan rotations stay wall-aligned or at 45 degrees at every supported
       const steps=part.yaw/(Math.PI/4);
       assert.ok(Math.abs(steps-Math.round(steps))<1e-8,JSON.stringify(part));
     }
-    assert.ok(Math.abs(f.w/15.5-f.d/11.5)<1e-8,'no nonuniform model scaling');
+    assert.ok(Math.abs(f.w/15.5-(f.d-quickDrop.glassOffset)/11.5)<1e-8,'no nonuniform model scaling');
   }
 });
 

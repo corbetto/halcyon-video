@@ -85,12 +85,12 @@ test('outside return ramp descends through the countertop into an enclosed cabin
   const bytes = readFileSync(new URL('../public/models/exit-return-counter.glb', import.meta.url));
   const { scene } = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   scene.updateMatrixWorld(true);
-  const down = new THREE.Raycaster(new THREE.Vector3(5.6,3.9,-1.65),new THREE.Vector3(0,-1,0));
+  const down = new THREE.Raycaster(new THREE.Vector3(5.6,2.75,-1.65),new THREE.Vector3(0,-1,0));
   const hits = down.intersectObject(scene,true);
-  assert.ok(hits.length && hits[0].point.y<2.82 && hits[0].point.y>2.2,'ramp outlet reaches below the surrounding worktop');
+  assert.ok(hits.length && hits[0].point.y<2.82 && hits[0].point.y>2.2,'covered ramp outlet reaches below the uninterrupted white worktop');
   const hood = new THREE.Raycaster(new THREE.Vector3(5.6,4.5,-.6),new THREE.Vector3(0,-1,0));
   const hoodHits=hood.intersectObject(scene,true);
-  assert.ok(hoodHits.length && hoodHits[0].point.y<3.3,'short sloping hood does not form an oversized box');
+  assert.ok(hoodHits.length && hoodHits[0].point.y<=3.55,'short sloping hood does not form an oversized box');
   const front = new THREE.Raycaster(new THREE.Vector3(5.6,1,-3),new THREE.Vector3(0,0,1));
   assert.ok(front.intersectObject(scene,true).length,'cabinet below the opening remains enclosed');
 });

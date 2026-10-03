@@ -1,3 +1,4 @@
+import quickDrop from '../exit-return-spec.json' with { type: 'json' };
 import { addFastReturnWindow } from './fast-return-window';
 import * as THREE from 'three';
 import type { FixtureContext } from '../fixtures';
@@ -17,12 +18,12 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   const length=footprint.w;
   const segments=exitReturnSegments(footprint);
   const root=new THREE.Group();root.name='exit-return-counter';
-  root.position.set(footprint.cx,0,footprint.cz+footprint.d/2);root.rotation.y=footprint.yaw;parent.add(root);
+  root.position.set(footprint.cx,0,footprint.cz+footprint.d/2-quickDrop.glassOffset);root.rotation.y=footprint.yaw;parent.add(root);
   const body = new THREE.MeshStandardMaterial({ color: ctx.activeTheme.palette.counterBody, roughness: .58 });
   const top = new THREE.MeshStandardMaterial({ color: ctx.activeTheme.palette.counterTop, roughness: .38 });
   const plinth = new THREE.MeshStandardMaterial({ color: 0x191919, roughness: .7 });
   const fallback = new THREE.Group(); root.add(fallback);
-  const worktop = new THREE.MeshStandardMaterial({color:ctx.activeTheme.palette.counterBody,roughness:.5});
+  const worktop = new THREE.MeshStandardMaterial({color:0xf4f4f0,roughness:.5});
   const stripe = new THREE.MeshStandardMaterial({color:ctx.activeTheme.palette.secondary,roughness:.5});
   for(const f of segments) {
     const lower=f.label.includes('worktop');
@@ -35,7 +36,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     fallback.add(piece);
   }
   const unsubscribe=onBrandChange(()=>{const t=getActiveTheme();body.color.set(t.palette.counterBody);
-    worktop.color.set(t.palette.counterBody);top.color.set(t.palette.counterTop);stripe.color.set(t.palette.secondary);});
+    worktop.color.set(0xf4f4f0);top.color.set(t.palette.counterTop);stripe.color.set(t.palette.secondary);});
   ctx.addCollider(fallback);
   const rel = 'fixtures/exit-return-counter/counter.glb';
   const pack = brandPackDir();
@@ -51,7 +52,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
         const p=o.geometry.getAttribute('position');
         // Pin 217: the exterior metal face stands one millimetre proud of
         // the z=15 glazing, not several inches out in the walkway.
-        const receiverFront = .18 + .00328084;
+        const receiverFront = quickDrop.glassOffset + quickDrop.faceClearance;
         for(let i=0;i<p.count;i++) if(p.getZ(i)>0) p.setZ(i,p.getZ(i)/.18328084*receiverFront/(length/15.5));
         p.needsUpdate=true;o.geometry.computeVertexNormals();o.geometry.computeBoundingSphere();
       });
@@ -72,7 +73,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     stack.name='Store-copy returns awaiting reshelving';
     for(let level=0;level<levels;level++) {
       // Cases lie flat wholly on the employee half, never in the passage.
-      pose.position.set(x*length/15.5,2.82+CASE_DEPTH/2+level*CASE_DEPTH,z*footprint.d/11.5);
+      pose.position.set(x*length/15.5,2.82+CASE_DEPTH/2+level*CASE_DEPTH,z*length/15.5);
       pose.rotation.set(-Math.PI/2,0,[-.12,.08,-.035,.17,-.08,.65,.81,.72,-.72,-.88,-.7,-.8][index] + (level%3-1)*.018);
       pose.updateMatrix();stack.setMatrixAt(level,pose.matrix);
     }
