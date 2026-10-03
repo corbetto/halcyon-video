@@ -97,18 +97,23 @@ export function heroDetailArtEnabled(): boolean {
  */
 export function stamp4kSticker(data: Uint8Array, w: number, h: number, movieId: string): Uint8Array {
   const { r1, r2, r3 } = getMovieOffsets(movieId);
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
-  const imgData = ctx.createImageData(w, h);
-  imgData.data.set(data);
-  ctx.putImageData(imgData, 0, 0);
-
   const R = w * 0.109375;                                  // 35/320
   const cx = w * 0.765625 + r1 * (w * 0.015625);            // 245/320, jitter 5/320
   const cy = h * 0.8333333 + r2 * (h * 0.0104167);          // 400/480, jitter 5/480
   const big = w >= COVER_WIDTH;
+  // Only the badge's pixels change. A full-poster readback stalls on large
+  // libraries and inspected covers; preserve the untouched worker pixels.
+  const padding = Math.ceil(R + Math.max(1, w * 0.0046875) / 2 + 2);
+  const left = Math.max(0, Math.floor(cx - padding));
+  const top = Math.max(0, Math.floor(cy - padding));
+  const width = Math.min(w, Math.ceil(cx + padding)) - left;
+  const height = Math.min(h, Math.ceil(cy + padding)) - top;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  const imgData = ctx.createImageData(w, h);
+  imgData.data.set(data);
+  ctx.putImageData(imgData, 0, 0);
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -133,7 +138,12 @@ export function stamp4kSticker(data: Uint8Array, w: number, h: number, movieId: 
   ctx.fillText('4K', 0, -1.5 * (w / COVER_WIDTH)); // nudge up (negative Y is up on the flipped buffer)
 
   ctx.restore();
-  return new Uint8Array(ctx.getImageData(0, 0, w, h).data);
+  const badge = ctx.getImageData(left, top, width, height).data;
+  const output = new Uint8Array(data);
+  for (let row = 0; row < height; row++) {
+    output.set(badge.subarray(row * width * 4, (row + 1) * width * 4), ((top + row) * w + left) * 4);
+  }
+  return output;
 }
 
 /**
