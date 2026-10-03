@@ -411,13 +411,13 @@ export class EntranceCheckout implements StoreFixture {
       const surface = this.ctx.wallSurface;
       const liner = (lo: number, hi: number, bottom: number, top: number) => {
         if (hi <= lo || top <= bottom) return;
-        const geo = new THREE.BoxGeometry(hi - lo, top - bottom, .16);
+        const geo = new THREE.BoxGeometry(hi - lo, top - bottom, .3);
         mapWallSegmentUV(geo, hi - lo, top - bottom, bottom, surface.storeWidth, surface.roomHeight);
         const mesh = new THREE.Mesh(geo, surface.material);
         // Match the room-facing plane of the rotated front-window wall at
         // z=frontZ.  Centering this liner inside the room made the jamb project
         // through the vestibule frame by almost four inches.
-        mesh.name = 'vestibule-interior-masonry'; mesh.position.set((lo + hi) / 2, (bottom + top) / 2, frontZ + .08);
+        mesh.name = 'vestibule-interior-masonry'; mesh.position.set((lo + hi) / 2, (bottom + top) / 2, frontZ + .15);
         mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
       };
       const glazing = facadeEntryGlazing(doorW, facadeStyle());
@@ -447,10 +447,10 @@ export class EntranceCheckout implements StoreFixture {
         const divider = box(glazing.dividerWidth, WINDOW_HEAD_Y, .32, frameMat, cx, WINDOW_HEAD_Y / 2, frontZ);
         divider.visible = false; // collision proxy; the facade owns its masonry finish
       } else {
-        buildGlazedWall('X', frontZ, xL, xR, [exitX, entrX], {
-          transomY: WINDOW_HEAD_Y,
-          extraMullions: [cx - doorW - glazing.sidelightWidth, cx + doorW + glazing.sidelightWidth],
-        });
+        // The opening endpoints are the sidelight jambs. An extra post .35 ft
+        // inside the masonry created a spurious narrow third pane.
+        buildGlazedWall('X', frontZ, cx - glazing.openingHalfWidth, cx + glazing.openingHalfWidth,
+          [exitX, entrX], { transomY: WINDOW_HEAD_Y });
       }
       // The glazed wall above already frames the paired opening completely: the
       // full-width transom bar at the door head is the shared header, and the
@@ -476,7 +476,7 @@ export class EntranceCheckout implements StoreFixture {
       for (const side of [-1, 1] as const) {
         const wall = vestibuleSide(spec, side, cx);
         const straight = vestibuleStraightSide(spec,side,cx);
-        buildGlazedWall('Z', straight.x, straight.z, frontZ, [], {singlePanels:true});
+        buildGlazedWall('Z', straight.x, straight.z, frontZ - .15, [], {singlePanels:true});
         const assembly = new THREE.Group(); assembly.name = `vestibule-side-${side}`;
         const first = group.children.length;
         buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {singlePanels:true,doorWidth:wall.doorWidth});
@@ -599,9 +599,12 @@ export class EntranceCheckout implements StoreFixture {
       // what was pristine carpet running straight to the door line.
       {
         const matW = (boxW / 2) - doorW * 0.55;
-        const matD = boxDepth - 1.1;
+        // Keep the rectangular mats wholly behind the clipped side doorway.
+        const matBack = backZ + Math.max(0, boxW / 4 + matW / 2 - vestibuleBackHalf(spec)) + .2;
+        const matFront = frontZ - .55;
+        const matD = matFront - matBack;
         buildWalkOffMats(this.ctx, group, matW, matD,
-          [cx + boxW / 4, cx - boxW / 4], (frontZ + backZ) / 2);
+          [cx + boxW / 4, cx - boxW / 4], (matFront + matBack) / 2);
       }
     } else {
       // ----- Storefront door (GH #110): ONE door leaf set directly into the

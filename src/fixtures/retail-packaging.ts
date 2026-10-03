@@ -3,7 +3,7 @@ import { BB_ARCHIVO_BLACK, ensureBundledFont } from '../bundled-fonts';
 
 /** Original, brand-free printed packaging. Shared by all facings of a product;
  * fixture ownership keeps generated maps alive through the model load only. */
-export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, render:()=>void, only?: readonly string[]) {
+export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, render:()=>void, only?: readonly string[], drinkWrapAspect = 1) {
   const roles: Record<string,THREE.Material> = {};
   const products: [string,string,string][] = [
     ['DrinkCanRed','COLA','#9b2530'],['DrinkCanBlue','SODA','#205880'],
@@ -16,7 +16,7 @@ export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, r
   const live: (()=>boolean)[]=[];
   for (const [role,label,color] of products) {
     if (only && !only.includes(role)) continue;
-    const canvas=document.createElement('canvas');canvas.width=256;canvas.height=256;
+    const canvas=document.createElement('canvas');canvas.width=Math.round(256 * (role.startsWith('Drink') ? drinkWrapAspect : 1));canvas.height=256;
     const tex=own(new THREE.CanvasTexture(canvas));tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;
     tex.anisotropy=4;tex.name=`${label} printed wrap`;
     let disposed=false;tex.addEventListener('dispose',()=>{disposed=true;});
@@ -24,13 +24,14 @@ export function retailPackaging(own: <T extends {dispose():void}>(value:T)=>T, r
     const paint=()=>{
       if(disposed) return;
       const c=canvas.getContext('2d')!;
-      c.fillStyle=color;c.fillRect(0,0,256,256);
-      c.fillStyle='#eee9da';c.fillRect(0,24,256,5);c.fillRect(0,210,256,5);
-      c.fillStyle='#f5f0e1';c.beginPath();c.ellipse(128,115,91,60,0,0,2*Math.PI);c.fill();
+      const W=canvas.width, cx=W/2;
+      c.fillStyle=color;c.fillRect(0,0,W,256);
+      c.fillStyle='#eee9da';c.fillRect(0,24,W,5);c.fillRect(0,210,W,5);
+      c.fillStyle='#f5f0e1';c.beginPath();c.ellipse(cx,115,91,60,0,0,2*Math.PI);c.fill();
       c.fillStyle=color;c.textAlign='center';c.textBaseline='middle';
       c.font=`24px ${BB_ARCHIVO_BLACK}, sans-serif`;
-      const words=label.split(' ');words.forEach((word,i)=>c.fillText(word,128,115+(i-(words.length-1)/2)*29,174));
-      c.fillStyle='#eee9da';c.font='11px sans-serif';c.fillText(role.startsWith('Drink')?'355 mL':'NET WT 85 g',128,190);
+      const words=label.split(' ');words.forEach((word,i)=>c.fillText(word,cx,115+(i-(words.length-1)/2)*29,174));
+      c.fillStyle='#eee9da';c.font='11px sans-serif';c.fillText(role.startsWith('Drink')?'355 mL':'NET WT 85 g',cx,190);
       // Fine ingredient rules and a barcode belong to the printed wrap.
       c.fillStyle='#ded7c7';for(let line=0;line<3;line++)c.fillRect(12,230+line*4,112-line*11,1);
       c.fillStyle='#f5f0e1';c.fillRect(185,224,56,24);c.fillStyle='#272522';

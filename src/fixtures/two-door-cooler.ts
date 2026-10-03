@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { coolerGraphics } from './cooler-graphics';
 import { retailPackaging } from './retail-packaging';
 import type { FixtureContext, StoreFixture } from '../fixtures';
 import type { FixturePlacement } from '../store-layout';
@@ -71,7 +72,9 @@ export class TwoDoorCooler implements StoreFixture {
 
     this.ctx.scene.add(group);
     this.ctx.addCollider(proxy);
-    this.removeModel = installDisplayModel(this.ctx, group, fallback, 'models/two-door-cooler.glb', retailPackaging(own, () => { if(this.group) this.ctx.requestRender(); }), new THREE.Vector3(1, 1, 1), prepareRetailModel);
+    const graphics = coolerGraphics(own, () => { if (this.group) this.ctx.requestRender(); });
+    graphics.decorate(group); graphics.decorate(fallback, true);
+    this.removeModel = installDisplayModel(this.ctx, group, fallback, 'models/two-door-cooler.glb', retailPackaging(own, () => { if(this.group) this.ctx.requestRender(); }, undefined, Math.PI * .288 / .19), new THREE.Vector3(1, 1, 1), prepareRetailModel);
     this.ctx.requestShadowRefresh();
     this.ctx.requestRender();
   }

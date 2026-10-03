@@ -40,13 +40,13 @@ test('Pumpkin export stays within the small seasonal mesh budget', () => {
   assert.ok(triangles < 3000);
 });
 
-test('Clings form a deterministic three-piece cluster on every other pane with frame margins', () => {
+test('Clings form a deterministic three-piece cluster on every clear pane with frame margins', () => {
   const panes = Array.from({ length: 8 }, (_, i) => ({ lo: i * 4, hi: i * 4 + 4 }));
   const a = halloweenClingPlacements(panes);
   const b = halloweenClingPlacements(panes);
   assert.deepEqual(a, b);
-  assert.deepEqual([...new Set(a.map(p => p.paneIndex))], [1, 3, 5, 7]);
-  assert.equal(a.length, 12);
+  assert.deepEqual([...new Set(a.map(p => p.paneIndex))], [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(a.length, 24);
   for (const placement of a) {
     const pane = panes[placement.paneIndex];
     assert.ok(placement.width >= .88);
@@ -94,10 +94,21 @@ test('Halloween cling art is non-empty SVG with transparent background and no ex
   assert.ok(!svg.includes('<rect'));
 });
 
-test('Halloween cling placements skip even panes and adapt to store width', () => {
+test('Halloween cling placements skip occupied panes and adapt to store width', () => {
   const smallPanes = [{ lo: 0, hi: 4 }, { lo: 4, hi: 8 }];
-  const placements = halloweenClingPlacements(smallPanes);
+  const placements = halloweenClingPlacements(smallPanes, 2, 7.7, [0]);
   assert.equal(placements.length, 3);
   assert.ok(placements.every(p => p.paneIndex === 1));
 });
 
+
+// Actual poster selection can shift after masonry or return-window placement.
+test('Clings cover both storefront wings evenly without touching occupied panes', () => {
+  const panes = Array.from({length:12},(_,i)=>({lo:i*4,hi:i*4+4}));
+  const occupied=[1,3,5,6,8,10];
+  const placements=halloweenClingPlacements(panes,2,7.7,occupied);
+  assert.deepEqual([...new Set(placements.map(p=>p.paneIndex))],[0,2,4,7,9,11]);
+  assert.equal(placements.filter(p=>p.paneIndex<6).length,9);
+  assert.equal(placements.filter(p=>p.paneIndex>=6).length,9);
+  assert.deepEqual(halloweenClingPlacements(panes,2,7.7,panes.map((_,i)=>i)),[]);
+});

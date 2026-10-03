@@ -31,22 +31,25 @@ def solid(name,outline,z0,z1,mat):
  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT');ob.select_set(False)
  parts.append(ob);return ob
 FRONT=.18328084
-solid('Quick return receiver left cheek',[(-1.15,FRONT),(-1.06,FRONT),(-1.06,-1.95),(-1.15,-1.95)],2.82,4.2,3)
-solid('Quick return receiver right cheek',[(1.06,FRONT),(1.15,FRONT),(1.15,-1.95),(1.06,-1.95)],2.82,4.2,3)
-solid('Quick return receiver sill',[(-1.06,FRONT),(1.06,FRONT),(1.06,-1.95),(-1.06,-1.95)],1.35,1.43,3)
-solid('Quick return receiver hood',[(-1.15,FRONT),(1.15,FRONT),(1.15,-1.95),(-1.15,-1.95)],4.11,4.2,3)
-# Welded folded ramp: high at the window slot, descending through the open
-# worktop cutout into the receiving well. This is a closed solid, not a visual
-# patch laid over the old countertop.
-def ramp(name,x0,x1):
- yz=[(3.90,FRONT),(3.82,FRONT),(2.12,-1.88),(2.20,-1.88)]
+# The shortened hood projects about ten inches into the shop, then feeds the existing
+# ramp into the counter. Side cheeks follow its slope rather than a tall box.
+def channel(name,x0,x1,yz):
  verts=[(x,-z,y) for x in (x0,x1) for y,z in yz];n=len(yz)
  faces=[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
  me=bpy.data.meshes.new(name);me.from_pydata(verts,[],faces);me.materials.append(MATERIALS[3]);me.update()
  ob=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(ob)
  bm=bmesh.new();bm.from_mesh(me);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));assert all(e.is_manifold for e in bm.edges);bm.to_mesh(me);bm.free()
+ bpy.context.view_layer.objects.active=ob;ob.select_set(True)
+ bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT');ob.select_set(False)
  parts.append(ob)
-ramp('Sloping quick-return ramp',RECEIVER_X-1.06,RECEIVER_X+1.06)
+cheek=[(2.82,FRONT),(4.2,FRONT),(3.12,-.65),(2.82,-.65)]
+channel('Quick return receiver left cheek',RECEIVER_X-1.15,RECEIVER_X-1.06,cheek)
+channel('Quick return receiver right cheek',RECEIVER_X+1.06,RECEIVER_X+1.15,cheek)
+channel('Quick return receiver hood',RECEIVER_X-1.15,RECEIVER_X+1.15,
+ [(4.11,FRONT),(4.2,FRONT),(3.12,-.65),(3.03,-.65)])
+solid('Quick return receiver sill',[(-1.06,FRONT),(1.06,FRONT),(1.06,-1.95),(-1.06,-1.95)],1.35,1.43,3)
+channel('Sloping quick-return ramp',RECEIVER_X-1.06,RECEIVER_X+1.06,
+ [(3.90,FRONT),(3.82,FRONT),(2.12,-1.88),(2.20,-1.88)])
 # Keep the receiving cabinet beneath the opening. Only the worktop is open;
 # removing an entire sweep must not leave a floor-to-counter void in the run.
 solid('Receiver cabinet front',[(-1.18,-2.2),(1.18,-2.2),(1.18,-2.12),(-1.18,-2.12)],.32,2.70,0)

@@ -16,6 +16,7 @@ export function installHalloween(
   pumpkinParent: THREE.Object3D,
   pumpkinPose: PumpkinPose,
   refresh: () => void,
+  occupiedPanes: readonly number[] = [],
 ): void {
   if (!inSeason('halloween') || !panes.length) return;
   const kit = new THREE.Group(); kit.name = 'halloween-window-decor'; windowParent.add(kit);
@@ -53,8 +54,8 @@ export function installHalloween(
     counterKit.add(model); own(model); fallback.visible = false; refresh();
   }, undefined, () => { /* Retain the inexpensive fallback on load failure. */ });
   // Each SVG path becomes a reusable die-cut master. Larger clones are then
-  // scattered across every other pane with deterministic variation and a
-  // measured clear margin from frames and mullions.
+  // distributed across clear panes, leaving posters and return hardware
+  // unobstructed, with measured margins from frames and mullions.
   const paths = new SVGLoader().parse(clings).paths;
   const masters: THREE.BufferGeometry[] = [];
   paths.forEach(path => SVGLoader.createShapes(path).forEach(shape => {
@@ -72,7 +73,7 @@ export function installHalloween(
     masters.push(geo);
   }));
   const parts: THREE.BufferGeometry[] = [];
-  halloweenClingPlacements(panes).forEach(placement => {
+  halloweenClingPlacements(panes, 2, 7.7, occupiedPanes).forEach(placement => {
     const geo = masters[placement.designIndex % masters.length].clone();
     geo.scale(placement.width, placement.width, 1);
     geo.rotateZ(placement.rotation);

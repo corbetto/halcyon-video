@@ -212,9 +212,9 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
           ctx.ceilingY, p.entryHalfWidth, p.openingHalfWidth, p.style);
         // Rear entrance masonry meets the wing veneer at the same outside plane.
         const z = position.getZ(i);
-        const flushJamb = p.style !== 'cone-canopy' && position.getY(i) <= 9.15 && z >= -.181 && z <= .33;
+        const flushJamb = position.getY(i) <= 9.15 && z >= -.181 && z <= .33;
         // Keep every rear face outside the interior liner and black frame.
-        const jambZ = z <= 0 ? .16 + (z + .18) * .1 : z + .5;
+        const jambZ = .3 + (z + .18) * .45 / .43;
         position.setXYZ(i, x, y, flushJamb ? jambZ : z);
       }
       position.needsUpdate = true;

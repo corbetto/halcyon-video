@@ -50,10 +50,11 @@ export function halloweenClingPlacements(
   panes: HalloweenPane[],
   paneBottom = 2,
   paneTop = 7.7,
+  occupiedPanes: readonly number[] = [],
 ): HalloweenClingPlacement[] {
   const placements: HalloweenClingPlacement[] = [];
   panes.forEach((pane, paneIndex) => {
-    if (paneIndex % 2 === 0) return;
+    if (occupiedPanes.includes(paneIndex)) return;
     const paneWidth = pane.hi - pane.lo;
     const usableHeight = paneTop - paneBottom - HALLOWEEN_CLING_MARGIN * 2;
     CLUSTERS.forEach((cluster, clusterIndex) => {

@@ -1,12 +1,12 @@
 {
   "triangles": 3112,
-  "draws": 5,
-  "materials": 3,
+  "draws": 6,
+  "materials": 4,
   "images": 2,
   "image_dimensions": [
     256,
     256
   ],
-  "glb_bytes": 403612,
+  "glb_bytes": 404644,
   "source_parts": 24
 }

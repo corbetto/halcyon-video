@@ -25,6 +25,7 @@ def material(name,color,metal,roughness):
  tex=nodes.new('ShaderNodeTexImage'); tex.image=rm; links.new(tex.outputs['Color'],p.inputs['Roughness'])
  return m
 body=material('ChuteLaminate',(.018,.065,.36),.03,.45)
+rim=material('ChuteRearRim',(.9,.9,.87),0,.45)
 metal=material('ChuteSteel',(.9,.9,.87),0,.45)
 dark=material('ChuteReveal',(.09,.10,.12),.1,.62)
 parts=[]
@@ -69,6 +70,15 @@ box('Receiver front rim',-1.06,1.06,.91,1.62,.16,.24,dark)
 for a,b in [(-1.06,-.98),(.98,1.06)]:box('Receiver side rim',a,b,.91,1.62,-1.41,.16,dark)
 bpy.context.view_layer.objects.active=shell
 mod=shell.modifiers.new('Eased laminate cut edges','BEVEL'); mod.width=.006; mod.segments=2; bpy.ops.object.modifier_apply(modifier=mod.name)
+shell.data.materials.append(rim)
+for face in shell.data.polygons:
+ # The exposed rear edge and its inward returns are white; the outside
+ # housing, front apertures and crown keep their established blue finish.
+ vertices=[shell.data.vertices[i].co for i in face.vertices]
+ rear_face=all(-v.y < -1.48 for v in vertices) and face.center.z < 3.54
+ inward_rim=all(v.z <= 3.54 and abs(v.x) <= 1.47 for v in vertices) and any(-v.y < -1.48 for v in vertices)
+ if rear_face or inward_rim:
+  face.material_index=1
 shell.select_set(True); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.smart_project(island_margin=.015); bpy.ops.object.mode_set(mode='OBJECT'); shell.select_set(False)
 mouth_start=len(parts)
 # Folded throat, open all the way to the receiver. No solid dark cavity cube.
@@ -115,5 +125,5 @@ obs=[o for o in scene.objects if o.type=='MESH']
 for o in obs:o.data.calc_loop_triangles()
 path=ROOT/'public/models/interior-return-chute.glb'
 bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',export_extras=True)
-metrics={'triangles':sum(len(o.data.loop_triangles) for o in obs),'draws':len(obs),'materials':3,'images':2,'image_dimensions':[256,256],'glb_bytes':path.stat().st_size,'source_parts':source_parts}
+metrics={'triangles':sum(len(o.data.loop_triangles) for o in obs),'draws':sum(len(o.data.materials) for o in obs),'materials':4,'images':2,'image_dimensions':[256,256],'glb_bytes':path.stat().st_size,'source_parts':source_parts}
 (ROOT/'tools/models/interior-return-chute-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n'); print(metrics)

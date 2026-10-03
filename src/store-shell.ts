@@ -2526,6 +2526,8 @@ export function buildStore(scene: StoreScene) {
         scene.scene,
         { position: new THREE.Vector3(pumpkinPosition.x, pumpkinPosition.y, pumpkinPosition.z), yaw: pumpkinAnchor.rotY },
         () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); },
+        [...frontPanelsWithPosters, ...frontPanes.flatMap((p,i) =>
+          returnWindowX >= STORE_CENTER_X-p.hi && returnWindowX <= STORE_CENTER_X-p.lo ? [i] : [])],
       );
     }
   }

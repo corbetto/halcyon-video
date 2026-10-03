@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -14,8 +15,8 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
     assert.ok(m.pbrMetallicRoughness.metallicRoughnessTexture);
     const [red, green, blue] = m.pbrMetallicRoughness.baseColorFactor;
     if (m.name === 'ChuteLaminate') assert.ok(blue > red * 3 && blue > green * 3, 'body retains blue laminate');
-    if (m.name === 'ChuteSteel') {
-      assert.ok(Math.min(red, green, blue) > .8, 'only the slot is white');
+    if (m.name === 'ChuteSteel' || m.name === 'ChuteRearRim') {
+      assert.ok(Math.min(red, green, blue) > .8, 'slot and approved rear rim are white');
       assert.equal(m.pbrMetallicRoughness.metallicFactor, 0);
     }
     // Node has no image decoder. Validate texture records above; parse geometry below.
@@ -35,13 +36,24 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
   assert.ok(b.min.distanceTo(new THREE.Vector3(-1.6, 0, -1.49)) < .001);
   assert.ok(b.max.distanceTo(new THREE.Vector3(1.6, 3.85, .340333)) < .001);
   let triangles = 0; const roles = new Set<string>();
+  const approvedPoints = new Set<string>();
   scene.traverse(o => {
     if (!(o instanceof THREE.Mesh)) return;
     roles.add((o.material as THREE.Material).name);
+    const positions=o.geometry.attributes.position;
+    for(let i=0;i<positions.count;i++) {
+      const point=new THREE.Vector3().fromBufferAttribute(positions,i).applyMatrix4(o.matrixWorld);
+      approvedPoints.add(point.toArray().map(n=>n.toFixed(5)).join(','));
+    }
     triangles += o.geometry.index!.count / 3;
     for (const key of ['position', 'normal', 'uv']) assert.ok([...o.geometry.attributes[key].array].every(Number.isFinite));
   });
-  assert.deepEqual([...roles].sort(), ['ChuteLaminate', 'ChuteReveal', 'ChuteSteel']);
+  assert.deepEqual([...roles].sort(), ['ChuteLaminate', 'ChuteRearRim', 'ChuteReveal', 'ChuteSteel']);
+  // Owner pin 246 approved this exact physical shape. Material-only changes
+  // may split primitives, but must retain every authored position and triangle.
+  assert.equal(triangles,3112);
+  assert.equal(createHash('sha256').update([...approvedPoints].sort().join('\n')).digest('hex'),
+    '42c537dcfa2541976e867d1b277775366acbb67eb1ab22bcdbcc34624b221a5c');
   assert.ok(triangles < 3500); assert.ok(bytes.length < 450000);
   const ray = new THREE.Raycaster(new THREE.Vector3(-.9, 2.55, 1.1), new THREE.Vector3(0, 0, -1));
   for (const x of [-.9,.9]) {
@@ -76,6 +88,9 @@ test('outside return ramp descends through the countertop into an enclosed cabin
   const down = new THREE.Raycaster(new THREE.Vector3(5.6,3.9,-1.65),new THREE.Vector3(0,-1,0));
   const hits = down.intersectObject(scene,true);
   assert.ok(hits.length && hits[0].point.y<2.82 && hits[0].point.y>2.2,'ramp outlet reaches below the surrounding worktop');
+  const hood = new THREE.Raycaster(new THREE.Vector3(5.6,4.5,-.6),new THREE.Vector3(0,-1,0));
+  const hoodHits=hood.intersectObject(scene,true);
+  assert.ok(hoodHits.length && hoodHits[0].point.y<3.3,'short sloping hood does not form an oversized box');
   const front = new THREE.Raycaster(new THREE.Vector3(5.6,1,-3),new THREE.Vector3(0,0,1));
   assert.ok(front.intersectObject(scene,true).length,'cabinet below the opening remains enclosed');
 });

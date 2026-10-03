@@ -166,9 +166,8 @@ export function buildWindowBays(
     addGlassReflectionPane(glass, group);
 
     // Outer border frames (per wing): sill on the knee wall, head, and the
-    // two verticals. The vertical on the vestibule side sits just OUTSIDE the
-    // pane run, bridging the small clearance sliver to the vestibule's own
-    // glazed wall so the run terminates cleanly against the entrance.
+    // two verticals. Both posts sit within their pane opening, so the
+    // adjacent masonry cannot bury the entrance-side frame.
     const horizGeo = new THREE.BoxGeometry(wingW, frameThickness, frameDepth);
     const bottomFrame = new THREE.Mesh(horizGeo, frameMat);
     bottomFrame.position.set(wingC, KNEE_H + frameThickness / 2, 0);
@@ -178,15 +177,13 @@ export function buildWindowBays(
     // door jambs. Extending a wing frame downward splits the brick footer.
     const vertSillGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
     const sillVertY = KNEE_H + (height - KNEE_H) / 2;
-    const leftIsVestibule = wing.innerAtLo;
     const leftVert = new THREE.Mesh(vertSillGeo, frameMat);
     leftVert.position.set(
-      leftIsVestibule ? wing.lo - frameThickness / 2 : wing.lo + frameThickness / 2,
+      wing.lo + frameThickness / 2,
       sillVertY, 0);
-    const rightIsVestibule = wing.innerAtHi;
     const rightVert = new THREE.Mesh(vertSillGeo, frameMat);
     rightVert.position.set(
-      rightIsVestibule ? wing.hi + frameThickness / 2 : wing.hi - frameThickness / 2,
+      wing.hi - frameThickness / 2,
       sillVertY, 0);
     [bottomFrame, topFrame, leftVert, rightVert].forEach((f) => {
       f.castShadow = true;

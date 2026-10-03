@@ -25,7 +25,7 @@ export function createNrBayWash(scene: StoreScene) {
       originals.set(material, { compile, key, release });
       material.addEventListener('dispose', release);
       const priorKey = key.call(material);
-      material.customProgramCacheKey = () => priorKey + ':nr-bay-wash-v3:' + layout.length;
+      material.customProgramCacheKey = () => priorKey + ':nr-bay-wash-v4:' + layout.length;
       material.onBeforeCompile = function(shader, renderer) {
         compile.call(this, shader, renderer);
         shader.uniforms.nrWashRuns = { value: layout };
@@ -64,8 +64,8 @@ export function createNrBayWash(scene: StoreScene) {
                 float d2 = max(dot(toLamp,toLamp),.25);
                 vec3 direction = toLamp * inversesqrt(d2);
                 vec3 axis = normalize(vec3(0.0, nrWashHeight-3.5, 1.2));
-                float cone = smoothstep(cos(1.10), cos(.20), dot(direction,axis));
-                energy += boundary * 62.0 / d2 * cone * max(dot(normalLocal,direction),0.0);
+                float cone = smoothstep(cos(1.35), cos(.85), dot(direction,axis));
+                energy += boundary * 50.0 / (d2 + 2.25) * cone * max(dot(normalLocal,direction),0.0);
               }
             }
             return vec3(1.0,.93,.83) * energy;
