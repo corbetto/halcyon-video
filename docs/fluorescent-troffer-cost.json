@@ -1,0 +1,18 @@
+{
+  "triangles": 1352,
+  "draws": 3,
+  "materials": 3,
+  "images": 0,
+  "glb_bytes": 94236,
+  "source_parts": 23,
+  "module_ft": [
+    5,
+    2.5
+  ],
+  "lens_ft": [
+    4.88,
+    0.04,
+    2.38
+  ],
+  "lens_center_y_ft": -0.06
+}

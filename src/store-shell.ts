@@ -1,3 +1,4 @@
+import { installTrofferModels, trofferCeilingGeometry } from './troffer-model.ts';
 import { reelSetting } from './reel-profile';
 import { mobileStoreActive } from './mobile-store';
 import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
@@ -733,7 +734,7 @@ export function buildStore(scene: StoreScene) {
   // troffer lens panels (HDR 1.55) are unambiguously the fixtures. The map is
   // what keeps this dim value from flattening.
 
-  const ceiling = new THREE.Mesh(ceilGeo, ceilMat);
+  const ceiling: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(ceilGeo, ceilMat);
   ceiling.position.set(STORE_CENTER_X, ceilingY, sideWallZ);
   ceiling.rotation.x = Math.PI / 2; // Facing down
   ceiling.receiveShadow = true;
@@ -901,14 +902,6 @@ export function buildStore(scene: StoreScene) {
       const isLight = !overSoffit &&
         (((k % 4 === 0) && (m % 4 === 0)) || ((k % 4 === 2) && (m % 4 === 2)));
       if (isLight) {
-        const frame = new THREE.Mesh(trofferFrameGeo, trofferFrameMat);
-        frame.castShadow = frame.receiveShadow = true;
-        frame.position.set(tx, ceilingY - 0.03, tz);
-        scene.scene.add(frame);
-        gridFallback.push(frame);
-        const panel = new THREE.Mesh(trofferPanelGeo, trofferMat);
-        panel.position.set(tx, ceilingY - 0.06, tz);
-        scene.scene.add(panel);
         scene.troffers.push({ x: tx, z: tz });
       } else if (!overSoffit && (k % 4 === 2) && (m % 4 === 0) && (((k - 2) / 4 + m / 4) % 2 === 0)) {
         // A sparse diagonal of HVAC supply diffusers between the light
@@ -935,6 +928,14 @@ export function buildStore(scene: StoreScene) {
         }
       }
     }
+  }
+
+  if (scene.troffers.length) {
+    ceiling.geometry.dispose();
+    ceiling.geometry = trofferCeilingGeometry(storeWidth, floorCeilLen,
+      scene.troffers.map(t => ({ x: t.x - STORE_CENTER_X, z: t.z - sideWallZ })));
+    installTrofferModels(scene.scene,
+      scene.troffers.map(t => ({ ...t, y: ceilingY })), trofferFrameMat, trofferMat, scene.fixtureContext());
   }
 
   if (panelSpots.length > 0) {
@@ -1281,6 +1282,7 @@ export function buildStore(scene: StoreScene) {
       tileMaterial: soffitMat,
       trofferPanelMaterial: trofferMat,
       trofferFrameMaterial: trofferFrameMat,
+      trofferContext: scene.fixtureContext(),
       tileX: TILE_X,
       tileZ: TILE_Z,
       softwareGL: !liveMirrorsAllowed(scene),

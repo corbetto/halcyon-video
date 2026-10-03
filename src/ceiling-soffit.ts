@@ -1,3 +1,4 @@
+import { addTrofferApertures, installTrofferModels, type TrofferModelContext } from './troffer-model.ts';
 import { counterDatumShift } from './vestibule-layout.ts';
 import { installCeilingGrid } from './ceiling-grid.ts';
 import { polygonGridPlan } from './ceiling-grid-plan.ts';
@@ -312,6 +313,7 @@ export interface FrontSoffitParams {
   tileMaterial: THREE.Material;
   trofferPanelMaterial: THREE.Material;
   trofferFrameMaterial: THREE.Material;
+  trofferContext?: TrofferModelContext;
   /** TILE_X / TILE_Z of the main grid, so the recessed troffers match its module. */
   tileX: number;
   tileZ: number;
@@ -411,6 +413,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
       shape.holes.push(hole);
     }
   }
+  if (!plainWhite) addTrofferApertures(shape, troffers, tileX, tileZ);
   const slab = new THREE.Mesh(new THREE.ShapeGeometry(shape), whiteBodyMat ?? tileMaterial);
   slab.position.y = soffitY;
   slab.rotation.x = Math.PI / 2;
@@ -556,16 +559,8 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     // the pair the reference photos show. Same module as the main grid so they
     // read as the same fixture, just lower, and landing on whole printed tiles
     // rather than straddling a grid line (see soffitTrofferCenters).
-    const panelGeo = new THREE.BoxGeometry(tileX - 0.12, 0.04, tileZ - 0.12);
-    const frameGeo = new THREE.BoxGeometry(tileX, 0.06, tileZ);
-    for (const t of troffers) {
-      const frame = new THREE.Mesh(frameGeo, trofferFrameMaterial);
-      frame.position.set(t.x, soffitY - 0.03, t.z);
-      group.add(frame);
-      const panel = new THREE.Mesh(panelGeo, trofferPanelMaterial);
-      panel.position.set(t.x, soffitY - 0.06, t.z);
-      group.add(panel);
-    }
+    installTrofferModels(group, troffers.map(t => ({ ...t, y: soffitY })),
+      trofferFrameMaterial, trofferPanelMaterial, params.trofferContext, tileX, tileZ);
   }
 
   scene.add(group);
