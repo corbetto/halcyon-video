@@ -65,7 +65,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     // These cached shelf materials belong to video-case, including live artwork refresh.
     const materials = createHeroRentalMaterials(movie);
     const positions = [[-2.7,-1.92],[-1.8,-1.88],[-.4,-1.94],[.48,-1.90],[2.15,-1.91],
-      [-5.92,-6.55],[-5.24,-7.25],[-3.92,-8.5],[-.88,-8.38],[.02,-7.6],[.73,-6.84],[1.37,-6.2]];
+      [-5.25,-6.15],[-4.10,-7.30],[-2.95,-8.45],[-.88,-8.38],[.02,-7.6],[.73,-6.84],[1.37,-6.2]];
     const [x,z] = positions[index];
     const levels = [3,5,2,4,6,3,5,2,4,3,6,2][index];
     const stack = new THREE.InstancedMesh(geometry,materials,levels);

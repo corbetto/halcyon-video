@@ -42,3 +42,57 @@ test('return station opens beside the vestibule and closes the opposite end',()=
     assert.ok(parts.some(p=>p.label.endsWith('front-angle') && Math.abs(p.yaw)>.5));
   }
 });
+
+test('returned tape stacks sit cleanly on worktops and clear counter walls', () => {
+  const CASE_W = 0.44, CASE_L = 0.73;
+  const positions = [
+    [-2.7,-1.92],[-1.8,-1.88],[-.4,-1.94],[.48,-1.90],[2.15,-1.91],
+    [-5.25,-6.15],[-4.10,-7.30],[-2.95,-8.45],[-.88,-8.38],[.02,-7.6],[.73,-6.84],[1.37,-6.2]
+  ];
+  const rots = [-.12,.08,-.035,.17,-.08,.65,.81,.72,-.72,-.88,-.7,-.8];
+
+  for (const width of [40, 48, 64, 80]) {
+    for (const doorW of [3, 3.2, 4]) {
+      const vest = {
+        xL: 3.3,
+        frontZ: 15,
+        sideDoorZ: vestibuleLayout({ doorWidth: doorW, entryStyle: 'vestibule' }).sideDoorZ,
+        doorW,
+        hasChamber: true
+      };
+      const f = exitReturnLayout(width, vest);
+      if (!f) continue;
+      const parts = exitReturnSegments(f);
+      const walls = parts.filter(p => !p.label.includes('worktop'));
+
+      for (let i = 0; i < positions.length; i++) {
+        const [xRel, zRel] = positions[i];
+        const rotY = rots[i];
+        const x = f.cx + xRel * f.w / 15.5;
+        const z = f.cz + f.d / 2 + zRel * f.d / 11.5;
+
+        const c = Math.cos(rotY), s = Math.sin(rotY);
+        const halfW = CASE_W / 2, halfL = CASE_L / 2;
+        const corners = [
+          [-halfW, -halfL],
+          [halfW, -halfL],
+          [halfW, halfL],
+          [-halfW, halfL]
+        ].map(([dx, dz]) => [x + dx * c - dz * s, z + dx * s + dz * c]);
+
+        for (const w of walls) {
+          const wc = Math.cos(w.yaw), ws = Math.sin(w.yaw);
+          for (const [cx, cz] of corners) {
+            const dx = cx - w.cx, dz = cz - w.cz;
+            const u = dx * wc - dz * ws;
+            const v = dx * ws + dz * wc;
+            assert.ok(
+              Math.abs(u) >= w.w / 2 || Math.abs(v) >= w.d / 2,
+              `Stack ${i} should clear ${w.label} at width=${width}, doorW=${doorW}`
+            );
+          }
+        }
+      }
+    }
+  }
+});
