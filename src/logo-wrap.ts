@@ -316,7 +316,7 @@ export function buildDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
 //   below); front placeholder at cx 995.5 centred on y 374, erase region
 //   x 978-1014 × y 205-545 in white, column x≈986-1005 kept clear.
 function drawTemplateWrap(spec: LogoSpec, medium: CaseMedium): HTMLCanvasElement {
-  return medium === 'vhs' ? drawVhsTemplateWrap(spec) : drawDvdTemplateWrap(spec);
+  return medium === 'vhs' ? drawVhsTemplateWrap(spec) : drawDvdBlueTemplateWrap(spec);
 }
 
 // The printed store address block (top of the back AND front faces). The
@@ -581,122 +581,6 @@ function drawVhsTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   return canvas;
 }
 
-// ── DVD template (the 2003 rental wrap's printed-form analog) ────────────────
-function drawDvdTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
-  const W = IMG_W, H = IMG_H.dvd; // 1024×683
-  const stock = STOCK.dvd, ink = INK.dvd;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-  const rand = mulberry32(spec.tornSeed ^ 0x44564420);
-  const brandLine = brandRentalLine(spec);
-
-  // Paper stock + faint fold creases at the crop boundaries.
-  ctx.fillStyle = stock;
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = 'rgba(0,0,0,0.07)';
-  ctx.fillRect(478, 0, 1, H);
-  ctx.fillRect(557, 0, 1, H);
-
-  // Top strip (BACK PANEL ONLY — the spine's form labels start right at the
-  // top, and the front's title column must stay clear white full-height).
-  ctx.fillStyle = ink;
-  ctx.fillRect(16, 14, 446, 1);
-  ctx.fillRect(16, 44, 446, 1);
-  drawFlatBarcode(ctx, rand, 24, 18, 88, 22, ink);
-  const stripText =
-    `© ${spec.mainText.toUpperCase()} ${spec.subText.toUpperCase()}`.trim() + ' · ALL RIGHTS RESERVED';
-  const stripPx = fitArialPx(ctx, stripText, 11, 'normal', 306, 8);
-  ctx.font = `${stripPx}px Arial, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(stripText, (128 + 462) / 2, 29);
-
-  // ── BACK: label window (interior x 48-350; heading ends y≈125, the typist
-  // types the title from y 140; window bottom y 500) ──
-  const win = { x0: 40, y0: 46, x1: 358, y1: 500, headEndY: 125 };
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(win.x0, win.y0, win.x1 - win.x0, win.y1 - win.y0);
-  ctx.lineWidth = 0.75;
-  ctx.strokeRect(win.x0 + 4, win.y0 + 4, win.x1 - win.x0 - 8, win.y1 - win.y0 - 8);
-  const headMax = win.x1 - win.x0 - 24;
-  const hp = fitSpecFontPx(ctx, spec, brandLine, 22, headMax, 11);
-  ctx.font = getLogoFontString(spec, hp);
-  ctx.fillStyle = spec.bodyColor;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(brandLine, (win.x0 + win.x1) / 2, win.headEndY - 6);
-  ctx.fillStyle = ink;
-  ctx.fillRect(win.x0 + 12, win.headEndY + 2, win.x1 - win.x0 - 24, 0.75);
-
-  // Checkout-day chart under the window — its top edge shares the window's
-  // bottom border ("window bottom (checkout-day chart starts) y≈500"); the
-  // caption goes UNDER the grid, clear of the frame.
-  const chart = { x0: 40, y0: 500, x1: 440, y1: 636 };
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = ink;
-  ctx.font = 'bold 13px Arial, sans-serif';
-  ctx.fillText('RETURN BY NOON ON THE DAY MARKED ABOVE', chart.x0, chart.y1 + 10);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 1.25;
-  ctx.strokeRect(chart.x0, chart.y0, chart.x1 - chart.x0, chart.y1 - chart.y0);
-  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  const colW = (chart.x1 - chart.x0) / 7;
-  ctx.font = 'bold 11px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i < 7; i++) {
-    const cx0 = chart.x0 + i * colW;
-    if (i) { ctx.beginPath(); ctx.moveTo(cx0, chart.y0); ctx.lineTo(cx0, chart.y1); ctx.stroke(); }
-    ctx.fillText(days[i], cx0 + colW / 2, chart.y0 + 12);
-  }
-  ctx.beginPath();
-  ctx.moveTo(chart.x0, chart.y0 + 24);
-  ctx.lineTo(chart.x1, chart.y0 + 24);
-  ctx.stroke();
-  // Vertical brand strip right of the window (the store-website strip the
-  // typists' wMax deliberately stops short of, at x≈363).
-  ctx.fillStyle = ink;
-  ctx.fillRect(366, 40, 0.75, 460);
-  const strip = `${spec.mainText} ${spec.subText}`.trim().toUpperCase();
-  const sp = fitSpecFontPx(ctx, spec, strip, 30, 430, 12);
-  vTextUp(ctx, strip, 414, 495, getLogoFontString(spec, sp), spec.bodyColor);
-
-  // ── SPINE: form labels + the big line running nearly the full height
-  // (ends ~y 473, only a ~20px gap before the barcode at y 493 — no typed
-  // spine title on this medium) ──
-  for (const f of SPINE_FIELDS.dvd) {
-    vTextDownEndingAt(ctx, f.text, f.cx, f.endY, '18px Arial, sans-serif', ink);
-  }
-  const bp = fitSpecFontPx(ctx, spec, brandLine, 28, 420, 12);
-  ctx.font = getLogoFontString(spec, bp);
-  const blen = ctx.measureText(brandLine).width;
-  vTextDown(ctx, brandLine, 540, 473 - blen, getLogoFontString(spec, bp), spec.bodyColor);
-  drawSpineBarcode(ctx, rand, 486, 493, 66, 70, ink);
-
-  // ── FRONT: rental banner, horizontal emblem, small brand footer — all kept
-  // left of x≈980 so the typed title column stays white. ──
-  ctx.fillStyle = spec.textColor;
-  ctx.fillRect(586, 46, 394, 66);
-  const bannerText = 'DVD · 1-WEEK RENTAL';
-  const bnp = fitSpecFontPx(ctx, spec, bannerText, 34, 360, 14);
-  ctx.font = getLogoFontString(spec, bnp);
-  ctx.fillStyle = spec.bodyColor;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(bannerText, 783, 80);
-  drawLogo(ctx, spec, { x: 791 - 400 / 2, y: 380 - 420 / 2, w: 400, h: 420, shadow: PRINT_SHADOW });
-  ctx.fillStyle = ink;
-  ctx.font = '13px Arial, sans-serif';
-  ctx.fillText(brandLine, 783, 640);
-
-  drawFrontPlaceholder(ctx, spec, 'dvd');
-  return canvas;
-}
-
 // ── DVD "Blue" template (the VHS "Standard Version" design ported onto the
 // DVD wrap's own fold geometry: 1024×683, folds x 478/558) ──────────────────
 // Same cream stock, full-bleed blue back/front panels, gold-rule frame and
@@ -708,7 +592,7 @@ function drawDvdTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
 // shared with video-case.ts's drawDvdBlueOverlays — keep the two in step.
 // The spine field positions (SPINE_FIELDS.dvd), the spine's big-line/barcode
 // geometry and the front title-placeholder column (cx 995.5, centre y 374)
-// are reused VERBATIM from drawDvdTemplateWrap/drawDvd2003Overlays below —
+// retain the legacy DVD form geometry used by drawDvd2003Overlays —
 // that geometry doesn't depend on how the back/front panels are styled, so
 // there's no reason to re-derive it.
 function drawDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
@@ -814,7 +698,7 @@ function drawDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
 
   // ── SPINE: the printed rental form — same field positions as the plain
   // DVD wrap's own form (SPINE_FIELDS.dvd) and the same big-line/barcode
-  // geometry as drawDvdTemplateWrap below, just set in the VHS wrap's ink
+  // geometry as the legacy DVD form, just set in the VHS wrap's ink
   // instead of the brand-blue body color. ──
   for (const f of SPINE_FIELDS.dvd) {
     vTextDownEndingAt(ctx, f.text, f.cx, f.endY, '18px Arial, sans-serif', ink);

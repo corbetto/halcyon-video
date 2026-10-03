@@ -302,8 +302,10 @@ export const COVER_VARIANTS: Record<CaseMedium, CoverVariant[]> = {
   ],
   dvd: [
     {
+      // Existing saved 'standard' picks use the same VHS-style print as
+      // 'blue', with DVD folds and disc-care copy rather than a weekday chart.
       id: 'standard', get label() { return customWrapLabel(wrapLogoSpec(), 'custom'); },
-      url: 'procedural://logo-wrap/custom',
+      url: 'procedural://logo-wrap/custom-blue', layout: DVD_BLUE_WRAP_LAYOUT,
       procedural: (m) => buildCustomTemplateWrap(wrapLogoSpec(), m),
     },
     {
