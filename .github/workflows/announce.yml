@@ -73,6 +73,10 @@ jobs:
             --to "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
             --changelog --release --out release-notes-body.md
+          # Prefer reviewed release prose when this tag carries it.
+          if [ -f "docs/releases/${{ github.ref_name }}.md" ]; then
+            cp "docs/releases/${{ github.ref_name }}.md" release-notes-body.md
+          fi
 
       # Standing brand rule this repo's docs point at: a published screenshot
       # must come from a clone with no public/user-assets/ drop-ins. A fresh
