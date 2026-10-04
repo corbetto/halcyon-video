@@ -9,6 +9,7 @@ import { getActiveTheme } from '../themes';
 import { getActiveLogoSpec } from '../logo-spec';
 import { drawLogo } from '../logo-renderer';
 import { flatSignal } from './flat-lifecycle';
+import { flatInputTarget } from './flat-input';
 import { resolveEpisodePlaybackArgs } from './flat-playback';
 import { openDemoPlaybackOverlay } from '../demo-playback';
 
@@ -317,6 +318,7 @@ export function openDetailsOverlay(
     const activeEl = items[focusedIndex];
     if (activeEl) {
       activeEl.classList.add('is-focused');
+      activeEl.focus({ preventScroll: true });
       // Scroll focused episode into view if it's inside the scrollable list
       if (focusedIndex >= 2) {
         activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -333,6 +335,7 @@ export function openDetailsOverlay(
       overlayEl.remove();
       // Return focus to originating case
       originatingCase.classList.add('is-focused');
+      originatingCase.focus({ preventScroll: true });
       // Center the case again
       const rowContainer = originatingCase.closest('.flat-row-scroll-container') as HTMLElement;
       if (rowContainer) {
@@ -360,6 +363,7 @@ export function openDetailsOverlay(
   };
 
   const handleKeydown = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || !flatInputTarget()) return;
     if (e.key === 'ArrowLeft') {
       if (focusedIndex === 1) {
         setOverlayFocus(0);

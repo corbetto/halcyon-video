@@ -1,9 +1,11 @@
 import { JellyfinLibrary, Movie } from '../jellyfin';
 import { createCase } from './flat-case';
 import { openDetailsOverlay } from './flat-detail';
+import { flatInputTarget } from './flat-input';
 
 let originatingFocusElement: HTMLElement | null = null;
 let currentSearchOverlay: HTMLElement | null = null;
+let onSearchClosed: (() => void) | undefined;
 let searchDebounceTimer: number | null = null;
 
 // Whether the last setSearchFocus() call originated from keyboard navigation rather than mouse
@@ -48,13 +50,15 @@ export function openFlatSearchOverlay(
   libraries: JellyfinLibrary[],
   currentLibraryId: string | null,
   mount: HTMLElement,
-  initialQuery?: string
+  initialQuery?: string,
+  onClose?: () => void
 ): void {
   // Prevent duplicate overlays
   if (currentSearchOverlay) return;
+  onSearchClosed = onClose;
 
   // Remember what was focused before opening search
-  originatingFocusElement = document.querySelector('.case.is-focused, .flat-library-card.is-focused') as HTMLElement;
+  originatingFocusElement = document.querySelector('.case.is-focused, .flat-library-card.is-focused, .flat-menu-btn.is-focused, .flat-back-btn.is-focused') as HTMLElement;
   if (originatingFocusElement) {
     originatingFocusElement.classList.remove('is-focused');
   }
@@ -103,6 +107,7 @@ export function openFlatSearchOverlay(
 
   // Setup keydown listener for general navigation inside search
   const handleOverlayKeydown = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || !flatInputTarget() || document.querySelector('.flat-detail-overlay')) return;
     const focused = document.activeElement as HTMLElement;
     const isInputFocused = focused === searchInput;
 
@@ -268,6 +273,8 @@ export function closeFlatSearchOverlay(): void {
 
   const overlay = currentSearchOverlay;
   currentSearchOverlay = null;
+  onSearchClosed?.();
+  onSearchClosed = undefined;
 
   if (searchDebounceTimer !== null) {
     window.clearTimeout(searchDebounceTimer);

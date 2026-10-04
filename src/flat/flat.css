@@ -1752,6 +1752,25 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 700px) {
+  /* Keep both navigation controls on screen. Native focus must not scroll
+     an oversized header sideways and take the catalog out of the viewport. */
+  .flat-header {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .flat-title {
+    min-width: 0;
+    white-space: normal;
+    font-size: 1.25rem;
+    letter-spacing: 1px;
+  }
+
+  .flat-total-access-tag { display: none; }
+  .flat-header .flat-menu-btn { width: 100%; justify-content: center; }
+
   .flat-detail-container.bb-box-back {
     position: relative;
     width: 94%;

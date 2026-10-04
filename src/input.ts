@@ -4,6 +4,7 @@ import { gamepadEverConnected } from './gamepad-tracker';
 import { notifyUserActivity } from './video-case';
 import { markUserActivity } from './user-activity';
 import { keyboardOwnedByControl } from './text-entry-focus';
+import { dispatchFlatInput, flatInputTarget } from './flat/flat-input';
 
 export interface InputCallbacks {
   onLeft: () => void;
@@ -186,21 +187,21 @@ export class InputManager {
       InputManager.HOLD_SELECT_MS,
       () => !!(this.callbacks.onHoldSelect && this.callbacks.isHoldSelectArmed?.()),
       () => this.callbacks.onHoldSelect?.(),
-      () => this.callbacks.onEnter(),
+      () => { if (!dispatchFlatInput('Enter')) this.callbacks.onEnter(); },
       (p) => this.callbacks.onHoldSelectProgress?.(p),
     );
     this.holdDown = new HoldGesture(
       InputManager.HOLD_DOWN_MS,
       () => !!(this.callbacks.onHoldDown && this.callbacks.isHoldDownArmed?.()),
       () => this.callbacks.onHoldDown?.(),
-      () => this.callbacks.onDown(),
+      () => { if (!dispatchFlatInput('ArrowDown')) this.callbacks.onDown(); },
       (p) => this.callbacks.onHoldDownProgress?.(p),
     );
     this.holdBack = new HoldGesture(
       InputManager.HOLD_BACK_MS,
       () => !!(this.callbacks.onHoldBack && this.callbacks.isHoldBackArmed?.()),
       () => this.callbacks.onHoldBack?.(),
-      () => this.callbacks.onBack(),
+      () => { if (!dispatchFlatInput('Escape')) this.callbacks.onBack(); },
       (p) => this.callbacks.onHoldBackProgress?.(p),
     );
     this.removeGameListener = onExternalGameChange((active) => {
@@ -227,10 +228,9 @@ export class InputManager {
       if (isExternalGameActive()) return;
       this.handleActivity();
 
-      // Ignore HTPC shortcuts if user is focused on form inputs
-      if (document.querySelector(".flat-detail-overlay") || document.querySelector(".flat-search-overlay")) {
-        return;
-      }
+      // Flat surfaces consume the original keyboard event once. Controller
+      // navigation dispatches the same event below; do not feed it back here.
+      if (flatInputTarget() && e.key !== '/') return;
 
       // A VISIBLE field owns the keyboard; a focused field whose overlay is
       // already down is stranded and gets blurred so this very key lands in
@@ -557,10 +557,10 @@ export class InputManager {
 
       // Trigger callback (down goes through its hold gesture, which passes
       // straight to onDown unless a dismiss hold is armed)
-      if (newDir === 'up') this.callbacks.onUp();
+      if (newDir === 'up') { if (!dispatchFlatInput('ArrowUp')) this.callbacks.onUp(); }
       else if (newDir === 'down') this.holdDown.press();
-      else if (newDir === 'left') this.callbacks.onLeft();
-      else if (newDir === 'right') this.callbacks.onRight();
+      else if (newDir === 'left') { if (!dispatchFlatInput('ArrowLeft')) this.callbacks.onLeft(); }
+      else if (newDir === 'right') { if (!dispatchFlatInput('ArrowRight')) this.callbacks.onRight(); }
       hasActivity = true;
     } else if (anyHeld) {
       // No new presses, check if our current repeat direction is still held
@@ -575,10 +575,10 @@ export class InputManager {
         if (elapsed >= this.REPEAT_DELAY) {
           const sinceLastTrigger = now - this.repeatLastTriggerTime;
           if (sinceLastTrigger >= this.REPEAT_INTERVAL) {
-            if (this.repeatDirection === 'up') this.callbacks.onUp();
+            if (this.repeatDirection === 'up') { if (!dispatchFlatInput('ArrowUp')) this.callbacks.onUp(); }
             else if (this.repeatDirection === 'down') this.holdDown.repeat();
-            else if (this.repeatDirection === 'left') this.callbacks.onLeft();
-            else if (this.repeatDirection === 'right') this.callbacks.onRight();
+            else if (this.repeatDirection === 'left') { if (!dispatchFlatInput('ArrowLeft')) this.callbacks.onLeft(); }
+            else if (this.repeatDirection === 'right') { if (!dispatchFlatInput('ArrowRight')) this.callbacks.onRight(); }
             hasActivity = true;
             this.repeatLastTriggerTime = now;
           }

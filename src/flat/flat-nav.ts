@@ -2,6 +2,7 @@ import { openDetailsOverlay } from './flat-detail';
 import { Movie } from '../jellyfin';
 import { isFlatSearchOverlayOpen } from './flat-search';
 import { flatSignal } from './flat-lifecycle';
+import { flatInputTarget } from './flat-input';
 
 let isNavigatingWithKeyboard = false;
 
@@ -151,6 +152,7 @@ function navigateSpatialGrid(
 export function initFlatNavigation() {
   // 1. Keyboard navigation listener
   window.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || !flatInputTarget() || e.ctrlKey || e.metaKey || e.altKey) return;
     // If details overlay is open, do nothing
     if (document.querySelector('.flat-detail-overlay')) {
       return;
@@ -163,6 +165,12 @@ export function initFlatNavigation() {
     // Also if settings drawer is open, don't run regular nav
     if (document.getElementById('settings-drawer-overlay')?.classList.contains('visible')) {
       return;
+    }
+
+    // At a navigation boundary the surface still owns the arrow: do not
+    // let the browser scroll the page just because there is no next item.
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'Escape', 'Backspace'].includes(e.key)) {
+      e.preventDefault();
     }
 
     // Any keydown reaching this point is keyboard-driven navigation; setFocus/scrollToFocused
@@ -179,12 +187,12 @@ export function initFlatNavigation() {
       if (e.key === 'ArrowDown') {
         idx = idx === -1 ? 0 : (idx + 1) % items.length;
         items.forEach((item, i) => item.classList.toggle('is-focused', i === idx));
-        items[idx].focus();
+        items[idx].focus({ preventScroll: true });
         e.preventDefault();
       } else if (e.key === 'ArrowUp') {
         idx = idx === -1 ? items.length - 1 : (idx - 1 + items.length) % items.length;
         items.forEach((item, i) => item.classList.toggle('is-focused', i === idx));
-        items[idx].focus();
+        items[idx].focus({ preventScroll: true });
         e.preventDefault();
       } else if (e.key === 'Enter' || e.key === ' ') {
         const target = activeItem || items[0];
@@ -214,7 +222,11 @@ export function initFlatNavigation() {
       const headerBtns = Array.from(document.querySelectorAll('.flat-header .flat-menu-btn')) as HTMLElement[];
       const btnIdx = headerBtns.indexOf(focusedMenu);
 
-      if (e.key === 'ArrowRight') {
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.key.toLowerCase() === 'q') {
+        const menuBtn = document.getElementById('btn-flat-menu');
+        if (menuBtn) setButtonFocus(menuBtn);
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
         if (btnIdx >= 0 && btnIdx < headerBtns.length - 1) {
           setButtonFocus(headerBtns[btnIdx + 1]);
           e.preventDefault();
@@ -312,7 +324,7 @@ export function initFlatNavigation() {
         return;
       }
 
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' || e.key === ' ') {
         focusedCard.click();
         e.preventDefault();
         return;
@@ -449,7 +461,7 @@ export function initFlatNavigation() {
         }
       }
       e.preventDefault();
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' || e.key === ' ') {
       const movie = (focused as any).movie as Movie;
       const mount = focused.closest('.flat-store-root') as HTMLElement;
       if (movie && mount) {
@@ -462,6 +474,7 @@ export function initFlatNavigation() {
 
   // 2. Mouse hover focus listener (via event delegation)
   window.addEventListener('mouseover', (e) => {
+    if (!flatInputTarget()) return;
     if (document.querySelector('.flat-detail-overlay')) {
       return;
     }

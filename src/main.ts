@@ -113,6 +113,7 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { waitForStartupModel } from './startup-reveal';
 import { InputManager, type InputCallbacks } from './input';
+import { configureFlatInput, flatInputTarget } from './flat/flat-input';
 import { syncTouchAction, installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
 import { isStreamingChoiceActive, cancelStreamingServiceChoice, setStreamingStockResolver } from './streaming-checkout';
 setStreamingStockResolver(getStreamingMovies);
@@ -1647,7 +1648,7 @@ function openSettingsDrawer(page: SettingGroup | 'Controls' | null = null, fromT
   if (ui.isPowerMenuOpen) closePowerMenu();
 
   if (getSetting<string>('bb_render_mode') === 'flat') {
-    elementBeforeSettingsOpened = document.querySelector('.case.is-focused, .flat-library-card.is-focused') as HTMLElement;
+    elementBeforeSettingsOpened = document.querySelector('.case.is-focused, .flat-library-card.is-focused, .flat-menu-btn.is-focused, .flat-back-btn.is-focused') as HTMLElement;
     if (elementBeforeSettingsOpened) {
       elementBeforeSettingsOpened.classList.remove('is-focused');
     }
@@ -2210,7 +2211,7 @@ async function openSearch() {
     const mount = document.getElementById('canvas-container') as HTMLElement;
     const activeContent = document.querySelector('.flat-content') as HTMLElement;
     const activeLibraryId = activeContent?.dataset.activeLibraryId || null;
-    openFlatSearchOverlay(storeLibraries, activeLibraryId, mount);
+    openFlatSearchOverlay(storeLibraries, activeLibraryId, mount, undefined, () => { ui.isSearchOpen = false; });
     logToConsole('[Search] Flat search overlay opened.', 'system');
     return;
   }
@@ -2244,7 +2245,7 @@ async function openSearchWithQuery(initialQuery: string) {
   const mount = document.getElementById('canvas-container') as HTMLElement;
   const activeContent = document.querySelector('.flat-content') as HTMLElement;
   const activeLibraryId = activeContent?.dataset.activeLibraryId || null;
-  openFlatSearchOverlay(storeLibraries, activeLibraryId, mount, initialQuery);
+  openFlatSearchOverlay(storeLibraries, activeLibraryId, mount, initialQuery, () => { ui.isSearchOpen = false; });
   logToConsole('[Search] Flat search overlay opened with query: ' + initialQuery, 'system');
 }
 
@@ -3781,7 +3782,7 @@ async function main() {
   
   // Register global keydown listener for typing letters to open search overlay in 2.5D
   window.addEventListener('keydown', (e) => {
-    if (getSetting<string>('bb_render_mode') !== 'flat') return;
+    if (!flatInputTarget() || e.defaultPrevented || e.key === ' ' || e.key === '/' || e.key.toLowerCase() === 'q') return;
     if (ui.isSearchOpen || ui.isSettingsDrawerOpen || ui.isLoginOpen || document.querySelector('.flat-detail-overlay') || videoPlayer?.isOpen) {
       return;
     }
@@ -3839,6 +3840,10 @@ async function main() {
   // Input callback hooks mapping HTPC inputs.
   // Stored as a named object so the virtual remote can call them directly
   // instead of relying on fragile synthetic KeyboardEvent dispatch.
+  configureFlatInput(() => !!videoPlayer?.isOpen || ui.isPlaybackActive
+    || ui.isPowerMenuOpen || ui.isSettingsDrawerOpen || ui.isLoginOpen || ui.isExitConfirmOpen
+    || ui.isVersionPickerOpen || ui.isCandyCheckoutOpen || ui.isFeedbackOpen
+    || ui.isCounterTerminalOpen || ui.isSetupOpen || ui.isEmblemStudioOpen || isMembershipPickerOpen());
   const inputCallbacks: InputCallbacks = {
     onLeft: () => {
       if (storeScene?.isWalkAroundMode) return;
@@ -4166,6 +4171,10 @@ async function main() {
       // login and setup typing sessions, playback, and the scene-driven jump
       // index. Testing the individual flags here is what let / open a second
       // live overlay over the settings drawer and the manager terminal.
+      if (flatInputTarget()) {
+        if (!document.querySelector('.flat-detail-overlay')) void openSearch();
+        return;
+      }
       if (!shortcutsAllowed()) return;
       openSearch();
     },

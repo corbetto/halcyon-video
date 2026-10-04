@@ -8,7 +8,7 @@ import { getActiveTheme, applyThemeCssVars } from '../themes';
 import { getActiveLogoSpec } from '../logo-spec';
 import { drawLogo } from '../logo-renderer';
 import { buildLibraryRows } from './flat-rows';
-import { initFlatNavigation, setLibraryFocus, setButtonFocus } from './flat-nav';
+import { initFlatNavigation, setLibraryFocus, setButtonFocus, setFocus } from './flat-nav';
 import { beginFlatSession, endFlatSession, flatSignal } from './flat-lifecycle';
 import { brandString } from '../brand-pack';
 
@@ -215,7 +215,7 @@ export function bootFlatStore(
       if (firstItem) {
         const items = Array.from(dropdown.querySelectorAll('.flat-menu-item')) as HTMLElement[];
         items.forEach((item, i) => item.classList.toggle('is-focused', i === 0));
-        firstItem.focus();
+        firstItem.focus({ preventScroll: true });
       }
     }
   };
@@ -232,7 +232,7 @@ export function bootFlatStore(
     if (item) {
       const items = Array.from(dropdown.querySelectorAll('.flat-menu-item')) as HTMLElement[];
       items.forEach(el => el.classList.toggle('is-focused', el === item));
-      item.focus();
+      item.focus({ preventScroll: true });
     }
   });
 
@@ -244,6 +244,7 @@ export function bootFlatStore(
     const action = item.dataset.action;
     dropdown.classList.remove('visible');
     menuBtn.setAttribute('aria-expanded', 'false');
+    setButtonFocus(menuBtn);
 
     if (action === 'mode-3d') {
       // In-process swap back to the 3D store — no page reload, no Jellyfin
@@ -278,7 +279,9 @@ export function bootFlatStore(
   gridTitle.textContent = 'Select a Library';
   content.appendChild(gridTitle);
 
+  mount.appendChild(content);
   if (libraries.length === 0) {
+    setButtonFocus(menuBtn);
     const emptyGrid = document.createElement('div');
     emptyGrid.className = 'flat-library-empty-state';
     emptyGrid.innerHTML = `
@@ -322,12 +325,6 @@ export function bootFlatStore(
       };
 
       card.addEventListener('click', selectLib);
-      card.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          selectLib();
-          e.preventDefault();
-        }
-      });
     });
 
     content.appendChild(grid);
@@ -344,8 +341,6 @@ export function bootFlatStore(
       setLibraryFocus(cardToFocus);
     }
   }
-
-  mount.appendChild(content);
 
   // Initialize navigation key/mouse handlers once
   if (!isNavInitialized) {
@@ -421,6 +416,6 @@ function loadLibrary(
     backBtn.classList.add('is-focused');
     backBtn.focus();
   } else {
-    // Keep focus unset on load; spatial keyboard navigation will automatically focus the first case on the first arrow keypress.
+    setFocus(firstCase);
   }
 }
