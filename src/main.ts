@@ -166,7 +166,7 @@ import { startScreensaverAnimation, stopScreensaverAnimation } from './screensav
 import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-library';
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
 import { titleMatchKeys } from './staff-picks';
-import { initDemoPlayback, openDemoPlaybackOverlay, revealDemoPlaybackOverlay, closeDemoPlaybackOverlay } from './demo-playback';
+import { initDemoPlayback, openDemoPlaybackOverlay, revealDemoPlaybackOverlay, closeDemoPlaybackOverlay, isDemoPlaybackOpen } from './demo-playback';
 import { installAttractMode, isAttractActive } from './attract-mode';
 import {
   episodeLabel,
@@ -2702,7 +2702,9 @@ async function initializeStoreScene(preservePosterCache = false) {
     // thing the couch changes is where playback lets you out, which is back
     // into the room rather than the store entrance (see finishPlayback).
     scene.onBackRoomPlay = (movie) => {
-      void launchVideoPlayback(movie, undefined, undefined, false, true).then(() => {
+      void launchVideoPlayback(movie, undefined, undefined, false, true).catch(() => {
+        logToConsole(`[System] Couldn't start "${movie.title}". Please try again.`, 'system');
+      }).finally(() => {
         // The launch is asynchronous, and an expiring session tears the scene
         // down mid-flight (expireSession) — this closure still holds the dead
         // one, so touching the room here would poke a room that no longer
@@ -3100,10 +3102,10 @@ function handleGapDismiss() {
  * (EmulatorJS), or shows the demo explanatory card when no game server is configured.
  * Plays checkout chime when rental goes through. Never throws.
  */
-async function handleGameLaunch(movie: Movie, startHidden = false) {
+async function handleGameLaunch(movie: Movie, startHidden = false, fromCouch = false) {
   if (movie.steamAppId) { await playSteamGame(movie, (message) => logToConsole(`[Steam] ${message}`, 'system')); return; }
   if (isDemoMode) {
-    openDemoPlaybackOverlay(movie.title, startHidden, 'game');
+    openDemoPlaybackOverlay(movie.title, startHidden, 'game', fromCouch);
     return;
   }
   logToConsole(`[System] Renting "${movie.title}" (${movie.platform || 'game'})...`, 'system');
@@ -3117,7 +3119,7 @@ async function handleGameLaunch(movie: Movie, startHidden = false) {
   } else if (result === 'browser') {
     retailAudio.playCheckoutChime();
     logToConsole(`[System] "${movie.title}" is ready (no game server configured).`, 'system');
-    openDemoPlaybackOverlay(movie.title, startHidden, 'game');
+    openDemoPlaybackOverlay(movie.title, startHidden, 'game', fromCouch);
   } else {
     logToConsole(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`, 'system');
   }
@@ -3279,6 +3281,12 @@ function finishPlayback(movie: Movie, fromCouch: boolean): void {
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
   if (storeScene?.reelMode) { showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
+  // Every entry point, including home rentals and the flat catalog, must
+  // dispatch games before any media-server lookup or movie player is opened.
+  if (movie.game || movie.steamAppId) {
+    await handleGameLaunch(movie, startHidden, fromCouch);
+    return;
+  }
   if (movie.streaming) {
     handleStreamingLaunch(movie);
     return;
@@ -3704,7 +3712,7 @@ function revealVideoPlayback() {
   }
   // Demo launches never open the real player — reveal the disabled card the
   // same way the real path reveals the hidden player.
-  if (isDemoMode && ui.isPlaybackActive && !videoPlayer?.isOpen) {
+  if (isDemoPlaybackOpen()) {
     revealDemoPlaybackOverlay();
     return;
   }
@@ -3847,7 +3855,7 @@ async function main() {
   const inputCallbacks: InputCallbacks = {
     onLeft: () => {
       if (storeScene?.isWalkAroundMode) return;
-      if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
+      if (isDemoPlaybackOpen()) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateHorizontal(-1); return; }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { void setupTerminalInput('left'); return; }
@@ -3874,7 +3882,7 @@ async function main() {
     },
     onRight: () => {
       if (storeScene?.isWalkAroundMode) return;
-      if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
+      if (isDemoPlaybackOpen()) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateHorizontal(1); return; }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { void setupTerminalInput('right'); return; }
@@ -3902,7 +3910,7 @@ async function main() {
     },
     onUp: () => {
       if (storeScene?.isWalkAroundMode) return;
-      if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
+      if (isDemoPlaybackOpen()) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateVertical(-1); return; }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { void setupTerminalInput('up'); return; }
@@ -3931,7 +3939,7 @@ async function main() {
     },
     onDown: () => {
       if (storeScene?.isWalkAroundMode) return;
-      if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
+      if (isDemoPlaybackOpen()) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateVertical(1); return; }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { void setupTerminalInput('down'); return; }
@@ -4054,7 +4062,7 @@ async function main() {
         return;
       }
       // Demo PLAYBACK DISABLED card: Back is the "stop watching" path.
-      if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
+      if (isDemoPlaybackOpen()) { closeDemoPlaybackOverlay(); return; }
       if (videoPlayer?.isOpen) { if (!videoPlayer.handleBack()) videoPlayer.requestClose(); return; }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { void setupTerminalInput('back'); return; }
@@ -4120,7 +4128,7 @@ async function main() {
     onPower: () => {
       if (storeScene?.isWalkAroundMode) return;
       // Same hard-stop the power key gives the real player.
-      if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
+      if (isDemoPlaybackOpen()) { closeDemoPlaybackOverlay(); return; }
       if (videoPlayer?.isOpen) { videoPlayer.close(); return; }
       if (ui.isLoginOpen) return;
       // No power menu over NEW STORE SETUP — there's no store behind it yet.

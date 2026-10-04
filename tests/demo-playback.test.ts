@@ -66,3 +66,78 @@ test('openDemoPlaybackOverlay and closeDemoPlaybackOverlay manage deps lifecycle
   assert.equal(closedCount, 1);
   assert.ok(logs.some((l) => l.message.includes('Demo game rental screen dismissed')));
 });
+
+function playbackFixture() {
+  const events: string[] = [];
+  const scene = {
+    pauseAmbientTvs() { events.push('pauseAmbient'); },
+    pauseRendering() { events.push('pauseRendering'); },
+    resumeRendering() { events.push('resumeRendering'); },
+    resumeAmbientTvs() { events.push('resumeAmbient'); },
+    returnToEntrance() { events.push('entrance'); },
+    endBackRoomWatching() { events.push('couch'); },
+  };
+  const ui = { isPlaybackActive: false };
+  initDemoPlayback({ ui, scene: () => scene, log() {}, onClosed() { events.push('closed'); } });
+  return { events, ui, scene };
+}
+
+test('a game opened at home returns to the couch and closes only once', () => {
+  const { events, ui } = playbackFixture();
+  openDemoPlaybackOverlay('Rental Quest', false, 'game', true);
+  assert.equal(ui.isPlaybackActive, true);
+  closeDemoPlaybackOverlay();
+  closeDemoPlaybackOverlay();
+  assert.equal(ui.isPlaybackActive, false);
+  assert.deepEqual(events, ['pauseAmbient', 'pauseRendering', 'resumeRendering', 'couch', 'closed']);
+  assert.ok(renderDemoOverlayHtml('game', true).includes('BACK TO THE COUCH'));
+});
+
+test('a normal demo launch still returns to the entrance', () => {
+  const { events } = playbackFixture();
+  openDemoPlaybackOverlay('Rental Quest', false, 'game');
+  closeDemoPlaybackOverlay();
+  assert.deepEqual(events, ['pauseAmbient', 'pauseRendering', 'resumeRendering', 'resumeAmbient', 'entrance', 'closed']);
+});
+
+test('closing a stale game overlay never navigates a replacement scene', () => {
+  const { scene } = playbackFixture();
+  let current = scene;
+  const events: string[] = [];
+  initDemoPlayback({ui:{isPlaybackActive:false}, scene:()=>current, log() {}, onClosed() {}});
+  openDemoPlaybackOverlay('Rental Quest', false, 'game', true);
+  current = {...scene, endBackRoomWatching() { events.push('couch'); }, returnToEntrance() {events.push('entrance');}};
+  closeDemoPlaybackOverlay();
+  assert.deepEqual(events, []);
+});
+
+test('reusing the overlay updates movie/game copy and the return destination', () => {
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const elements = new Map<string, any>();
+  Object.defineProperty(globalThis, 'document', {configurable:true, value:{
+    getElementById(id: string) { return elements.get(id) ?? null; },
+    createElement() { return {id:'', dataset:{}, innerHTML:'', style:{}, addEventListener() {}}; },
+    body:{appendChild(el: any) {elements.set(el.id, el);}},
+  }});
+  try {
+    playbackFixture();
+    openDemoPlaybackOverlay('Movie', false, 'video');
+    assert.ok(elements.get('demo-playback-overlay').innerHTML.includes('NO MEDIA SERVER'));
+    closeDemoPlaybackOverlay();
+    openDemoPlaybackOverlay('Game', false, 'game', true);
+    const game = elements.get('demo-playback-overlay').innerHTML;
+    assert.ok(game.includes('NO GAME SERVER'));
+    assert.ok(game.includes('BACK TO THE COUCH'));
+    assert.ok(!game.includes('NO MEDIA SERVER'));
+    closeDemoPlaybackOverlay();
+    openDemoPlaybackOverlay('Movie again', false, 'video');
+    const movie = elements.get('demo-playback-overlay').innerHTML;
+    assert.ok(movie.includes('NO MEDIA SERVER'));
+    assert.ok(movie.includes('BACK TO THE STORE'));
+    assert.ok(!movie.includes('BACK TO THE COUCH'));
+    closeDemoPlaybackOverlay();
+  } finally {
+    if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+    else Reflect.deleteProperty(globalThis, 'document');
+  }
+});
