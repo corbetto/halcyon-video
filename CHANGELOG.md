@@ -5,6 +5,60 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.23.0] — 2026-10-03
+
+### General
+- Route rented games through their launchers and preserve home returns
+- Restore controller navigation in the flat catalog
+- Retain material programs when reflection textures are unchanged
+- Limit case sticker readback to the changed pixels
+- Coalesce identical shelf clasp edge draws
+- Use recorded VHS clamshell and DVD keepcase Foley for case flips and handling
+- Fix: remove unused fast return slot and add white backsplash
+- Use VHS-style store-copy artwork for standard DVD wraps
+- Match the quick drop and white window worktop to the reference
+- Match the cooler stripes to the owner reference
+- Resolve October entrance and merchandising feedback
+- Avoid invisible procedural texture stamps during store entry
+- Render hanging pouches on the public candy rack and gondola
+- Author reusable hanging snack pouch and support kit
+- Fill game gondolas with identity-preserving display copies (Closes [#371](https://github.com/halcyon-video/halcyon-video/issues/371))
+- Model shared folded candy cartons for rack stock and bag drops (Closes [#194](https://github.com/halcyon-video/halcyon-video/issues/194))
+- Keep reel capture active through navigation and checkout (Closes [#368](https://github.com/halcyon-video/halcyon-video/issues/368))
+- Model recessed fluorescent troffer housings (Closes [#226](https://github.com/halcyon-video/halcyon-video/issues/226))
+- Restore pronounced return chute crown profile (Closes [#372](https://github.com/halcyon-video/halcyon-video/issues/372))
+- Fix store exit door swing direction into vestibule (#369)
+- Fix returned tape stack placement to clear counter walls (#370)
+- Fix(placement): resolve demo placement livelock and runaway render requests (#155)
+- Perf: prioritize idle preparation of the first inspected case
+- Perf: prepare instanced factory case variants during idle
+- Add private reel provenance and review-pack gates
+- Add fixture launch readiness and privacy-safe metrics proof
+- Perf: reuse prepared shelf shaders for inspected cases
+- Connect optional showcase, store and self-host journeys
+- Add fail-closed showcase artifact and rollback foundation
+- Fix: pause reflection program preparation when input resumes
+- Build fixture-tested mobile catalog browsing
+- Declare standalone showcase Node types
+- Build a guarded fixture catalog publisher
+- Keep local phone stores empty until services are chosen
+- Defer ceiling TV detail until the store is usable
+- Choose individual overhead TV programs from the store terminal
+- Add controller-driven reel recording and smooth flight
+- Tidy diffuser provenance formatting
+- Model ceiling ventilation diffusers (Closes [#227](https://github.com/halcyon-video/halcyon-video/issues/227))
+- Stage room textures and release rejected fixture models
+- Restore streaming-only stores on desktop reload
+- Present Halcyon as a browser video store (Closes [#365](https://github.com/halcyon-video/halcyon-video/issues/365))
+- Restore shelf exteriors and rake only lower internal backings
+- Allow HTTP scheme in Steam companion approval and load local operator env
+- Flare lower display shelves and increase cover lean
+- Prepare background graphics without interrupting navigation (Closes [#363](https://github.com/halcyon-video/halcyon-video/issues/363), [#364](https://github.com/halcyon-video/halcyon-video/issues/364))
+- Move triple ceiling TVs to the side of the sales floor
+- Document sustained rewind decoder reset investigation (Closes #360) (Closes [#360](https://github.com/halcyon-video/halcyon-video/issues/360))
+- Clear attract mode tour paths around retail queue fixtures
+- Restore desktop cubemap reflections before the idle tour
+
 ## [v0.22.0] — 2026-09-22
 
 ### CHANGELOG
