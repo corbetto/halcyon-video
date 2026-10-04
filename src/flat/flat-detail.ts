@@ -1,7 +1,6 @@
 import type { Movie, Episode } from '../jellyfin';
 import { activeProvider, providerForKind, sessionOf } from '../providers/active-provider';
 import { connectionForTitle } from '../media-sources';
-import { launchGame } from '../romm';
 import { retailAudio } from '../audio';
 import { requestMovie, isDiscoveryRequested } from '../jellyseerr';
 import type { StoreTheme } from '../themes';
@@ -11,7 +10,6 @@ import { drawLogo } from '../logo-renderer';
 import { flatSignal } from './flat-lifecycle';
 import { flatInputTarget } from './flat-input';
 import { resolveEpisodePlaybackArgs } from './flat-playback';
-import { openDemoPlaybackOverlay } from '../demo-playback';
 
 let launchVideoPlaybackFn: ((movie: Movie, overrideItemId?: string, overridePath?: string) => Promise<void>) | null = null;
 
@@ -428,26 +426,11 @@ export function openDetailsOverlay(
       }
       return;
     }
-    if (movie.game) {
-      logSystemMessage(`[System] Renting "${movie.title}" (${movie.platform || 'game'})...`);
-      const result = await launchGame(movie);
-      if (result === 'launched') {
-        retailAudio.playCheckoutChime();
-        logSystemMessage(`[System] Launching "${movie.title}" in the emulator...`);
-        closeOverlay();
-      } else if (result === 'webplayer') {
-        retailAudio.playCheckoutChime();
-        logSystemMessage(`[System] "${movie.title}" is playing in the Romm browser emulator — check the new tab.`);
-        closeOverlay();
-      } else if (result === 'browser') {
-        retailAudio.playCheckoutChime();
-        logSystemMessage(`[System] "${movie.title}" is ready — take it to the counter to play (no game server configured).`);
-        closeOverlay();
-        openDemoPlaybackOverlay(movie.title, false, 'game');
-      } else {
-        logSystemMessage(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`);
-        closeOverlay();
-      }
+    if (movie.game || movie.steamAppId) {
+      // Use the same provider dispatch as the 3D store and home rentals.
+      // In particular, Steam games must never fall through to RomM's demo card.
+      closeOverlay();
+      await launchVideoPlaybackFn?.(movie);
     } else if (movie.discovery || movie.collectionGap) {
       if (typeof movie.tmdbId !== 'number') return;
       logSystemMessage(`[System] Requesting "${movie.title}"...`);

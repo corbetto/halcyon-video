@@ -641,7 +641,12 @@ export async function launchGame(movie: Movie): Promise<LaunchResult> {
       if (hasTauri) {
         await openUrl(url); // system browser -- the webview stays on the store
       } else {
-        window.open(url, '_blank');
+        const player = window.open(url, '_blank');
+        if (!player) {
+          console.warn(`[Romm] Browser blocked the player window for "${movie.title}".`);
+          return 'error';
+        }
+        player.opener = null;
       }
       return 'webplayer';
     } catch (e) {

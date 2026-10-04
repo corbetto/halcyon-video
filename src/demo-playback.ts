@@ -23,6 +23,7 @@ interface PlaybackScene {
   resumeRendering(): void;
   resumeAmbientTvs(): void;
   returnToEntrance(): void;
+  endBackRoomWatching(): void;
 }
 
 export interface DemoPlaybackDeps {
@@ -37,12 +38,17 @@ export interface DemoPlaybackDeps {
 
 let deps: DemoPlaybackDeps | null = null;
 let activeKind: DemoOverlayKind = 'video';
+let fromCouch = false;
+let overlayOpen = false;
+let launchScene: PlaybackScene | null | undefined;
+
+export function isDemoPlaybackOpen(): boolean { return overlayOpen; }
 
 export function initDemoPlayback(d: DemoPlaybackDeps) { deps = d; }
 
 export type DemoOverlayKind = 'video' | 'game';
 
-export function renderDemoOverlayHtml(kind: DemoOverlayKind = 'video'): string {
+export function renderDemoOverlayHtml(kind: DemoOverlayKind = 'video', returnToCouch = false): string {
   const isGame = kind === 'game';
   const heading = isGame ? 'GAME PLAY DISABLED' : 'PLAYBACK DISABLED';
   const subtitle = isGame ? 'THIS PUBLIC DEMO HAS NO GAME SERVER' : 'THIS PUBLIC DEMO HAS NO MEDIA SERVER';
@@ -57,7 +63,7 @@ export function renderDemoOverlayHtml(kind: DemoOverlayKind = 'video'): string {
         <p style="color:#8fa3c8;font-family:'Courier New',monospace;font-size:clamp(12px,1.4vw,17px);letter-spacing:0.22em;margin:18px 0 0;">${subtitle}</p>
         <p style="color:#c5d2e8;font-family:'Courier New',monospace;font-size:clamp(13px,1.3vw,16px);letter-spacing:0.04em;line-height:1.6;margin:28px auto 0;">${body}</p>
         <a id="demo-playback-project-link" href="${PROJECT_PAGE_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;color:#ffa903;font-family:'Courier New',monospace;font-size:clamp(13px,1.3vw,16px);font-weight:bold;letter-spacing:0.06em;margin:12px auto 0;text-decoration:underline;text-underline-offset:4px;word-break:break-all;">${linkText}</a>
-        <button id="demo-playback-back" style="margin:34px auto 0;display:block;min-height:52px;padding:15px 30px;border:0;border-radius:10px;cursor:pointer;font-family:${BB_ARCHIVO_BLACK},sans-serif;font-size:17px;letter-spacing:0.06em;background:#ffa903;color:#10214a;-webkit-tap-highlight-color:transparent;">BACK TO THE STORE</button>
+        <button id="demo-playback-back" style="margin:34px auto 0;display:block;min-height:52px;padding:15px 30px;border:0;border-radius:10px;cursor:pointer;font-family:${BB_ARCHIVO_BLACK},sans-serif;font-size:17px;letter-spacing:0.06em;background:#ffa903;color:#10214a;-webkit-tap-highlight-color:transparent;">${returnToCouch ? 'BACK TO THE COUCH' : 'BACK TO THE STORE'}</button>
         <p style="color:#55607a;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.25em;margin:20px 0 0;">OR PRESS ESC</p>
       </div>`;
 }
@@ -69,7 +75,7 @@ function onOverlayKeydown(e: KeyboardEvent) {
   }
 }
 
-function ensureOverlay(kind: DemoOverlayKind = 'video'): HTMLElement {
+function ensureOverlay(): HTMLElement {
   let el = typeof document !== 'undefined' ? document.getElementById('demo-playback-overlay') : null;
   if (!el && typeof document !== 'undefined') {
     el = document.createElement('div');
@@ -96,17 +102,21 @@ function ensureOverlay(kind: DemoOverlayKind = 'video'): HTMLElement {
     });
     document.body.appendChild(el);
   }
-  if (el && (activeKind !== kind || !el.innerHTML.trim())) {
-    activeKind = kind;
-    el.innerHTML = renderDemoOverlayHtml(kind);
+  const variant = `${activeKind}:${fromCouch}`;
+  if (el && (el.dataset.variant !== variant || !el.innerHTML.trim())) {
+    el.dataset.variant = variant;
+    el.innerHTML = renderDemoOverlayHtml(activeKind, fromCouch);
   }
   return el!;
 }
 
-export function openDemoPlaybackOverlay(title: string, startHidden = false, kind: DemoOverlayKind = 'video') {
-  activeKind = kind;
-  ensureOverlay(kind);
+export function openDemoPlaybackOverlay(title: string, startHidden = false, kind: DemoOverlayKind = 'video', returnToCouch = false) {
   if (!deps) return;
+  activeKind = kind;
+  fromCouch = returnToCouch;
+  launchScene = deps.scene();
+  overlayOpen = true;
+  ensureOverlay();
   deps.ui.isPlaybackActive = true;
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', onOverlayKeydown);
@@ -122,31 +132,40 @@ export function openDemoPlaybackOverlay(title: string, startHidden = false, kind
 }
 
 export function revealDemoPlaybackOverlay() {
+  if (!overlayOpen) return;
   // Same yields as the real reveal: park the renderer behind the card.
   const scene = deps?.scene();
   scene?.pauseAmbientTvs();
   scene?.pauseRendering();
-  const el = ensureOverlay(activeKind);
+  const el = ensureOverlay();
   if (el) el.style.display = 'flex';
 }
 
 export function closeDemoPlaybackOverlay() {
+  if (!overlayOpen) return;
+  overlayOpen = false;
   if (deps) deps.ui.isPlaybackActive = false;
   if (typeof window !== 'undefined') {
     window.removeEventListener('keydown', onOverlayKeydown);
   }
   const overlay = typeof document !== 'undefined' ? document.getElementById('demo-playback-overlay') : null;
   if (overlay) overlay.style.display = 'none';
-  // Mirror the real player's onClose tail: resume rendering and fade back in
-  // from white standing at the entrance, in library-select.
+  // Preserve the rental lockout and the scene that owns this launch. A
+  // session teardown may already have replaced the scene beneath the card.
   const scene = deps?.scene();
-  scene?.resumeRendering();
-  scene?.resumeAmbientTvs();
-  scene?.returnToEntrance();
+  if (scene && scene === launchScene) {
+    scene.resumeRendering();
+    if (fromCouch) scene.endBackRoomWatching();
+    else {
+      scene.resumeAmbientTvs();
+      scene.returnToEntrance();
+    }
+  }
+  launchScene = null;
   deps?.onClosed();
   if (activeKind === 'game') {
-    deps?.log('[System] Demo game rental screen dismissed. Returned through the entrance.', 'system');
+    deps?.log(`[System] Demo game rental screen dismissed. ${fromCouch ? 'Back on the couch.' : 'Returned through the entrance.'}`, 'system');
   } else {
-    deps?.log('[Video] Demo playback screen dismissed. Returned through the entrance.', 'video');
+    deps?.log(`[Video] Demo playback screen dismissed. ${fromCouch ? 'Back on the couch.' : 'Returned through the entrance.'}`, 'video');
   }
 }
