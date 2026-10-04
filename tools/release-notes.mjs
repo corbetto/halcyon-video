@@ -236,7 +236,7 @@ function renderFooter(tag, repo) {
     '',
     `**Try it in a browser, no server, no signup:** https://${org}.github.io/${name}/`,
     '',
-    `**Docker:** \`ghcr.io/${repo}:${tag}\` (amd64, arm64) — also \`:latest\``,
+    `**Docker:** \`ghcr.io/${repo}:${tag.replace(/^v/, '')}\` (amd64, arm64) — also \`:latest\``,
     '',
     '**Discord:** https://discord.gg/SN6FnJgQe — setup help, release notes, and show us the store you built.',
   ].join('\n');
